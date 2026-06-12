@@ -15,11 +15,21 @@ export async function fetchConsumeChains(
   const parsed = await response.json() as ApiResponse<SliceResponseDTO<ConsumeChainResponseDTORaw>>
 
   if (!response.ok) {
-    throw new Error(parsed.message || `HTTP ${response.status}`)
+    throw new Error(formatBackendError(parsed, `HTTP ${response.status}`))
   }
   if (parsed.code !== 200) {
-    throw new Error(parsed.message || `Backend code ${parsed.code}`)
+    throw new Error(formatBackendError(parsed, `Backend code ${parsed.code}`))
   }
 
   return parsed.data
+}
+
+function formatBackendError(
+  response: ApiResponse<unknown>,
+  fallback: string,
+): string {
+  if (typeof response.data === 'string' && response.data.length > 0) {
+    return `${response.message || fallback}: ${response.data}`
+  }
+  return response.message || fallback
 }

@@ -19,6 +19,10 @@ The explorer calls the current NMSCI consume-chain endpoints:
 
 Responses are expected as `ResponseResult<SliceResponseDTO<ConsumeChainResponseDTO>>`.
 
+During local development the UI uses `/api` by default. Vite proxies `/api/*`
+to `http://localhost:8080/*`, so browser requests stay same-origin and avoid
+CORS failures.
+
 ## Development
 
 ```bash

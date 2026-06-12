@@ -36,7 +36,7 @@ type CurrencyFilter = 'all' | '1' | '0'
 type Selection = { kind: 'node'; id: string } | { kind: 'edge'; id: string }
 type DataOrigin = 'demo' | 'backend'
 
-const defaultApiBase = 'http://localhost:8080'
+const defaultApiBase = '/api'
 const defaultPageSize = 50
 
 function App() {
