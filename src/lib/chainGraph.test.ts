@@ -3,6 +3,7 @@ import {
   buildConsumeChainUrl,
   buildGraphFromConsumeChains,
   formatAmount,
+  mergeConsumeChains,
   shortId,
 } from './chainGraph'
 import type { ConsumeChainResponseDTORaw } from './types'
@@ -116,11 +117,59 @@ describe('chain graph mapping', () => {
       page: 0,
       size: 10,
     })).toBe('http://localhost:8080/consume-chain/by-end?end=node+2&isLoop=true&page=0&size=10')
+
+    expect(buildConsumeChainUrl('/api', {
+      mode: 'node',
+      nodeId: 'node-3',
+      loopStatus: 'all',
+      page: 1,
+      size: 100,
+    })).toBe('/api/consume-chain/by-node?node=node-3&page=1&size=100')
   })
 
   it('formats operational labels without losing raw ids', () => {
-    expect(shortId('11111111-1111-4111-8111-111111111111')).toBe('111111...1111')
+    expect(shortId('abcdef11-1111-4111-8111-111111111111')).toBe('ABCDEF')
     expect(formatAmount(12500, 1)).toBe('125.00 CNY')
     expect(formatAmount(2500000, 0)).toBe('2,500,000 ug Au')
+  })
+
+  it('merges extended consume chains by chain id without duplicating existing graph rows', () => {
+    const duplicate = {
+      ...chainRows[0],
+      consumeChain: {
+        ...chainRows[0].consumeChain,
+        amount: 999999,
+      },
+    }
+    const extra: ConsumeChainResponseDTORaw = {
+      consumeChain: {
+        id: 'chain-c',
+        start: '44444444-4444-4444-8444-444444444444',
+        end: '55555555-5555-4555-8555-555555555555',
+        amount: 6000,
+        currencyType: 1,
+        isLoop: false,
+        tailMountTimestamp: 1_700_000_000_000_020,
+      },
+      consumeChainEdges: [
+        {
+          id: 'edge-c1',
+          source: '44444444-4444-4444-8444-444444444444',
+          target: '55555555-5555-4555-8555-555555555555',
+          amount: 6000,
+          currencyType: 1,
+          chain: 'chain-c',
+          relatedTransactionRecord: 'record-c1',
+          relatedTransactionMount: 'mount-c1',
+          relatedTransactionMountTimestamp: 1_700_000_000_000_021,
+          isLoop: false,
+        },
+      ],
+    }
+
+    const merged = mergeConsumeChains(chainRows, [duplicate, extra])
+
+    expect(merged.map((row) => row.consumeChain.id)).toEqual(['chain-a', 'chain-b', 'chain-c'])
+    expect(merged[0].consumeChain.amount).toBe(12500)
   })
 })

@@ -3,6 +3,7 @@ import type {
   ApiResponse,
   ConsumeChainQuery,
   ConsumeChainResponseDTORaw,
+  FlowNodeRegisterMsgRaw,
   SliceResponseDTO,
 } from './types'
 
@@ -13,6 +14,29 @@ export async function fetchConsumeChains(
 ): Promise<SliceResponseDTO<ConsumeChainResponseDTORaw>> {
   const response = await fetch(buildConsumeChainUrl(baseUrl, query), { signal })
   const parsed = await response.json() as ApiResponse<SliceResponseDTO<ConsumeChainResponseDTORaw>>
+
+  if (!response.ok) {
+    throw new Error(formatBackendError(parsed, `HTTP ${response.status}`))
+  }
+  if (parsed.code !== 200) {
+    throw new Error(formatBackendError(parsed, `Backend code ${parsed.code}`))
+  }
+
+  return parsed.data
+}
+
+export function buildFlowNodeDetailUrl(baseUrl: string, nodeId: string): string {
+  const normalizedBaseUrl = baseUrl.replace(/\/+$/, '')
+  return `${normalizedBaseUrl}/flow-node-register-msg/id/${encodeURIComponent(nodeId)}`
+}
+
+export async function fetchFlowNodeDetail(
+  baseUrl: string,
+  nodeId: string,
+  signal?: AbortSignal,
+): Promise<FlowNodeRegisterMsgRaw> {
+  const response = await fetch(buildFlowNodeDetailUrl(baseUrl, nodeId), { signal })
+  const parsed = await response.json() as ApiResponse<FlowNodeRegisterMsgRaw>
 
   if (!response.ok) {
     throw new Error(formatBackendError(parsed, `HTTP ${response.status}`))

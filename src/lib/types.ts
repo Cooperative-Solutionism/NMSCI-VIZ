@@ -1,4 +1,4 @@
-export type QueryMode = 'start' | 'end'
+export type QueryMode = 'start' | 'end' | 'node'
 export type LoopStatus = 'all' | 'looped' | 'open'
 export type EdgeStatus = 'looped' | 'open'
 
@@ -43,6 +43,18 @@ export interface ConsumeChainEdgeRaw {
 export interface ConsumeChainResponseDTORaw {
   consumeChain: ConsumeChainRaw
   consumeChainEdges: ConsumeChainEdgeRaw[]
+}
+
+export interface FlowNodeRegisterMsgRaw {
+  id: string
+  msgType?: number
+  registerDifficultyTarget?: string
+  nonce?: number
+  flowNodePubkey?: string
+  flowNodeSignature?: string
+  rawBytes?: string
+  txid?: string
+  confirmTimestamp?: number
 }
 
 export interface ChainGraphNode {

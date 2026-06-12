@@ -50,8 +50,18 @@ export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTORaw[]):
 
 export function buildConsumeChainUrl(baseUrl: string, query: ConsumeChainQuery): string {
   const normalizedBaseUrl = baseUrl.replace(/\/+$/, '')
-  const endpoint = query.mode === 'start' ? '/consume-chain/by-start' : '/consume-chain/by-end'
-  const nodeParam = query.mode === 'start' ? 'start' : 'end'
+  const endpointByMode: Record<ConsumeChainQuery['mode'], string> = {
+    start: '/consume-chain/by-start',
+    end: '/consume-chain/by-end',
+    node: '/consume-chain/by-node',
+  }
+  const nodeParamByMode: Record<ConsumeChainQuery['mode'], string> = {
+    start: 'start',
+    end: 'end',
+    node: 'node',
+  }
+  const endpoint = endpointByMode[query.mode]
+  const nodeParam = nodeParamByMode[query.mode]
   const params = new URLSearchParams()
   params.set(nodeParam, query.nodeId)
 
@@ -66,8 +76,23 @@ export function buildConsumeChainUrl(baseUrl: string, query: ConsumeChainQuery):
 }
 
 export function shortId(id: string): string {
-  if (id.length <= 14) return id
-  return `${id.slice(0, 6)}...${id.slice(-4)}`
+  return id.slice(0, 6).toUpperCase()
+}
+
+export function mergeConsumeChains(
+  currentRows: ConsumeChainResponseDTORaw[],
+  nextRows: ConsumeChainResponseDTORaw[],
+): ConsumeChainResponseDTORaw[] {
+  const rowsByChainId = new Map<string, ConsumeChainResponseDTORaw>()
+  for (const row of currentRows) {
+    rowsByChainId.set(row.consumeChain.id, row)
+  }
+  for (const row of nextRows) {
+    if (!rowsByChainId.has(row.consumeChain.id)) {
+      rowsByChainId.set(row.consumeChain.id, row)
+    }
+  }
+  return Array.from(rowsByChainId.values())
 }
 
 export function formatAmount(amount: number, currencyType: number): string {

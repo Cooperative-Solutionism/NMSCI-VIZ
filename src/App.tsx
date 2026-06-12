@@ -8,6 +8,7 @@ import {
   GitBranch,
   LocateFixed,
   Network,
+  Orbit,
   RefreshCw,
   Search,
   SlidersHorizontal,
@@ -16,17 +17,19 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import './App.css'
 import { NetworkGraph } from './components/NetworkGraph'
 import { demoChains, demoNodeId } from './data/demoChains'
-import { fetchConsumeChains } from './lib/api'
+import { fetchConsumeChains, fetchFlowNodeDetail } from './lib/api'
 import {
   buildConsumeChainUrl,
   buildGraphFromConsumeChains,
   formatAmount,
+  mergeConsumeChains,
   shortId,
 } from './lib/chainGraph'
 import type {
   ChainGraphEdge,
   ChainGraphNode,
   ConsumeChainResponseDTORaw,
+  FlowNodeRegisterMsgRaw,
   LoopStatus,
   QueryMode,
   SliceResponseDTO,
@@ -35,13 +38,14 @@ import type {
 type CurrencyFilter = 'all' | '1' | '0'
 type Selection = { kind: 'node'; id: string } | { kind: 'edge'; id: string }
 type DataOrigin = 'demo' | 'backend'
+type NodeDetailStatus = 'idle' | 'loading' | 'loaded' | 'error'
 
 const defaultApiBase = '/api'
 const defaultPageSize = 50
 
 function App() {
   const [apiBase, setApiBase] = useState(defaultApiBase)
-  const [mode, setMode] = useState<QueryMode>('start')
+  const [mode, setMode] = useState<QueryMode>('node')
   const [nodeId, setNodeId] = useState(demoNodeId)
   const [loopStatus, setLoopStatus] = useState<LoopStatus>('all')
   const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>('all')
@@ -52,7 +56,11 @@ function App() {
   const [selection, setSelection] = useState<Selection | null>({ kind: 'edge', id: demoChains[0].consumeChainEdges[0].id })
   const [origin, setOrigin] = useState<DataOrigin>('demo')
   const [loading, setLoading] = useState(false)
+  const [extendLoading, setExtendLoading] = useState<QueryMode | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [nodeDetailsById, setNodeDetailsById] = useState<Record<string, FlowNodeRegisterMsgRaw>>({})
+  const [nodeDetailStatus, setNodeDetailStatus] = useState<NodeDetailStatus>('idle')
+  const [nodeDetailError, setNodeDetailError] = useState<string | null>(null)
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -88,6 +96,7 @@ function App() {
     if (!selectedEdge) return null
     return filteredRows.find((row) => row.consumeChain.id === selectedEdge.chainId) ?? null
   }, [filteredRows, selectedEdge])
+  const selectedNodeDetail = selectedNode ? nodeDetailsById[selectedNode.id] : undefined
   const requestUrl = useMemo(() => {
     return buildConsumeChainUrl(apiBase, { mode, nodeId, loopStatus, page, size })
   }, [apiBase, loopStatus, mode, nodeId, page, size])
@@ -120,9 +129,62 @@ function App() {
     }
   }, [apiBase, loopStatus, mode, nodeId, page, size])
 
+  const loadNodeDetail = useCallback(async (targetNodeId: string) => {
+    setNodeDetailStatus('loading')
+    setNodeDetailError(null)
+
+    try {
+      const detail = await fetchFlowNodeDetail(apiBase, targetNodeId)
+      setNodeDetailsById((currentDetails) => ({
+        ...currentDetails,
+        [targetNodeId]: detail,
+      }))
+      setNodeDetailStatus('loaded')
+    } catch (detailError) {
+      setNodeDetailStatus('error')
+      setNodeDetailError(detailError instanceof Error ? detailError.message : 'Unknown node detail error')
+    }
+  }, [apiBase])
+
+  const selectNodeAndFetch = useCallback((node: ChainGraphNode) => {
+    setSelection({ kind: 'node', id: node.id })
+    void loadNodeDetail(node.id)
+  }, [loadNodeDetail])
+
+  const extendFromNode = useCallback(async (node: ChainGraphNode, targetMode: QueryMode) => {
+    const normalizedSize = Math.min(200, Math.max(1, size))
+
+    setLoading(true)
+    setExtendLoading(targetMode)
+    setError(null)
+    setMode(targetMode)
+    setNodeId(node.id)
+    setPage(0)
+    setSize(normalizedSize)
+    setSelection({ kind: 'node', id: node.id })
+
+    try {
+      const result = await fetchConsumeChains(apiBase, {
+        mode: targetMode,
+        nodeId: node.id,
+        loopStatus,
+        page: 0,
+        size: normalizedSize,
+      })
+      setRows((currentRows) => mergeConsumeChains(currentRows, result.content))
+      setSlice(result)
+      setOrigin('backend')
+    } catch (queryError) {
+      setError(queryError instanceof Error ? queryError.message : 'Unknown request error')
+    } finally {
+      setLoading(false)
+      setExtendLoading(null)
+    }
+  }, [apiBase, loopStatus, size])
+
   const resetToDemo = useCallback(() => {
     setApiBase(defaultApiBase)
-    setMode('start')
+    setMode('node')
     setNodeId(demoNodeId)
     setLoopStatus('all')
     setCurrencyFilter('all')
@@ -133,19 +195,22 @@ function App() {
     setSelection({ kind: 'edge', id: demoChains[0].consumeChainEdges[0].id })
     setOrigin('demo')
     setError(null)
+    setNodeDetailsById({})
+    setNodeDetailStatus('idle')
+    setNodeDetailError(null)
   }, [])
 
   const selectFirstNode = useCallback(() => {
-    if (graph.nodes[0]) setSelection({ kind: 'node', id: graph.nodes[0].id })
-  }, [graph.nodes])
+    if (graph.nodes[0]) selectNodeAndFetch(graph.nodes[0])
+  }, [graph.nodes, selectNodeAndFetch])
 
   const selectFirstEdge = useCallback(() => {
     if (graph.edges[0]) setSelection({ kind: 'edge', id: graph.edges[0].id })
   }, [graph.edges])
 
   const handleNodeSelect = useCallback((node: ChainGraphNode) => {
-    setSelection({ kind: 'node', id: node.id })
-  }, [])
+    selectNodeAndFetch(node)
+  }, [selectNodeAndFetch])
 
   const handleEdgeSelect = useCallback((edge: ChainGraphEdge) => {
     setSelection({ kind: 'edge', id: edge.id })
@@ -205,6 +270,14 @@ function App() {
               >
                 <CircleDot size={15} />
                 End
+              </button>
+              <button
+                className={mode === 'node' ? 'active' : ''}
+                type="button"
+                onClick={() => setMode('node')}
+              >
+                <Orbit size={15} />
+                Node
               </button>
             </div>
           </Field>
@@ -335,7 +408,17 @@ function App() {
           {selectedEdge ? (
             <EdgeInspector edge={selectedEdge} chain={selectedChain} />
           ) : selectedNode ? (
-            <NodeInspector node={selectedNode} />
+            <NodeInspector
+              detail={selectedNodeDetail}
+              detailError={nodeDetailError}
+              detailStatus={nodeDetailStatus}
+              disabled={loading}
+              extendLoading={extendLoading}
+              node={selectedNode}
+              onExtendEnd={() => void extendFromNode(selectedNode, 'end')}
+              onExtendNode={() => void extendFromNode(selectedNode, 'node')}
+              onExtendStart={() => void extendFromNode(selectedNode, 'start')}
+            />
           ) : (
             <div className="empty-state">No chain data in the current filter.</div>
           )}
@@ -441,14 +524,75 @@ function EdgeInspector({
   )
 }
 
-function NodeInspector({ node }: { node: ChainGraphNode }) {
+function NodeInspector({
+  detail,
+  detailError,
+  detailStatus,
+  disabled,
+  extendLoading,
+  node,
+  onExtendEnd,
+  onExtendNode,
+  onExtendStart,
+}: {
+  detail?: FlowNodeRegisterMsgRaw
+  detailError: string | null
+  detailStatus: NodeDetailStatus
+  disabled: boolean
+  extendLoading: QueryMode | null
+  node: ChainGraphNode
+  onExtendEnd: () => void
+  onExtendNode: () => void
+  onExtendStart: () => void
+}) {
   return (
     <div className="inspector-content">
       <PanelHeader icon={<CircleDot size={16} />} title="Selected node" />
+      <div className="node-actions">
+        <button
+          className="secondary-button"
+          type="button"
+          disabled={disabled}
+          onClick={onExtendNode}
+        >
+          {extendLoading === 'node' ? 'Loading' : 'Load node'}
+        </button>
+        <button
+          className="secondary-button"
+          type="button"
+          disabled={disabled}
+          onClick={onExtendStart}
+        >
+          {extendLoading === 'start' ? 'Extending' : 'Extend start'}
+        </button>
+        <button
+          className="secondary-button"
+          type="button"
+          disabled={disabled}
+          onClick={onExtendEnd}
+        >
+          {extendLoading === 'end' ? 'Extending' : 'Extend end'}
+        </button>
+      </div>
       <DetailRow label="Node" value={<code>{node.id}</code>} />
       <DetailRow label="Label" value={shortId(node.id)} />
       <DetailRow label="Touches" value={node.chainCount} />
       <DetailRow label="Volume" value={formatAmount(node.volume, 1)} />
+      <div className="section-title">Backend detail</div>
+      {detailStatus === 'loading' ? <div className="detail-state">Loading node detail...</div> : null}
+      {detailStatus === 'error' ? (
+        <div className="detail-state error">{detailError ?? 'Node detail request failed.'}</div>
+      ) : null}
+      {detail ? (
+        <>
+          <DetailRow label="Msg type" value={formatOptional(detail.msgType)} />
+          <DetailRow label="Nonce" value={formatOptional(detail.nonce)} />
+          <DetailRow label="Difficulty" value={formatOptional(detail.registerDifficultyTarget)} />
+          <DetailRow label="Pubkey" value={<code>{formatOptional(detail.flowNodePubkey)}</code>} />
+          <DetailRow label="TxID" value={<code>{formatOptional(detail.txid)}</code>} />
+          <DetailRow label="Signature" value={<code>{formatOptional(detail.flowNodeSignature)}</code>} />
+        </>
+      ) : null}
     </div>
   )
 }
@@ -473,6 +617,11 @@ function statusLabel(status: LoopStatus): string {
 function formatMicros(value: number): string {
   if (!Number.isFinite(value)) return '-'
   return new Date(Math.floor(value / 1000)).toISOString().replace('T', ' ').replace('.000Z', ' UTC')
+}
+
+function formatOptional(value: string | number | undefined): string {
+  if (value === undefined || value === '') return '-'
+  return String(value)
 }
 
 export default App
