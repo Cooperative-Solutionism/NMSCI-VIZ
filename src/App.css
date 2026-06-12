@@ -56,6 +56,11 @@
   box-shadow: 0 0 0 4px var(--amber-soft);
 }
 
+.status-dot.idle {
+  background: var(--line-strong);
+  box-shadow: 0 0 0 4px var(--soft);
+}
+
 .status-dot.backend {
   background: var(--green);
   box-shadow: 0 0 0 4px var(--teal-soft);
@@ -200,7 +205,7 @@
 
 .action-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr;
   gap: 10px;
 }
 

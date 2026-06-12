@@ -9,14 +9,12 @@ import {
   LocateFixed,
   Network,
   Orbit,
-  RefreshCw,
   Search,
   SlidersHorizontal,
 } from 'lucide-react'
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import './App.css'
 import { NetworkGraph } from './components/NetworkGraph'
-import { demoChains, demoNodeId } from './data/demoChains'
 import { fetchConsumeChains, fetchFlowNodeDetail } from './lib/api'
 import {
   buildConsumeChainUrl,
@@ -37,7 +35,7 @@ import type {
 
 type CurrencyFilter = 'all' | '1' | '0'
 type Selection = { kind: 'node'; id: string } | { kind: 'edge'; id: string }
-type DataOrigin = 'demo' | 'backend'
+type DataOrigin = 'idle' | 'backend'
 type NodeDetailStatus = 'idle' | 'loading' | 'loaded' | 'error'
 
 const defaultApiBase = '/api'
@@ -46,15 +44,15 @@ const defaultPageSize = 50
 function App() {
   const [apiBase, setApiBase] = useState(defaultApiBase)
   const [mode, setMode] = useState<QueryMode>('node')
-  const [nodeId, setNodeId] = useState(demoNodeId)
+  const [nodeId, setNodeId] = useState('')
   const [loopStatus, setLoopStatus] = useState<LoopStatus>('all')
   const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>('all')
   const [page, setPage] = useState(0)
   const [size, setSize] = useState(defaultPageSize)
-  const [rows, setRows] = useState<ConsumeChainResponseDTORaw[]>(demoChains)
-  const [slice, setSlice] = useState<SliceResponseDTO<ConsumeChainResponseDTORaw>>(makeSlice(demoChains))
-  const [selection, setSelection] = useState<Selection | null>({ kind: 'edge', id: demoChains[0].consumeChainEdges[0].id })
-  const [origin, setOrigin] = useState<DataOrigin>('demo')
+  const [rows, setRows] = useState<ConsumeChainResponseDTORaw[]>([])
+  const [slice, setSlice] = useState<SliceResponseDTO<ConsumeChainResponseDTORaw>>(makeSlice([]))
+  const [selection, setSelection] = useState<Selection | null>(null)
+  const [origin, setOrigin] = useState<DataOrigin>('idle')
   const [loading, setLoading] = useState(false)
   const [extendLoading, setExtendLoading] = useState<QueryMode | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -182,24 +180,6 @@ function App() {
     }
   }, [apiBase, loopStatus, size])
 
-  const resetToDemo = useCallback(() => {
-    setApiBase(defaultApiBase)
-    setMode('node')
-    setNodeId(demoNodeId)
-    setLoopStatus('all')
-    setCurrencyFilter('all')
-    setPage(0)
-    setSize(defaultPageSize)
-    setRows(demoChains)
-    setSlice(makeSlice(demoChains))
-    setSelection({ kind: 'edge', id: demoChains[0].consumeChainEdges[0].id })
-    setOrigin('demo')
-    setError(null)
-    setNodeDetailsById({})
-    setNodeDetailStatus('idle')
-    setNodeDetailError(null)
-  }, [])
-
   const selectFirstNode = useCallback(() => {
     if (graph.nodes[0]) selectNodeAndFetch(graph.nodes[0])
   }, [graph.nodes, selectNodeAndFetch])
@@ -234,7 +214,7 @@ function App() {
         </div>
         <div className="topbar-status" aria-label="Data status">
           <span className={`status-dot ${origin}`} />
-          <span>{origin === 'backend' ? 'Backend data' : 'Demo data'}</span>
+          <span>{origin === 'backend' ? 'Backend data' : 'No data'}</span>
           <span className="status-divider" />
           <span>{graph.nodes.length} nodes</span>
           <span>{graph.edges.length} edges</span>
@@ -346,10 +326,6 @@ function App() {
               <Search size={16} />
               {loading ? 'Loading' : 'Load'}
             </button>
-            <button className="ghost-button" type="button" onClick={resetToDemo}>
-              <RefreshCw size={16} />
-              Demo
-            </button>
           </div>
 
           <div className="request-preview">
@@ -436,8 +412,8 @@ function App() {
           <button type="button" disabled={loading || !slice.hasPrevious} onClick={handlePreviousPage} aria-label="Previous page">
             <ChevronLeft size={16} />
           </button>
-          <span>{loading ? 'Loading page' : origin === 'backend' ? 'Live slice' : 'Demo slice'}</span>
-          <button type="button" disabled={loading || (origin === 'backend' && !slice.hasNext)} onClick={handleNextPage} aria-label="Next page">
+          <span>{loading ? 'Loading page' : origin === 'backend' ? 'Live slice' : 'No slice'}</span>
+          <button type="button" disabled={loading || origin !== 'backend' || !slice.hasNext} onClick={handleNextPage} aria-label="Next page">
             <ChevronRight size={16} />
           </button>
         </div>

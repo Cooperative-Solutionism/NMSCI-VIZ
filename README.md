@@ -8,7 +8,6 @@ Node-centered consume chain explorer for the NMSCI service.
 - Toggle looped/open chain filters and client-side currency filtering.
 - Render directed consumption paths with Cytoscape.
 - Inspect selected node or edge metadata.
-- Keep demo data available when the backend is not running.
 
 ## Backend Contract
 
