@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildConsumeChainUrl,
   buildGraphFromConsumeChains,
+  chainColor,
   formatAmount,
   mergeConsumeChains,
   shortId,
@@ -91,7 +92,10 @@ describe('chain graph mapping', () => {
       chainId: 'chain-a',
       status: 'looped',
       amount: 5000,
+      color: chainColor('chain-a'),
     })
+    expect(graph.edges[0].color).toBe(graph.edges[1].color)
+    expect(graph.edges[0].color).not.toBe(graph.edges[2].color)
     expect(graph.stats).toEqual({
       totalChains: 2,
       loopedChains: 1,
@@ -131,6 +135,8 @@ describe('chain graph mapping', () => {
     expect(shortId('abcdef11-1111-4111-8111-111111111111')).toBe('ABCDEF')
     expect(formatAmount(12500, 1)).toBe('125.00 CNY')
     expect(formatAmount(2500000, 0)).toBe('2,500,000 ug Au')
+    expect(chainColor('chain-a')).toBe(chainColor('chain-a'))
+    expect(chainColor('chain-a')).not.toBe(chainColor('chain-b'))
   })
 
   it('merges extended consume chains by chain id without duplicating existing graph rows', () => {

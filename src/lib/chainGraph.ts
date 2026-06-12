@@ -26,6 +26,7 @@ export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTORaw[]):
         currencyType: edge.currencyType,
         chainId: edge.chain,
         status: edge.isLoop ? 'looped' : 'open',
+        color: chainColor(edge.chain),
         relatedTransactionRecord: edge.relatedTransactionRecord,
         relatedTransactionMount: edge.relatedTransactionMount,
         relatedTransactionMountTimestamp: edge.relatedTransactionMountTimestamp,
@@ -110,6 +111,29 @@ export function formatAmount(amount: number, currencyType: number): string {
 
 export function edgeColor(status: EdgeStatus): string {
   return status === 'looped' ? '#178f69' : '#d88a21'
+}
+
+const chainPalette = [
+  '#0f766e',
+  '#b45309',
+  '#2563eb',
+  '#be123c',
+  '#6d28d9',
+  '#15803d',
+  '#c2410c',
+  '#0369a1',
+  '#a21caf',
+  '#4d7c0f',
+  '#b91c1c',
+  '#0e7490',
+]
+
+export function chainColor(chainId: string): string {
+  let hash = 0
+  for (let index = 0; index < chainId.length; index += 1) {
+    hash = (hash * 31 + chainId.charCodeAt(index)) >>> 0
+  }
+  return chainPalette[hash % chainPalette.length]
 }
 
 function touchNode(nodes: Map<string, ChainGraphNode>, id: string, amount: number): void {

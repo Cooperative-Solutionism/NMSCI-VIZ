@@ -73,6 +73,7 @@ export interface ChainGraphEdge {
   currencyType: number
   chainId: string
   status: EdgeStatus
+  color: string
   relatedTransactionRecord: string
   relatedTransactionMount: string
   relatedTransactionMountTimestamp: number

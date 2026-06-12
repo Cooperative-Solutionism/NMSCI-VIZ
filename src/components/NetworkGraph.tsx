@@ -1,7 +1,7 @@
-import cytoscape, { type Core, type ElementDefinition } from 'cytoscape'
+import cytoscape, { type Core, type NodeSingular } from 'cytoscape'
 import { Maximize2, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEffect, useMemo, useRef } from 'react'
-import { edgeColor, formatAmount } from '../lib/chainGraph'
+import { formatAmount } from '../lib/chainGraph'
 import type { ChainGraph, ChainGraphEdge, ChainGraphNode } from '../lib/types'
 
 interface NetworkGraphProps {
@@ -11,38 +11,49 @@ interface NetworkGraphProps {
   onSelectEdge: (edge: ChainGraphEdge) => void
 }
 
+interface Point {
+  x: number
+  y: number
+}
+
 export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: NetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const cyRef = useRef<Core | null>(null)
+  const initializedRef = useRef(false)
+  const nodeMapRef = useRef(new Map<string, ChainGraphNode>())
+  const edgeMapRef = useRef(new Map<string, ChainGraphEdge>())
+  const onSelectNodeRef = useRef(onSelectNode)
+  const onSelectEdgeRef = useRef(onSelectEdge)
+
   const nodeMap = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node])), [graph.nodes])
   const edgeMap = useMemo(() => new Map(graph.edges.map((edge) => [edge.id, edge])), [graph.edges])
+  const selectedChainId = useMemo(() => {
+    if (!selectedId) return null
+    return edgeMap.get(selectedId)?.chainId ?? null
+  }, [edgeMap, selectedId])
 
-  const elements = useMemo<ElementDefinition[]>(() => [
-    ...graph.nodes.map((node) => ({
-      data: {
-        id: node.id,
-        label: node.label,
-        volume: node.volume,
-      },
-    })),
-    ...graph.edges.map((edge) => ({
-      data: {
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        label: formatAmount(edge.amount, edge.currencyType),
-        status: edge.status,
-        color: edgeColor(edge.status),
-      },
-    })),
-  ], [graph.edges, graph.nodes])
+  useEffect(() => {
+    nodeMapRef.current = nodeMap
+  }, [nodeMap])
+
+  useEffect(() => {
+    edgeMapRef.current = edgeMap
+  }, [edgeMap])
+
+  useEffect(() => {
+    onSelectNodeRef.current = onSelectNode
+  }, [onSelectNode])
+
+  useEffect(() => {
+    onSelectEdgeRef.current = onSelectEdge
+  }, [onSelectEdge])
 
   useEffect(() => {
     if (!containerRef.current) return
 
     const cy = cytoscape({
       container: containerRef.current,
-      elements,
+      elements: [],
       minZoom: 0.35,
       maxZoom: 2.4,
       style: [
@@ -57,10 +68,9 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
             'font-family': 'Inter, ui-sans-serif, system-ui',
             'font-size': 11,
             height: 48,
-            'label': 'data(label)',
             'overlay-opacity': 0,
-            'text-valign': 'center',
             'text-halign': 'center',
+            'text-valign': 'center',
             width: 48,
           },
         },
@@ -75,65 +85,108 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
         {
           selector: 'edge',
           style: {
+            color: '#334155',
             'curve-style': 'bezier',
+            'font-family': 'Inter, ui-sans-serif, system-ui',
+            'font-size': 10,
+            label: 'data(label)',
             'line-color': 'data(color)',
+            opacity: 0.84,
+            'overlay-opacity': 0,
             'target-arrow-color': 'data(color)',
             'target-arrow-shape': 'triangle',
             'target-distance-from-node': 2,
-            width: 2.4,
-            opacity: 0.9,
-            label: 'data(label)',
-            color: '#334155',
-            'font-family': 'Inter, ui-sans-serif, system-ui',
-            'font-size': 10,
             'text-background-color': '#ffffff',
             'text-background-opacity': 0.92,
             'text-background-padding': '3px',
             'text-rotation': 'autorotate',
-            'overlay-opacity': 0,
+            width: 2.5,
+          },
+        },
+        {
+          selector: 'edge.chain-dimmed',
+          style: {
+            opacity: 0.16,
+            'text-background-opacity': 0,
+            'text-opacity': 0.2,
+          },
+        },
+        {
+          selector: 'edge.chain-highlight',
+          style: {
+            opacity: 1,
+            'line-color': 'data(color)',
+            'target-arrow-color': 'data(color)',
+            width: 5,
+            'z-index': 20,
           },
         },
         {
           selector: 'edge:selected',
           style: {
-            width: 4,
-            'line-color': '#063f3a',
-            'target-arrow-color': '#063f3a',
+            width: 6,
           },
         },
       ],
       layout: {
-        name: 'cose',
-        animate: false,
-        fit: true,
-        padding: 56,
-        nodeRepulsion: 9500,
-        idealEdgeLength: 132,
+        name: 'preset',
       },
     })
 
     cy.on('tap', 'node', (event) => {
-      const node = nodeMap.get(event.target.id())
-      if (node) onSelectNode(node)
+      const node = nodeMapRef.current.get(event.target.id())
+      if (node) onSelectNodeRef.current(node)
     })
     cy.on('tap', 'edge', (event) => {
-      const edge = edgeMap.get(event.target.id())
-      if (edge) onSelectEdge(edge)
+      const edge = edgeMapRef.current.get(event.target.id())
+      if (edge) onSelectEdgeRef.current(edge)
     })
 
     cyRef.current = cy
     return () => {
       cy.destroy()
       cyRef.current = null
+      initializedRef.current = false
     }
-  }, [edgeMap, elements, nodeMap, onSelectEdge, onSelectNode])
+  }, [])
 
   useEffect(() => {
     const cy = cyRef.current
     if (!cy) return
+
+    const wasEmpty = cy.elements().empty()
+    syncNodes(cy, graph.nodes, graph.edges)
+    syncEdges(cy, graph.edges)
+
+    if (wasEmpty && graph.nodes.length > 0) {
+      cy.layout({
+        name: 'cose',
+        animate: false,
+        fit: true,
+        padding: 56,
+        nodeRepulsion: 9500,
+        idealEdgeLength: 132,
+      }).run()
+      initializedRef.current = true
+    }
+  }, [graph.edges, graph.nodes])
+
+  useEffect(() => {
+    const cy = cyRef.current
+    if (!cy) return
+
     cy.elements().unselect()
+    cy.edges().removeClass('chain-highlight chain-dimmed')
+
+    if (selectedChainId) {
+      cy.edges().forEach((edge) => {
+        edge.toggleClass('chain-highlight', edge.data('chainId') === selectedChainId)
+        edge.toggleClass('chain-dimmed', edge.data('chainId') !== selectedChainId)
+      })
+    }
+
     if (selectedId) cy.getElementById(selectedId).select()
-  }, [selectedId])
+  }, [selectedChainId, selectedId])
 
   return (
     <div className="graph-shell">
@@ -165,10 +218,113 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
         </button>
       </div>
       <div className="legend">
-        <span><i className="legend-line looped" />Looped chain</span>
-        <span><i className="legend-line open" />Open chain</span>
-        <span>Amounts shown per edge</span>
+        <span><i className="legend-line chain" />Color = consume chain</span>
+        <span><i className="legend-line selected" />Selected chain</span>
+        <span>Edge label = amount</span>
       </div>
     </div>
   )
+}
+
+function syncNodes(cy: Core, nodes: ChainGraphNode[], edges: ChainGraphEdge[]): void {
+  const nextNodeIds = new Set(nodes.map((node) => node.id))
+  cy.nodes().forEach((node) => {
+    if (!nextNodeIds.has(node.id())) node.remove()
+  })
+
+  for (const node of nodes) {
+    const existingNode = cy.getElementById(node.id)
+    if (existingNode.nonempty()) {
+      existingNode.data({
+        ...existingNode.data(),
+        label: node.label,
+        volume: node.volume,
+      })
+      continue
+    }
+
+    cy.add({
+      data: {
+        id: node.id,
+        label: node.label,
+        volume: node.volume,
+      },
+      group: 'nodes',
+      position: positionForNewNode(cy, node.id, edges),
+    })
+  }
+}
+
+function syncEdges(cy: Core, edges: ChainGraphEdge[]): void {
+  const nextEdgeIds = new Set(edges.map((edge) => edge.id))
+  cy.edges().forEach((edge) => {
+    if (!nextEdgeIds.has(edge.id())) edge.remove()
+  })
+
+  for (const edge of edges) {
+    const edgeData = {
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      label: formatAmount(edge.amount, edge.currencyType),
+      status: edge.status,
+      chainId: edge.chainId,
+      color: edge.color,
+    }
+    const existingEdge = cy.getElementById(edge.id)
+    if (existingEdge.nonempty()) {
+      existingEdge.data({
+        ...existingEdge.data(),
+        ...edgeData,
+      })
+      continue
+    }
+    cy.add({
+      data: edgeData,
+      group: 'edges',
+    })
+  }
+}
+
+function positionForNewNode(cy: Core, nodeId: string, edges: ChainGraphEdge[]): Point {
+  const neighborPosition = findNeighborPosition(cy, nodeId, edges)
+  const offset = deterministicOffset(nodeId)
+  if (neighborPosition) {
+    return {
+      x: neighborPosition.x + offset.x,
+      y: neighborPosition.y + offset.y,
+    }
+  }
+
+  const center = cy.extent()
+  return {
+    x: (center.x1 + center.x2) / 2 + offset.x,
+    y: (center.y1 + center.y2) / 2 + offset.y,
+  }
+}
+
+function findNeighborPosition(cy: Core, nodeId: string, edges: ChainGraphEdge[]): Point | null {
+  for (const edge of edges) {
+    const neighborId = edge.source === nodeId ? edge.target : edge.target === nodeId ? edge.source : null
+    if (!neighborId) continue
+
+    const neighbor = cy.getElementById(neighborId)
+    if (neighbor.nonempty() && neighbor.isNode()) {
+      return (neighbor as NodeSingular).position()
+    }
+  }
+  return null
+}
+
+function deterministicOffset(id: string): Point {
+  let hash = 0
+  for (let index = 0; index < id.length; index += 1) {
+    hash = (hash * 33 + id.charCodeAt(index)) >>> 0
+  }
+  const angle = (hash % 360) * (Math.PI / 180)
+  const radius = 126 + (hash % 48)
+  return {
+    x: Math.cos(angle) * radius,
+    y: Math.sin(angle) * radius,
+  }
 }
