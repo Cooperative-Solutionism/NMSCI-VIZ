@@ -1103,3 +1103,11 @@
   font-weight: 600;
   padding: 2px 8px;
 }
+
+.secondary-button.danger {
+  color: var(--red);
+}
+
+.secondary-button.danger:hover {
+  border-color: var(--red);
+}

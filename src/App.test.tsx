@@ -362,6 +362,47 @@ describe('App initial state', () => {
       expect(screen.getAllByText(/Registered 021111/i).length).toBeGreaterThan(0)
     })
   })
+
+  it('renames and deletes a local flow node', async () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: /generate flow node/i }))
+    await waitFor(() => {
+      expect((screen.getByLabelText('Local flow node') as HTMLSelectElement).value).toBe('02'.padEnd(66, '1'))
+    })
+
+    vi.stubGlobal('prompt', vi.fn(() => 'Renamed node'))
+    fireEvent.click(screen.getByRole('button', { name: /^rename$/i }))
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
+        nodes: Array<{ label: string }>
+      }
+      expect(saved.nodes[0]?.label).toBe('Renamed node')
+    })
+
+    vi.stubGlobal('confirm', vi.fn(() => true))
+    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as { nodes: unknown[] }
+      expect(saved.nodes).toHaveLength(0)
+    })
+  })
+
+  it('imports a flow node from a pasted private key', async () => {
+    const privateKey = '01'.padStart(64, '0')
+    vi.stubGlobal('prompt', vi.fn(() => privateKey))
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: /import flow node/i }))
+
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
+        nodes: Array<{ privateKeyHex: string; publicKeyHex: string }>
+      }
+      expect(saved.nodes[0]?.privateKeyHex).toBe(privateKey)
+      expect(saved.nodes[0]?.publicKeyHex.length).toBe(66)
+    })
+  })
 })
 
 function stubFetchByUrl(handler: (url: URL, init?: RequestInit) => Response): ReturnType<typeof vi.fn> {
