@@ -37,6 +37,15 @@ vi.mock('@nmsci/sdk', async (importOriginal) => {
       privateKey: '0'.repeat(63) + '1',
       publicKey: '02'.padEnd(66, '1'),
     }),
+    mineNonce: async (
+      _prefix: Uint8Array,
+      _suffix: Uint8Array,
+      _target: string,
+      onProgress?: (attempts: number, hashHex: string, nonce: number) => void,
+    ) => {
+      onProgress?.(1000, '00', 42)
+      return 42
+    },
   }
 })
 
@@ -303,6 +312,56 @@ describe('App initial state', () => {
 
     expect((screen.getByLabelText('Flow node id / pubkey') as HTMLTextAreaElement).value).toBe(pubkey)
   })
+
+  it('registers a flow node end to end and persists a sent registration', async () => {
+    const pubkey = '02'.padEnd(66, '1')
+    stubFetchByUrl((url, init) => {
+      if (url.pathname === '/flow-node-registrations' && init?.method === 'POST') {
+        return jsonResponse({
+          code: 200,
+          message: 'ok',
+          data: {
+            id: 'reg-1',
+            msgType: 0,
+            registerDifficultyTarget: '1d00ffff',
+            nonce: 42,
+            flowNodePubkey: pubkey,
+            flowNodeSignature: '00',
+            rawBytes: '00',
+            txid: 'regtxid',
+          },
+        })
+      }
+      if (url.pathname === `/flow-nodes/${pubkey}`) {
+        return jsonResponse({
+          code: 200,
+          message: 'ok',
+          data: { registered: true, authorized: false, locked: false, currentCentralPubkeyAuthorized: false },
+        })
+      }
+      throw new Error(`Unexpected URL ${url.href}`)
+    })
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: /generate flow node/i }))
+    await waitFor(() => {
+      expect((screen.getByLabelText('Local flow node') as HTMLSelectElement).value).toBe(pubkey)
+    })
+    fireEvent.change(screen.getByLabelText('Register difficulty target'), { target: { value: '1d00ffff' } })
+    fireEvent.click(screen.getByRole('button', { name: /register node/i }))
+
+    await waitFor(() => {
+      const raw = localStorage.getItem('nmsci.flowNodes.v1')
+      const saved = JSON.parse(raw ?? '{"nodes":[]}') as {
+        nodes: Array<{ registration?: { status: string; txid?: string } }>
+      }
+      expect(saved.nodes[0]?.registration?.status).toBe('sent')
+      expect(saved.nodes[0]?.registration?.txid).toBe('regtxid')
+    })
+    await waitFor(() => {
+      expect(screen.getAllByText(/Registered 021111/i).length).toBeGreaterThan(0)
+    })
+  })
 })
 
 function stubFetchByUrl(handler: (url: URL, init?: RequestInit) => Response): ReturnType<typeof vi.fn> {
@@ -310,6 +369,22 @@ function stubFetchByUrl(handler: (url: URL, init?: RequestInit) => Response): Re
     const url = new URL(String(input), 'http://localhost')
     if (url.pathname.startsWith('/api/')) {
       url.pathname = url.pathname.slice('/api'.length)
+    }
+    // App 挂载即拉取系统状态；统一给个默认（未冻结）响应。
+    if (url.pathname === '/system/status') {
+      return jsonResponse({
+        code: 200,
+        message: 'ok',
+        data: {
+          latestBlockHeight: 100,
+          latestBlockHash: 'ab',
+          latestBlockTimestamp: 1,
+          pendingMessageCount: 0,
+          oldestPendingConfirmTimestamp: null,
+          blockIntervalMs: 600000,
+          currentCentralPubkeyLocked: false,
+        },
+      })
     }
     // 选中节点/边会触发回流率查询；统一给个默认响应，免得每个用例都要处理。
     if (url.pathname === '/returning-flow-rates') {

@@ -24,12 +24,15 @@ export function normalizePubkeyHex(value: string): string {
   return toHex(pubkeyToBytes(value.trim()))
 }
 
-export async function buildRegisterMessage(params: {
-  uuid: string
-  privateKeyHex: string
-  publicKeyHex: string
-  difficultyHex: string
-}): Promise<{ bytes: Uint8Array; rawBytesHex: string; nonce: number }> {
+export async function buildRegisterMessage(
+  params: {
+    uuid: string
+    privateKeyHex: string
+    publicKeyHex: string
+    difficultyHex: string
+  },
+  onProgress?: (attempts: number) => void,
+): Promise<{ bytes: Uint8Array; rawBytesHex: string; nonce: number }> {
   const noncePrefix = concat(
     toBytesBigEndian(MsgType.FLOW_NODE_REGISTRATION, 2),
     uuidToBytes(params.uuid),
@@ -37,7 +40,9 @@ export async function buildRegisterMessage(params: {
   )
   const nonceSuffix = pubkeyToBytes(params.publicKeyHex)
   const target = calculateTargetFromNBits(params.difficultyHex)
-  const nonce = await mineNonce(noncePrefix, nonceSuffix, target)
+  const nonce = onProgress
+    ? await mineNonce(noncePrefix, nonceSuffix, target, (attempts) => onProgress(attempts))
+    : await mineNonce(noncePrefix, nonceSuffix, target)
   const payload = buildFlowNodeRegisterPayload({
     uuid: params.uuid,
     registerDifficultyTarget: params.difficultyHex,
