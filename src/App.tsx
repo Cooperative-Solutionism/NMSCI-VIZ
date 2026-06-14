@@ -16,87 +16,93 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
-  SlidersHorizontal,
 } from 'lucide-react'
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import './App.css'
-import { NetworkGraph } from './components/NetworkGraph'
+import {
+  DetailRow,
+  EdgeInspector,
+  ErrorBoundary,
+  Field,
+  MetricCard,
+  NodeInspector,
+  PanelHeader,
+} from './components'
 import {
   ApiClient,
-  MsgType,
-  buildCentralPubkeyEmpowerPayload,
-  buildFlowNodeRegisterPayload,
-  calculateTargetFromNBits,
-  concat,
   generateKeyPair,
-  getFlowNodeRegisterMsgById,
   getLastBlock,
-  mineNonce,
-  nBitsToBytes,
-  pubkeyToBytes,
-  queryConsumeChains,
   sendCentralPubkeyEmpowerMsg,
   sendFlowNodeRegisterMsg,
-  serializeCentralPubkeyEmpowerSubmitPayload,
-  serializeFlowNodeRegister,
-  signCentralPubkeyEmpowerPayload,
-  signFlowNodeRegisterPayload,
-  toBytesBigEndian,
-  toHex,
-  uuidToBytes,
-  type ConsumeChainQueryFilters,
 } from '@nmsci/sdk'
+import { formatAmount, shortId } from './lib/chainGraph'
+import { statusLabel } from './lib/consumeChainFilters'
+import { useConsumeChainQuery, type CurrencyFilter } from './hooks/useConsumeChainQuery'
+import { useNodeDetail } from './hooks/useNodeDetail'
+import { normalizeNBitsHex } from './lib/difficulty'
+import { errorMessage } from './lib/errors'
+import { formatDateTime, maskSecret, shortHex } from './lib/format'
 import {
-  buildConsumeChainUrl,
-  buildGraphFromConsumeChains,
-  formatAmount,
-  mergeConsumeChains,
-  shortId,
-} from './lib/chainGraph'
+  buildEmpowerMessage,
+  buildRegisterMessage,
+  makeMessageId,
+  normalizePubkeyHex,
+} from './lib/messageBuilders'
 import {
   loadLocalFlowNodes,
+  patchLocalFlowNode,
   saveLocalFlowNodes,
   type LocalFlowNode,
   type LocalFlowNodeAuthorization,
   type LocalFlowNodeRegistration,
 } from './lib/flowNodeStorage'
-import type {
-  ChainGraphEdge,
-  ChainGraphNode,
-  ConsumeChainResponseDTORaw,
-  FlowNodeRegisterMsgRaw,
-  LoopStatus,
-  QueryMode,
-  SliceResponseDTO,
-} from './lib/types'
-
-type CurrencyFilter = 'all' | '1' | '0'
-type Selection = { kind: 'node'; id: string } | { kind: 'edge'; id: string }
-type DataOrigin = 'idle' | 'backend'
-type NodeDetailStatus = 'idle' | 'loading' | 'loaded' | 'error'
 type FlowNodeBusyState = 'difficulty' | 'register' | 'authorize' | null
 
-const defaultApiBase = '/api'
+const defaultApiBase = import.meta.env.VITE_API_BASE ?? '/api'
 const defaultPageSize = 50
+const NetworkGraph = lazy(() =>
+  import('./components/NetworkGraph').then((module) => ({ default: module.NetworkGraph })),
+)
 
 function App() {
   const [apiBase, setApiBase] = useState(defaultApiBase)
-  const [mode, setMode] = useState<QueryMode>('node')
-  const [nodeId, setNodeId] = useState('')
-  const [loopStatus, setLoopStatus] = useState<LoopStatus>('all')
-  const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>('all')
-  const [page, setPage] = useState(0)
-  const [size, setSize] = useState(defaultPageSize)
-  const [rows, setRows] = useState<ConsumeChainResponseDTORaw[]>([])
-  const [slice, setSlice] = useState<SliceResponseDTO<ConsumeChainResponseDTORaw>>(makeSlice([]))
-  const [selection, setSelection] = useState<Selection | null>(null)
-  const [origin, setOrigin] = useState<DataOrigin>('idle')
-  const [loading, setLoading] = useState(false)
-  const [extendLoading, setExtendLoading] = useState<QueryMode | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [nodeDetailsById, setNodeDetailsById] = useState<Record<string, FlowNodeRegisterMsgRaw>>({})
-  const [nodeDetailStatus, setNodeDetailStatus] = useState<NodeDetailStatus>('idle')
-  const [nodeDetailError, setNodeDetailError] = useState<string | null>(null)
+  const {
+    currencyFilter,
+    effectiveSelection,
+    error,
+    extendFromNode,
+    extendLoading,
+    extended,
+    filteredRows,
+    graph,
+    loading,
+    loopStatus,
+    mode,
+    nodeId,
+    origin,
+    page,
+    requestUrl,
+    rows,
+    runQuery,
+    selectEdge,
+    selectNode,
+    selectedChain,
+    selectedEdge,
+    selectedNode,
+    setCurrencyFilter,
+    setLoopStatus,
+    setMode,
+    setNodeId,
+    setPage,
+    setSize,
+    size,
+    slice,
+  } = useConsumeChainQuery(apiBase, defaultPageSize)
+  const {
+    nodeDetailError,
+    nodeDetailStatus,
+    nodeDetailsById,
+  } = useNodeDetail(apiBase, selectedNode?.id ?? null)
   const [localFlowNodes, setLocalFlowNodes] = useState<LocalFlowNode[]>(() => loadLocalFlowNodes())
   const [selectedLocalPubkey, setSelectedLocalPubkey] = useState(() => localFlowNodes[0]?.publicKeyHex ?? '')
   const [registerDifficultyTarget, setRegisterDifficultyTarget] = useState('')
@@ -105,147 +111,13 @@ function App() {
   const [flowNodeStatus, setFlowNodeStatus] = useState<string | null>(null)
   const [flowNodeError, setFlowNodeError] = useState<string | null>(null)
   const [lastFlowNodeRawBytes, setLastFlowNodeRawBytes] = useState('')
-
-  const filteredRows = useMemo(() => {
-    return rows.filter((row) => {
-      const currencyMatches =
-        currencyFilter === 'all' || row.consumeChain.currencyType === Number(currencyFilter)
-      const loopMatches =
-        loopStatus === 'all' || row.consumeChain.isLoop === (loopStatus === 'looped')
-      return currencyMatches && loopMatches
-    })
-  }, [currencyFilter, loopStatus, rows])
-
-  const graph = useMemo(() => buildGraphFromConsumeChains(filteredRows), [filteredRows])
-  const effectiveSelection = useMemo<Selection | null>(() => {
-    if (selection?.kind === 'edge' && graph.edges.some((edge) => edge.id === selection.id)) {
-      return selection
-    }
-    if (selection?.kind === 'node' && graph.nodes.some((node) => node.id === selection.id)) {
-      return selection
-    }
-    if (graph.edges[0]) return { kind: 'edge', id: graph.edges[0].id }
-    if (graph.nodes[0]) return { kind: 'node', id: graph.nodes[0].id }
-    return null
-  }, [graph.edges, graph.nodes, selection])
-  const selectedEdge = useMemo(() => {
-    if (effectiveSelection?.kind !== 'edge') return null
-    return graph.edges.find((edge) => edge.id === effectiveSelection.id) ?? null
-  }, [effectiveSelection, graph.edges])
-  const selectedNode = useMemo(() => {
-    if (effectiveSelection?.kind !== 'node') return null
-    return graph.nodes.find((node) => node.id === effectiveSelection.id) ?? null
-  }, [effectiveSelection, graph.nodes])
-  const selectedChain = useMemo(() => {
-    if (!selectedEdge) return null
-    return filteredRows.find((row) => row.consumeChain.id === selectedEdge.chainId) ?? null
-  }, [filteredRows, selectedEdge])
+  const client = useMemo(() => new ApiClient({ baseUrl: apiBase }), [apiBase])
   const selectedNodeDetail = selectedNode ? nodeDetailsById[selectedNode.id] : undefined
   const selectedLocalNode = useMemo(() => {
     return localFlowNodes.find((localNode) => localNode.publicKeyHex === selectedLocalPubkey)
       ?? localFlowNodes[0]
       ?? null
   }, [localFlowNodes, selectedLocalPubkey])
-  const requestUrl = useMemo(() => {
-    return buildConsumeChainUrl(apiBase, { mode, nodeId, loopStatus, page, size })
-  }, [apiBase, loopStatus, mode, nodeId, page, size])
-
-  const runQuery = useCallback(async (targetPage = page) => {
-    const normalizedSize = Math.min(200, Math.max(1, size))
-    const normalizedPage = Math.max(0, targetPage)
-
-    setLoading(true)
-    setError(null)
-    setPage(normalizedPage)
-    setSize(normalizedSize)
-
-    try {
-      const client = new ApiClient({ baseUrl: apiBase })
-      const result = await queryConsumeChains(
-        client,
-        consumeChainFilters(mode, nodeId.trim(), loopStatus),
-        { page: normalizedPage, size: normalizedSize },
-      )
-      setRows(result.data.content)
-      setSlice(result.data)
-      setOrigin('backend')
-      setSelection(null)
-    } catch (queryError) {
-      setError(queryError instanceof Error ? queryError.message : 'Unknown request error')
-    } finally {
-      setLoading(false)
-    }
-  }, [apiBase, loopStatus, mode, nodeId, page, size])
-
-  const loadNodeDetail = useCallback(async (targetNodeId: string) => {
-    setNodeDetailStatus('loading')
-    setNodeDetailError(null)
-
-    try {
-      const client = new ApiClient({ baseUrl: apiBase })
-      const detail = await getFlowNodeRegisterMsgById(client, targetNodeId)
-      setNodeDetailsById((currentDetails) => ({
-        ...currentDetails,
-        [targetNodeId]: detail.data,
-      }))
-      setNodeDetailStatus('loaded')
-    } catch (detailError) {
-      setNodeDetailStatus('error')
-      setNodeDetailError(detailError instanceof Error ? detailError.message : 'Unknown node detail error')
-    }
-  }, [apiBase])
-
-  const selectNodeAndFetch = useCallback((node: ChainGraphNode) => {
-    setSelection({ kind: 'node', id: node.id })
-    void loadNodeDetail(node.id)
-  }, [loadNodeDetail])
-
-  const extendFromNode = useCallback(async (node: ChainGraphNode, targetMode: QueryMode) => {
-    const normalizedSize = Math.min(200, Math.max(1, size))
-
-    setLoading(true)
-    setExtendLoading(targetMode)
-    setError(null)
-    setMode(targetMode)
-    setNodeId(node.id)
-    setPage(0)
-    setSize(normalizedSize)
-    setSelection({ kind: 'node', id: node.id })
-
-    try {
-      const client = new ApiClient({ baseUrl: apiBase })
-      const result = await queryConsumeChains(
-        client,
-        consumeChainFilters(targetMode, node.id, loopStatus),
-        { page: 0, size: normalizedSize },
-      )
-      setRows((currentRows) => mergeConsumeChains(currentRows, result.data.content))
-      setSlice(result.data)
-      setOrigin('backend')
-    } catch (queryError) {
-      setError(queryError instanceof Error ? queryError.message : 'Unknown request error')
-    } finally {
-      setLoading(false)
-      setExtendLoading(null)
-    }
-  }, [apiBase, loopStatus, size])
-
-  const selectFirstNode = useCallback(() => {
-    if (graph.nodes[0]) selectNodeAndFetch(graph.nodes[0])
-  }, [graph.nodes, selectNodeAndFetch])
-
-  const selectFirstEdge = useCallback(() => {
-    if (graph.edges[0]) setSelection({ kind: 'edge', id: graph.edges[0].id })
-  }, [graph.edges])
-
-  const handleNodeSelect = useCallback((node: ChainGraphNode) => {
-    selectNodeAndFetch(node)
-  }, [selectNodeAndFetch])
-
-  const handleEdgeSelect = useCallback((edge: ChainGraphEdge) => {
-    setSelection({ kind: 'edge', id: edge.id })
-  }, [])
-
   const handlePreviousPage = useCallback(() => {
     const nextPage = Math.max(0, page - 1)
     void runQuery(nextPage)
@@ -288,29 +160,41 @@ function App() {
     setNodeId(queryIdForLocalFlowNode(selectedLocalNode))
     setFlowNodeError(null)
     setFlowNodeStatus('Flow node UUID filled into query.')
-  }, [selectedLocalNode])
+  }, [selectedLocalNode, setNodeId])
+
+  const handleCopyText = useCallback(async (value: string, label: string) => {
+    await navigator.clipboard.writeText(value)
+    setFlowNodeError(null)
+    setFlowNodeStatus(`${label} copied.`)
+  }, [])
+
+  const handleExportPrivateKey = useCallback(async () => {
+    if (!selectedLocalNode) return
+    const confirmed = window.confirm('Export private key from localStorage? It is stored in clear text.')
+    if (!confirmed) return
+    await handleCopyText(selectedLocalNode.privateKeyHex, 'Private key')
+  }, [handleCopyText, selectedLocalNode])
 
   const handleFetchRegisterDifficulty = useCallback(async () => {
     setFlowNodeBusy('difficulty')
     setFlowNodeError(null)
 
     try {
-      const client = new ApiClient({ baseUrl: apiBase })
       const block = (await getLastBlock(client)).data
       if (!block.registerDifficultyTarget) {
         throw new Error('Latest block did not include registerDifficultyTarget')
       }
-      setRegisterDifficultyTarget(nbitsHexToDecimalString(block.registerDifficultyTarget))
+      setRegisterDifficultyTarget(normalizeNBitsHex(block.registerDifficultyTarget, 'Register difficulty target'))
       if (block.centralPubkey) {
         setCentralPubkey(block.centralPubkey)
       }
       setFlowNodeStatus(`Latest register difficulty loaded from block ${block.height ?? '-'}.`)
     } catch (operationError) {
-      setFlowNodeError(operationError instanceof Error ? operationError.message : 'Failed to load latest block')
+      setFlowNodeError(errorMessage(operationError, 'Failed to load latest block'))
     } finally {
       setFlowNodeBusy(null)
     }
-  }, [apiBase])
+  }, [client])
 
   const handleRegisterFlowNode = useCallback(async () => {
     if (!selectedLocalNode) return
@@ -318,18 +202,17 @@ function App() {
     setFlowNodeBusy('register')
     setFlowNodeError(null)
 
-    let difficultyTarget = 0
+    let difficultyTarget = ''
     let rawBytesHex = ''
     let nonce = 0
     try {
-      difficultyTarget = parseIntegerField(registerDifficultyTarget, 'Register difficulty target')
+      difficultyTarget = normalizeNBitsHex(registerDifficultyTarget, 'Register difficulty target')
       const messageId = makeMessageId()
-      const client = new ApiClient({ baseUrl: apiBase })
       const built = await buildRegisterMessage({
         uuid: messageId,
         privateKeyHex: selectedLocalNode.privateKeyHex,
         publicKeyHex: selectedLocalNode.publicKeyHex,
-        difficultyHex: decimalToNbitsHex(difficultyTarget),
+        difficultyHex: difficultyTarget,
       })
       rawBytesHex = built.rawBytesHex
       nonce = built.nonce
@@ -345,16 +228,16 @@ function App() {
         updatedAt: new Date().toISOString(),
       }
 
-      persistLocalFlowNodes((currentNodes) => updateLocalFlowNode(currentNodes, selectedLocalNode.id, {
+      persistLocalFlowNodes((currentNodes) => patchLocalFlowNode(currentNodes, selectedLocalNode.id, {
         registration,
         updatedAt: registration.updatedAt,
       }))
       setLastFlowNodeRawBytes(built.rawBytesHex)
       setFlowNodeStatus(`Registered ${shortId(selectedLocalNode.publicKeyHex)} with nonce ${built.nonce}.`)
     } catch (operationError) {
-      const message = operationError instanceof Error ? operationError.message : 'Flow node registration failed'
+      const message = errorMessage(operationError, 'Flow node registration failed')
       const failedAt = new Date().toISOString()
-      persistLocalFlowNodes((currentNodes) => updateLocalFlowNode(currentNodes, selectedLocalNode.id, {
+      persistLocalFlowNodes((currentNodes) => patchLocalFlowNode(currentNodes, selectedLocalNode.id, {
         registration: {
           id: makeMessageId(),
           rawBytesHex,
@@ -370,7 +253,7 @@ function App() {
     } finally {
       setFlowNodeBusy(null)
     }
-  }, [apiBase, persistLocalFlowNodes, registerDifficultyTarget, selectedLocalNode])
+  }, [client, persistLocalFlowNodes, registerDifficultyTarget, selectedLocalNode])
 
   const handleAuthorizeCentralPubkey = useCallback(async () => {
     if (!selectedLocalNode) return
@@ -381,7 +264,6 @@ function App() {
     try {
       const normalizedCentralPubkey = normalizePubkeyHex(centralPubkey)
       const messageId = makeMessageId()
-      const client = new ApiClient({ baseUrl: apiBase })
       const built = await buildEmpowerMessage({
         uuid: messageId,
         privateKeyHex: selectedLocalNode.privateKeyHex,
@@ -399,22 +281,33 @@ function App() {
         updatedAt: new Date().toISOString(),
       }
 
-      persistLocalFlowNodes((currentNodes) => updateLocalFlowNode(currentNodes, selectedLocalNode.id, {
+      persistLocalFlowNodes((currentNodes) => patchLocalFlowNode(currentNodes, selectedLocalNode.id, {
         authorizations: [authorization, ...selectedLocalNode.authorizations],
         updatedAt: authorization.updatedAt,
       }))
       setLastFlowNodeRawBytes(built.rawBytesHex)
       setFlowNodeStatus(`Authorized central pubkey ${shortId(normalizedCentralPubkey)}.`)
     } catch (operationError) {
-      const message = operationError instanceof Error ? operationError.message : 'Central pubkey authorization failed'
+      const message = errorMessage(operationError, 'Central pubkey authorization failed')
       setFlowNodeError(message)
     } finally {
       setFlowNodeBusy(null)
     }
-  }, [apiBase, centralPubkey, persistLocalFlowNodes, selectedLocalNode])
+  }, [centralPubkey, client, persistLocalFlowNodes, selectedLocalNode])
+
+  const politeMessage = flowNodeStatus
+    ?? (origin === 'backend' ? `Query complete: ${filteredRows.length} visible rows.` : '')
+  const alertMessage = error ?? flowNodeError ?? nodeDetailError ?? ''
 
   return (
     <main className="app-shell">
+      <a className="skip-link" href="#network-graph">Skip to graph</a>
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {politeMessage}
+      </div>
+      <div className="sr-only" role="alert">
+        {alertMessage}
+      </div>
       <header className="topbar">
         <div>
           <p className="eyebrow">NMSCI Consumption Network</p>
@@ -504,6 +397,7 @@ function App() {
                 <option value="1">CNY</option>
                 <option value="0">Au ug</option>
               </select>
+              <span className="field-hint">Current page view filter</span>
             </Field>
             <Field label="Page">
               <input
@@ -529,11 +423,17 @@ function App() {
               className="primary-button"
               type="button"
               disabled={loading || nodeId.trim().length === 0}
-              onClick={() => void runQuery()}
+              aria-describedby={nodeId.trim().length === 0 ? 'load-disabled-reason' : undefined}
+              onClick={() => void runQuery(0)}
             >
               <Search size={16} />
               {loading ? 'Loading' : 'Load'}
             </button>
+            {nodeId.trim().length === 0 ? (
+              <span id="load-disabled-reason" className="sr-only">
+                Enter a flow node UUID to load chain data.
+              </span>
+            ) : null}
           </div>
 
           <div className="request-preview">
@@ -542,6 +442,7 @@ function App() {
           </div>
 
           {error ? <p className="error-banner">{error}. Current graph was kept unchanged.</p> : null}
+          {extended ? <p className="info-banner">Extended graph view; reload the query to resume pagination.</p> : null}
 
           <div className="flow-node-block">
             <PanelHeader icon={<KeyRound size={16} />} title="Flow nodes" />
@@ -578,8 +479,28 @@ function App() {
 
             {selectedLocalNode ? (
               <div className="node-key-box">
-                <DetailRow label="Pubkey" value={<code>{selectedLocalNode.publicKeyHex}</code>} />
-                <DetailRow label="Node ID" value={<code>{queryIdForLocalFlowNode(selectedLocalNode)}</code>} />
+                <DetailRow
+                  label="Pubkey"
+                  value={(
+                    <span className="copyable-value">
+                      <code>{selectedLocalNode.publicKeyHex}</code>
+                      <button type="button" onClick={() => void handleCopyText(selectedLocalNode.publicKeyHex, 'Pubkey')}>
+                        Copy
+                      </button>
+                    </span>
+                  )}
+                />
+                <DetailRow
+                  label="Node ID"
+                  value={(
+                    <span className="copyable-value">
+                      <code>{queryIdForLocalFlowNode(selectedLocalNode)}</code>
+                      <button type="button" onClick={() => void handleCopyText(queryIdForLocalFlowNode(selectedLocalNode), 'Node ID')}>
+                        Copy
+                      </button>
+                    </span>
+                  )}
+                />
                 <DetailRow label="Secret" value={<code>{maskSecret(selectedLocalNode.privateKeyHex)}</code>} />
                 <DetailRow label="Saved" value={formatDateTime(selectedLocalNode.createdAt)} />
                 <DetailRow label="Register" value={selectedLocalNode.registration?.status ?? '-'} />
@@ -592,6 +513,13 @@ function App() {
                   <Copy size={15} />
                   Fill node UUID
                 </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => void handleExportPrivateKey()}
+                >
+                  Export private key
+                </button>
               </div>
             ) : null}
 
@@ -599,19 +527,25 @@ function App() {
               <input
                 value={registerDifficultyTarget}
                 onChange={(event) => setRegisterDifficultyTarget(event.currentTarget.value)}
-                inputMode="numeric"
-                placeholder="545259519"
+                inputMode="text"
+                placeholder="1d00ffff"
               />
             </Field>
             <button
               className="primary-button"
               type="button"
               disabled={!selectedLocalNode || registerDifficultyTarget.trim().length === 0 || flowNodeBusy !== null}
+              aria-describedby={!selectedLocalNode || registerDifficultyTarget.trim().length === 0 ? 'register-disabled-reason' : undefined}
               onClick={() => void handleRegisterFlowNode()}
             >
               <BadgeCheck size={16} />
               {flowNodeBusy === 'register' ? 'Registering' : 'Register node'}
             </button>
+            {!selectedLocalNode || registerDifficultyTarget.trim().length === 0 ? (
+              <span id="register-disabled-reason" className="sr-only">
+                Select a local flow node and enter an nBits hex difficulty.
+              </span>
+            ) : null}
 
             <Field label="Central pubkey">
               <textarea
@@ -626,11 +560,17 @@ function App() {
               className="primary-button"
               type="button"
               disabled={!selectedLocalNode || centralPubkey.trim().length === 0 || flowNodeBusy !== null}
+              aria-describedby={!selectedLocalNode || centralPubkey.trim().length === 0 ? 'authorize-disabled-reason' : undefined}
               onClick={() => void handleAuthorizeCentralPubkey()}
             >
               <ShieldCheck size={16} />
               {flowNodeBusy === 'authorize' ? 'Authorizing' : 'Authorize central'}
             </button>
+            {!selectedLocalNode || centralPubkey.trim().length === 0 ? (
+              <span id="authorize-disabled-reason" className="sr-only">
+                Select a local flow node and enter a central compressed public key.
+              </span>
+            ) : null}
 
             {flowNodeStatus ? <p className="operation-message">{flowNodeStatus}</p> : null}
             {flowNodeError ? <p className="operation-message error">{flowNodeError}</p> : null}
@@ -642,15 +582,9 @@ function App() {
             ) : null}
           </div>
 
-          <div className="advanced-block">
-            <PanelHeader icon={<SlidersHorizontal size={16} />} title="Advanced filters" />
-            <div className="disabled-field">Amount range</div>
-            <div className="disabled-field">Mount time window</div>
-            <div className="disabled-field">Max depth</div>
-          </div>
         </aside>
 
-        <section className="graph-panel" aria-label="Network visualization">
+        <section id="network-graph" className="graph-panel" aria-label="Network visualization" aria-busy={loading}>
           <div className="metrics-strip">
             <MetricCard label="Total chains" value={graph.stats.totalChains.toString()} icon={<GitBranch size={17} />} />
             <MetricCard label="Looped" value={graph.stats.loopedChains.toString()} tone="looped" icon={<Activity size={17} />} />
@@ -662,30 +596,27 @@ function App() {
             />
           </div>
 
-          <NetworkGraph
-            graph={graph}
-            selectedId={effectiveSelection?.id ?? null}
-            onSelectNode={handleNodeSelect}
-            onSelectEdge={handleEdgeSelect}
-          />
+          <ErrorBoundary label="Network graph failed">
+            <Suspense fallback={<div className="graph-loading">Loading graph...</div>}>
+              <NetworkGraph
+                graph={graph}
+                selectedId={effectiveSelection?.id ?? null}
+                onSelectNode={selectNode}
+                onSelectEdge={selectEdge}
+              />
+            </Suspense>
+          </ErrorBoundary>
         </section>
 
         <aside className="inspector-panel" aria-label="Selection inspector">
-          <div className="inspector-tabs" role="tablist" aria-label="Inspector tabs">
-            <button
-              className={effectiveSelection?.kind === 'node' ? 'active' : ''}
-              type="button"
-              onClick={selectFirstNode}
-            >
-              Node
-            </button>
-            <button
-              className={effectiveSelection?.kind === 'edge' ? 'active' : ''}
-              type="button"
-              onClick={selectFirstEdge}
-            >
-              Edge
-            </button>
+          <div className="inspector-heading">
+            <h2>
+              {effectiveSelection?.kind === 'node'
+                ? 'Selected node'
+                : effectiveSelection?.kind === 'edge'
+                  ? 'Selected edge'
+                  : 'Selection'}
+            </h2>
           </div>
 
           {selectedEdge ? (
@@ -712,15 +643,17 @@ function App() {
         <div>
           <span className="footer-label">Slice</span>
           <span>
-            page {slice.page} / size {slice.size} / {slice.numberOfElements} rows
+            page {slice.page} / size {slice.size} / {filteredRows.length} visible row
+            {filteredRows.length === 1 ? '' : 's'} / {rows.length} backend row
+            {rows.length === 1 ? '' : 's'}
           </span>
         </div>
         <div className="pagination">
-          <button type="button" disabled={loading || !slice.hasPrevious} onClick={handlePreviousPage} aria-label="Previous page">
+          <button type="button" disabled={loading || extended || !slice.hasPrevious} onClick={handlePreviousPage} aria-label="Previous page">
             <ChevronLeft size={16} />
           </button>
           <span>{loading ? 'Loading page' : origin === 'backend' ? 'Live slice' : 'No slice'}</span>
-          <button type="button" disabled={loading || origin !== 'backend' || !slice.hasNext} onClick={handleNextPage} aria-label="Next page">
+          <button type="button" disabled={loading || extended || origin !== 'backend' || !slice.hasNext} onClick={handleNextPage} aria-label="Next page">
             <ChevronRight size={16} />
           </button>
         </div>
@@ -729,302 +662,11 @@ function App() {
   )
 }
 
-function MetricCard({
-  icon,
-  label,
-  tone,
-  value,
-}: {
-  icon: ReactNode
-  label: string
-  tone?: 'looped' | 'open'
-  value: string
-}) {
-  return (
-    <div className={`metric-card ${tone ?? ''}`}>
-      <span className="metric-icon">{icon}</span>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  )
-}
-
-function PanelHeader({ icon, title }: { icon: ReactNode; title: string }) {
-  return (
-    <div className="panel-header">
-      {icon}
-      <span>{title}</span>
-    </div>
-  )
-}
-
-function Field({ children, label }: { children: ReactNode; label: string }) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      {children}
-    </label>
-  )
-}
-
-function DetailRow({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="detail-row">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  )
-}
-
-function EdgeInspector({
-  chain,
-  edge,
-}: {
-  chain: ConsumeChainResponseDTORaw | null
-  edge: ChainGraphEdge
-}) {
-  return (
-    <div className="inspector-content">
-      <PanelHeader icon={<GitBranch size={16} />} title="Selected edge" />
-      <div className={`status-pill ${edge.status}`}>{edge.status}</div>
-      <DetailRow label="Edge ID" value={<code>{edge.id}</code>} />
-      <DetailRow label="Chain ID" value={<code>{edge.chainId}</code>} />
-      <DetailRow label="Amount" value={formatAmount(edge.amount, edge.currencyType)} />
-      <DetailRow label="Source" value={<code>{edge.source}</code>} />
-      <DetailRow label="Target" value={<code>{edge.target}</code>} />
-      <DetailRow label="Record" value={<code>{edge.relatedTransactionRecord}</code>} />
-      <DetailRow label="Mount" value={<code>{edge.relatedTransactionMount}</code>} />
-      <DetailRow label="Mount time" value={formatMicros(edge.relatedTransactionMountTimestamp)} />
-      {chain ? (
-        <>
-          <div className="section-title">Chain tail</div>
-          <DetailRow label="Start" value={<code>{chain.consumeChain.start}</code>} />
-          <DetailRow label="End" value={<code>{chain.consumeChain.end}</code>} />
-          <DetailRow label="Tail mount" value={formatMicros(chain.consumeChain.tailMountTimestamp)} />
-        </>
-      ) : null}
-    </div>
-  )
-}
-
-function NodeInspector({
-  detail,
-  detailError,
-  detailStatus,
-  disabled,
-  extendLoading,
-  node,
-  onExtendEnd,
-  onExtendNode,
-  onExtendStart,
-}: {
-  detail?: FlowNodeRegisterMsgRaw
-  detailError: string | null
-  detailStatus: NodeDetailStatus
-  disabled: boolean
-  extendLoading: QueryMode | null
-  node: ChainGraphNode
-  onExtendEnd: () => void
-  onExtendNode: () => void
-  onExtendStart: () => void
-}) {
-  return (
-    <div className="inspector-content">
-      <PanelHeader icon={<CircleDot size={16} />} title="Selected node" />
-      <div className="node-actions">
-        <button
-          className="secondary-button"
-          type="button"
-          disabled={disabled}
-          onClick={onExtendNode}
-        >
-          {extendLoading === 'node' ? 'Loading' : 'Load node'}
-        </button>
-        <button
-          className="secondary-button"
-          type="button"
-          disabled={disabled}
-          onClick={onExtendStart}
-        >
-          {extendLoading === 'start' ? 'Extending' : 'Extend start'}
-        </button>
-        <button
-          className="secondary-button"
-          type="button"
-          disabled={disabled}
-          onClick={onExtendEnd}
-        >
-          {extendLoading === 'end' ? 'Extending' : 'Extend end'}
-        </button>
-      </div>
-      <DetailRow label="Node" value={<code>{node.id}</code>} />
-      <DetailRow label="Label" value={shortId(node.id)} />
-      <DetailRow label="Touches" value={node.chainCount} />
-      <DetailRow label="Volume" value={formatAmount(node.volume, 1)} />
-      <div className="section-title">Backend detail</div>
-      {detailStatus === 'loading' ? <div className="detail-state">Loading node detail...</div> : null}
-      {detailStatus === 'error' ? (
-        <div className="detail-state error">{detailError ?? 'Node detail request failed.'}</div>
-      ) : null}
-      {detail ? (
-        <>
-          <DetailRow label="Msg type" value={formatOptional(detail.msgType)} />
-          <DetailRow label="Nonce" value={formatOptional(detail.nonce)} />
-          <DetailRow label="Difficulty" value={formatOptional(detail.registerDifficultyTarget)} />
-          <DetailRow label="Pubkey" value={<code>{formatOptional(detail.flowNodePubkey)}</code>} />
-          <DetailRow label="TxID" value={<code>{formatOptional(detail.txid)}</code>} />
-          <DetailRow label="Signature" value={<code>{formatOptional(detail.flowNodeSignature)}</code>} />
-        </>
-      ) : null}
-    </div>
-  )
-}
-
-function makeSlice(rows: ConsumeChainResponseDTORaw[]): SliceResponseDTO<ConsumeChainResponseDTORaw> {
-  return {
-    content: rows,
-    page: 0,
-    size: defaultPageSize,
-    numberOfElements: rows.length,
-    hasNext: false,
-    hasPrevious: false,
-  }
-}
-
-function statusLabel(status: LoopStatus): string {
-  if (status === 'looped') return 'Looped'
-  if (status === 'open') return 'Open'
-  return 'All'
-}
-
-function formatMicros(value: number): string {
-  if (!Number.isFinite(value)) return '-'
-  return new Date(Math.floor(value / 1000)).toISOString().replace('T', ' ').replace('.000Z', ' UTC')
-}
-
-function formatOptional(value: string | number | undefined): string {
-  if (value === undefined || value === '') return '-'
-  return String(value)
-}
-
-function makeMessageId(): string {
-  return crypto.randomUUID()
-}
-
 function queryIdForLocalFlowNode(node: LocalFlowNode): string {
   if (node.registration?.status === 'sent' && node.registration.id) {
     return node.registration.id
   }
   return node.id
-}
-
-function parseIntegerField(value: string, label: string): number {
-  const trimmed = value.trim()
-  const radix = /^0x/i.test(trimmed) || /[a-f]/i.test(trimmed) ? 16 : 10
-  const digits = trimmed.replace(/^0x/i, '')
-  if (digits.length === 0 || !/^[0-9a-f]+$/i.test(digits)) {
-    throw new Error(`${label} must be an integer`)
-  }
-  const parsed = Number.parseInt(digits, radix)
-  if (!Number.isInteger(parsed)) {
-    throw new Error(`${label} must be an integer`)
-  }
-  return parsed
-}
-
-function consumeChainFilters(mode: QueryMode, nodeId: string, loopStatus: LoopStatus): ConsumeChainQueryFilters {
-  const isLoop = loopStatus === 'all' ? undefined : loopStatus === 'looped'
-  if (mode === 'start') return { startId: nodeId, isLoop }
-  if (mode === 'end') return { endId: nodeId, isLoop }
-  return { nodeId, isLoop }
-}
-
-function normalizePubkeyHex(value: string): string {
-  return toHex(pubkeyToBytes(value.trim()))
-}
-
-function nbitsHexToDecimalString(nbitsHex: string): string {
-  return String(Number.parseInt(nbitsHex.replace(/^0x/i, ''), 16))
-}
-
-function decimalToNbitsHex(value: number): string {
-  return toHex(toBytesBigEndian(value, 4))
-}
-
-async function buildRegisterMessage(params: {
-  uuid: string
-  privateKeyHex: string
-  publicKeyHex: string
-  difficultyHex: string
-}): Promise<{ bytes: Uint8Array; rawBytesHex: string; nonce: number }> {
-  const noncePrefix = concat(
-    toBytesBigEndian(MsgType.FLOW_NODE_REGISTRATION, 2),
-    uuidToBytes(params.uuid),
-    nBitsToBytes(params.difficultyHex),
-  )
-  const nonceSuffix = pubkeyToBytes(params.publicKeyHex)
-  const target = calculateTargetFromNBits(params.difficultyHex)
-  const nonce = await mineNonce(noncePrefix, nonceSuffix, target)
-  const payload = buildFlowNodeRegisterPayload({
-    uuid: params.uuid,
-    registerDifficultyTarget: params.difficultyHex,
-    nonce,
-    flowNodePubkey: params.publicKeyHex,
-  })
-  const flowNodeSignature = await signFlowNodeRegisterPayload(payload, params.privateKeyHex)
-  const bytes = serializeFlowNodeRegister({
-    msgType: MsgType.FLOW_NODE_REGISTRATION,
-    uuid: params.uuid,
-    registerDifficultyTarget: params.difficultyHex,
-    nonce,
-    flowNodePubkey: params.publicKeyHex,
-    flowNodeSignature,
-  })
-  return { bytes, rawBytesHex: toHex(bytes), nonce }
-}
-
-async function buildEmpowerMessage(params: {
-  uuid: string
-  privateKeyHex: string
-  flowNodePubkeyHex: string
-  centralPubkeyHex: string
-}): Promise<{ bytes: Uint8Array; rawBytesHex: string }> {
-  const payload = buildCentralPubkeyEmpowerPayload({
-    uuid: params.uuid,
-    flowNodePubkey: params.flowNodePubkeyHex,
-    centralPubkey: params.centralPubkeyHex,
-  })
-  const flowNodeSignature = await signCentralPubkeyEmpowerPayload(payload, params.privateKeyHex)
-  const bytes = serializeCentralPubkeyEmpowerSubmitPayload({
-    msgType: MsgType.CENTRAL_KEY_AUTH,
-    uuid: params.uuid,
-    flowNodePubkey: params.flowNodePubkeyHex,
-    centralPubkey: params.centralPubkeyHex,
-    flowNodeSignature,
-  })
-  return { bytes, rawBytesHex: toHex(bytes) }
-}
-
-function updateLocalFlowNode(
-  nodes: LocalFlowNode[],
-  id: string,
-  patch: Partial<LocalFlowNode>,
-): LocalFlowNode[] {
-  return nodes.map((node) => (node.id === id ? { ...node, ...patch } : node))
-}
-
-function shortHex(hex: string): string {
-  return `${hex.slice(0, 10).toUpperCase()}...${hex.slice(-6).toUpperCase()}`
-}
-
-function maskSecret(hex: string): string {
-  return `${hex.slice(0, 6)}...${hex.slice(-6)}`
-}
-
-function formatDateTime(value: string): string {
-  const timestamp = Date.parse(value)
-  if (Number.isNaN(timestamp)) return value
-  return new Date(timestamp).toLocaleString()
 }
 
 export default App

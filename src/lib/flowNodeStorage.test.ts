@@ -1,9 +1,8 @@
-// @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   loadLocalFlowNodes,
+  patchLocalFlowNode,
   saveLocalFlowNodes,
-  upsertLocalFlowNode,
   type LocalFlowNode,
 } from './flowNodeStorage'
 
@@ -30,13 +29,12 @@ describe('flow node local storage', () => {
     expect(loadLocalFlowNodes()).toEqual([node])
   })
 
-  it('upserts nodes without duplicating the same local id', () => {
-    upsertLocalFlowNode(node)
-    upsertLocalFlowNode({
-      ...node,
+  it('patches matching nodes without duplicating the same local id', () => {
+    const patchedNodes = patchLocalFlowNode([node], node.id, {
       label: 'NODE02',
       updatedAt: '2026-06-13T00:01:00.000Z',
     })
+    saveLocalFlowNodes(patchedNodes)
 
     expect(loadLocalFlowNodes()).toEqual([{
       ...node,

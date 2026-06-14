@@ -6,6 +6,7 @@ export type {
   FlowNodeRegisterMsgRaw,
   CentralPubkeyEmpowerMsgRaw,
   ConsumeChainRaw,
+  ConsumeChainResponseDTO,
   ConsumeChainEdgeRaw,
   ConsumeChainResponseDTORaw,
 } from '@nmsci/sdk'
@@ -19,7 +20,7 @@ export interface ChainGraphNode {
   id: string
   label: string
   chainCount: number
-  volume: number
+  volume: bigint
 }
 
 export interface ChainGraphEdge {
@@ -27,21 +28,21 @@ export interface ChainGraphEdge {
   source: string
   target: string
   label: string
-  amount: number
+  amount: bigint
   currencyType: number
   chainId: string
   status: EdgeStatus
   color: string
   relatedTransactionRecord: string
   relatedTransactionMount: string
-  relatedTransactionMountTimestamp: number
+  relatedTransactionMountTimestamp: bigint
 }
 
 export interface ChainGraphStats {
   totalChains: number
   loopedChains: number
   openChains: number
-  volume: number
+  volume: bigint
   currencyType: number
 }
 
