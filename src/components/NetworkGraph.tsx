@@ -72,6 +72,23 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
           },
         },
         {
+          selector: 'node[kind = "local-flow"]',
+          style: {
+            'background-color': tokens.localFlowBackground,
+            'border-color': tokens.localFlowBorder,
+            'border-width': 3,
+          },
+        },
+        {
+          selector: 'node[kind = "local-consume"]',
+          style: {
+            'background-color': tokens.localConsumeBackground,
+            'border-color': tokens.localConsumeBorder,
+            'border-width': 3,
+            shape: 'round-rectangle',
+          },
+        },
+        {
           selector: 'node:selected',
           style: {
             'background-color': tokens.nodeSelectedBackground,
@@ -283,6 +300,7 @@ function syncNodes(cy: Core, nodes: ChainGraphNode[], edges: ChainGraphEdge[]): 
       existingNode.data({
         ...existingNode.data(),
         label: node.label,
+        kind: node.kind,
       })
       continue
     }
@@ -291,9 +309,11 @@ function syncNodes(cy: Core, nodes: ChainGraphNode[], edges: ChainGraphEdge[]): 
       data: {
         id: node.id,
         label: node.label,
+        kind: node.kind,
       },
       group: 'nodes',
-      position: positionForNewNode(cy, node.id, edges),
+      // 本地节点用右键落点；链节点沿用邻接定位。
+      position: node.position ?? positionForNewNode(cy, node.id, edges),
     })
   }
 }

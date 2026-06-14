@@ -6,6 +6,10 @@ export interface GraphTokens {
   nodeSelectedBorder: string
   edgeText: string
   edgeLabelBackground: string
+  localFlowBackground: string
+  localFlowBorder: string
+  localConsumeBackground: string
+  localConsumeBorder: string
   chainPalette: string[]
 }
 
@@ -17,6 +21,10 @@ export const graphTokenDefaults: GraphTokens = {
   nodeSelectedBorder: '#08776c',
   edgeText: '#334155',
   edgeLabelBackground: '#ffffff',
+  localFlowBackground: '#e3f4ef',
+  localFlowBorder: '#08776c',
+  localConsumeBackground: '#ede9fe',
+  localConsumeBorder: '#6d28d9',
   chainPalette: [
     '#0f766e',
     '#b45309',
@@ -54,6 +62,18 @@ export function readGraphTokens(root: Element | null = defaultRoot()): GraphToke
       styles,
       '--graph-edge-label-bg',
       graphTokenDefaults.edgeLabelBackground,
+    ),
+    localFlowBackground: cssVar(styles, '--node-local-flow-bg', graphTokenDefaults.localFlowBackground),
+    localFlowBorder: cssVar(styles, '--node-local-flow-border', graphTokenDefaults.localFlowBorder),
+    localConsumeBackground: cssVar(
+      styles,
+      '--node-local-consume-bg',
+      graphTokenDefaults.localConsumeBackground,
+    ),
+    localConsumeBorder: cssVar(
+      styles,
+      '--node-local-consume-border',
+      graphTokenDefaults.localConsumeBorder,
     ),
     chainPalette: graphTokenDefaults.chainPalette.map((fallback, index) =>
       cssVar(styles, `--chain-${index + 1}`, fallback),

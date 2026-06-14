@@ -1,5 +1,6 @@
 export * from './chainGraph'
 export * from './consumeChainFilters'
+export * from './consumeNodeStorage'
 export * from './difficulty'
 export * from './errors'
 export * from './flowNodeStorage'

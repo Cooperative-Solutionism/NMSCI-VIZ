@@ -38,7 +38,7 @@ import {
   sendCentralPubkeyEmpowerMsg,
   sendFlowNodeRegisterMsg,
 } from '@nmsci/sdk'
-import { formatVolumeByCurrency, shortId } from './lib/chainGraph'
+import { formatVolumeByCurrency, mergeLocalNodes, shortId } from './lib/chainGraph'
 import { statusLabel } from './lib/consumeChainFilters'
 import { useConsumeChainQuery, type CurrencyFilter } from './hooks/useConsumeChainQuery'
 import { useNodeDetail } from './hooks/useNodeDetail'
@@ -63,6 +63,7 @@ import {
   type LocalFlowNodeAuthorization,
   type LocalFlowNodeRegistration,
 } from './lib/flowNodeStorage'
+import { loadLocalConsumeNodes, type LocalConsumeNode } from './lib/consumeNodeStorage'
 type FlowNodeBusyState = 'difficulty' | 'register' | 'authorize' | null
 
 const defaultApiBase = import.meta.env.VITE_API_BASE ?? '/api'
@@ -136,6 +137,11 @@ function App() {
         ? `${rows.length} row${rows.length === 1 ? '' : 's'} hidden by the current-page filter.`
         : 'No chains matched. Try loop status: All or another mode.'
   const [localFlowNodes, setLocalFlowNodes] = useState<LocalFlowNode[]>(() => loadLocalFlowNodes())
+  const [localConsumeNodes] = useState<LocalConsumeNode[]>(() => loadLocalConsumeNodes())
+  const canvasGraph = useMemo(
+    () => mergeLocalNodes(graph, localFlowNodes, localConsumeNodes),
+    [graph, localFlowNodes, localConsumeNodes],
+  )
   const [selectedLocalPubkey, setSelectedLocalPubkey] = useState(() => localFlowNodes[0]?.publicKeyHex ?? '')
   const [registerDifficultyTarget, setRegisterDifficultyTarget] = useState('')
   const [centralPubkey, setCentralPubkey] = useState('')
@@ -762,7 +768,7 @@ function App() {
           <ErrorBoundary label="Network graph failed">
             <Suspense fallback={<div className="graph-loading">Loading graph...</div>}>
               <NetworkGraph
-                graph={graph}
+                graph={canvasGraph}
                 selectedId={effectiveSelection?.id ?? null}
                 onSelectNode={selectNode}
                 onSelectEdge={selectEdge}
