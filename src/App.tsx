@@ -34,6 +34,7 @@ import {
   ApiClient,
   generateKeyPair,
   getLastBlock,
+  getPublicKeyFromPrivate,
   sendCentralPubkeyEmpowerMsg,
   sendFlowNodeRegisterMsg,
 } from '@nmsci/sdk'
@@ -206,6 +207,54 @@ function App() {
     setFlowNodeStatus('Flow node generated and saved locally.')
     setLastFlowNodeRawBytes('')
   }, [persistLocalFlowNodes])
+
+  const handleImportLocalNode = useCallback(() => {
+    const privateKeyHex = window.prompt('Paste a private key (hex)')?.trim()
+    if (!privateKeyHex) return
+    try {
+      const publicKeyHex = getPublicKeyFromPrivate(privateKeyHex)
+      const now = new Date().toISOString()
+      const node: LocalFlowNode = {
+        id: makeMessageId(),
+        label: shortId(publicKeyHex),
+        privateKeyHex,
+        publicKeyHex,
+        createdAt: now,
+        updatedAt: now,
+        authorizations: [],
+      }
+      persistLocalFlowNodes((currentNodes) => [
+        node,
+        ...currentNodes.filter((current) => current.publicKeyHex !== publicKeyHex),
+      ])
+      setSelectedLocalPubkey(publicKeyHex)
+      setFlowNodeError(null)
+      setFlowNodeStatus('Flow node imported.')
+    } catch (importError) {
+      setFlowNodeError(errorMessage(importError, 'Invalid private key'))
+    }
+  }, [persistLocalFlowNodes])
+
+  const handleRenameLocalNode = useCallback(() => {
+    if (!selectedLocalNode) return
+    const next = window.prompt('Rename flow node', selectedLocalNode.label)
+    if (next == null) return
+    const label = next.trim() || selectedLocalNode.label
+    persistLocalFlowNodes((currentNodes) =>
+      patchLocalFlowNode(currentNodes, selectedLocalNode.id, { label, updatedAt: new Date().toISOString() }),
+    )
+    setFlowNodeStatus('Flow node renamed.')
+  }, [persistLocalFlowNodes, selectedLocalNode])
+
+  const handleDeleteLocalNode = useCallback(() => {
+    if (!selectedLocalNode) return
+    if (!window.confirm('Delete this local flow node? Its private key will be lost.')) return
+    const removedPubkey = selectedLocalNode.publicKeyHex
+    persistLocalFlowNodes((currentNodes) => currentNodes.filter((current) => current.publicKeyHex !== removedPubkey))
+    setSelectedLocalPubkey('')
+    setFlowNodeError(null)
+    setFlowNodeStatus('Flow node deleted.')
+  }, [persistLocalFlowNodes, selectedLocalNode])
 
   const handleQuerySelectedFlowNode = useCallback(() => {
     if (!selectedLocalNode) return
@@ -526,6 +575,12 @@ function App() {
                 {flowNodeBusy === 'difficulty' ? 'Loading' : 'Use latest'}
               </button>
             </div>
+            <div className="action-row">
+              <button className="secondary-button" type="button" onClick={handleImportLocalNode}>
+                <Plus size={15} />
+                Import flow node
+              </button>
+            </div>
 
             <Field label="Local flow node">
               <select
@@ -592,6 +647,12 @@ function App() {
                   onClick={() => void handleExportPrivateKey()}
                 >
                   Export private key
+                </button>
+                <button className="secondary-button" type="button" onClick={handleRenameLocalNode}>
+                  Rename
+                </button>
+                <button className="secondary-button danger" type="button" onClick={handleDeleteLocalNode}>
+                  Delete
                 </button>
               </div>
             ) : null}
