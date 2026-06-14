@@ -26,6 +26,8 @@ export interface LocalFlowNode {
   privateKeyHex: string
   createdAt: string
   updatedAt: string
+  // 画布落点（右键添加时记录），用于在图上稳定定位本地节点。
+  position?: { x: number; y: number }
   registration?: LocalFlowNodeRegistration
   authorizations: LocalFlowNodeAuthorization[]
 }

@@ -7,6 +7,7 @@ import {
   formatAmount,
   formatVolumeByCurrency,
   mergeConsumeChains,
+  mergeLocalNodes,
   shortId,
 } from './chainGraph'
 import type { ConsumeChainResponseDTORaw } from './types'
@@ -110,6 +111,27 @@ describe('chain graph mapping', () => {
       openChains: 1,
       volumeByCurrency: new Map([[1, 15700n]]),
     })
+  })
+
+  it('merges local flow/consume nodes onto the chain graph by pubkey', () => {
+    const graph = buildGraphFromConsumeChains(chainRows)
+    const before = graph.nodes.length
+
+    const merged = mergeLocalNodes(
+      graph,
+      [{ publicKeyHex: 'pk-flow', label: 'Flow A', position: { x: 1, y: 2 } }],
+      [{ publicKeyHex: 'pk-consume', label: 'Consume A' }],
+    )
+    expect(merged.nodes.length).toBe(before + 2)
+    const flow = merged.nodes.find((node) => node.id === 'pk-flow')
+    expect(flow?.kind).toBe('local-flow')
+    expect(flow?.position).toEqual({ x: 1, y: 2 })
+    expect(merged.nodes.find((node) => node.id === 'pk-consume')?.kind).toBe('local-consume')
+
+    // 已存在的 id 不重复叠加
+    const dup = mergeLocalNodes(graph, [{ publicKeyHex: graph.nodes[0]!.id, label: 'X' }], [])
+    expect(dup.nodes.length).toBe(before)
+    expect(dup).toBe(graph)
   })
 
   it('aggregates volume per currency and never sums across currencies', () => {

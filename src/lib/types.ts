@@ -17,6 +17,14 @@ export type LoopStatus = 'all' | 'looped' | 'open'
 export type EdgeStatus = 'looped' | 'open'
 export type IdentityKind = 'id' | 'pubkey'
 
+// 画布节点来源：来自查询的链节点，或本地密钥（流转/消费）叠加层。
+export type NodeKind = 'chain' | 'local-flow' | 'local-consume'
+
+export interface CanvasPosition {
+  x: number
+  y: number
+}
+
 // 按币种归集的金额（key = currencyType）。混币求和无意义，故所有聚合都按币种分桶。
 export type VolumeByCurrency = Map<number, bigint>
 
@@ -26,6 +34,9 @@ export interface ChainGraphNode {
   chainCount: number
   // 节点吞吐量 = 关联边金额之和，按币种分桶（不再把链额与边额重复计入同一节点）。
   volumeByCurrency: VolumeByCurrency
+  kind: NodeKind
+  // 本地节点的画布落点（右键添加时记录）；链节点无此字段，由布局算法定位。
+  position?: CanvasPosition
 }
 
 export interface ChainGraphEdge {

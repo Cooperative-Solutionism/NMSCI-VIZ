@@ -24,6 +24,10 @@
   --graph-node-selected-border: #08776c;
   --graph-edge-text: #334155;
   --graph-edge-label-bg: #ffffff;
+  --node-local-flow-bg: #e3f4ef;
+  --node-local-flow-border: #08776c;
+  --node-local-consume-bg: #ede9fe;
+  --node-local-consume-border: #6d28d9;
   --chain-1: #0f766e;
   --chain-2: #b45309;
   --chain-3: #2563eb;
@@ -80,6 +84,10 @@
     --graph-node-selected-border: #4fc4b5;
     --graph-edge-text: #d9e5df;
     --graph-edge-label-bg: #17211d;
+    --node-local-flow-bg: #173c37;
+    --node-local-flow-border: #4fc4b5;
+    --node-local-consume-bg: #2a2150;
+    --node-local-consume-border: #a78bfa;
   }
 }
 

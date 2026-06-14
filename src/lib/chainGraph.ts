@@ -1,9 +1,11 @@
 import type {
+  CanvasPosition,
   ChainGraph,
   ChainGraphEdge,
   ChainGraphNode,
   ConsumeChainQuery,
   ConsumeChainResponseDTO,
+  NodeKind,
   VolumeByCurrency,
 } from './types'
 import { consumeChainParamName, detectIdentityKind } from './consumeChainFilters'
@@ -150,5 +152,42 @@ function touchNode(
     label: shortId(id),
     chainCount: 1,
     volumeByCurrency,
+    kind: 'chain',
   })
+}
+
+// 本地密钥节点的最小展示信息（避免 chainGraph 依赖 storage 类型）。
+export interface LocalNodeRef {
+  publicKeyHex: string
+  label: string
+  position?: CanvasPosition
+}
+
+// 把本地密钥节点（流转/消费）叠加到查询得到的链图上，使其直接显示在画布、可在无查询结果时先建后查。
+// 以 pubkey 为 id；与链节点的 UUID id 不会冲突。
+export function mergeLocalNodes(
+  graph: ChainGraph,
+  flowNodes: LocalNodeRef[],
+  consumeNodes: LocalNodeRef[],
+): ChainGraph {
+  const seen = new Set(graph.nodes.map((node) => node.id))
+  const extra: ChainGraphNode[] = []
+  const append = (refs: LocalNodeRef[], kind: NodeKind): void => {
+    for (const ref of refs) {
+      if (seen.has(ref.publicKeyHex)) continue
+      seen.add(ref.publicKeyHex)
+      extra.push({
+        id: ref.publicKeyHex,
+        label: ref.label || shortId(ref.publicKeyHex),
+        chainCount: 0,
+        volumeByCurrency: new Map(),
+        kind,
+        position: ref.position,
+      })
+    }
+  }
+  append(flowNodes, 'local-flow')
+  append(consumeNodes, 'local-consume')
+  if (extra.length === 0) return graph
+  return { ...graph, nodes: [...graph.nodes, ...extra] }
 }
