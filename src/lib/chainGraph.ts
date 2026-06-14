@@ -49,22 +49,16 @@ export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTORaw[]):
   }
 }
 
+// 展示用：还原 SDK queryConsumeChains 实际请求的 URL（集合根 + id 模式查询参数）。
 export function buildConsumeChainUrl(baseUrl: string, query: ConsumeChainQuery): string {
   const normalizedBaseUrl = baseUrl.replace(/\/+$/, '')
-  const endpointByMode: Record<ConsumeChainQuery['mode'], string> = {
-    start: '/consume-chain/by-start',
-    end: '/consume-chain/by-end',
-    node: '/consume-chain/by-node',
-  }
   const nodeParamByMode: Record<ConsumeChainQuery['mode'], string> = {
-    start: 'start',
-    end: 'end',
-    node: 'node',
+    start: 'startId',
+    end: 'endId',
+    node: 'nodeId',
   }
-  const endpoint = endpointByMode[query.mode]
-  const nodeParam = nodeParamByMode[query.mode]
   const params = new URLSearchParams()
-  params.set(nodeParam, query.nodeId)
+  params.set(nodeParamByMode[query.mode], query.nodeId)
 
   if (query.loopStatus !== 'all') {
     params.set('isLoop', String(query.loopStatus === 'looped'))
@@ -73,7 +67,7 @@ export function buildConsumeChainUrl(baseUrl: string, query: ConsumeChainQuery):
   params.set('page', String(query.page))
   params.set('size', String(query.size))
 
-  return `${normalizedBaseUrl}${endpoint}?${params.toString()}`
+  return `${normalizedBaseUrl}/consume-chains?${params.toString()}`
 }
 
 export function shortId(id: string): string {

@@ -1,61 +1,19 @@
+// 后端 DTO 类型统一从 @nmsci/sdk 复用，避免与 SDK 漂移。
+export type {
+  ApiResponse,
+  SliceResponseDTO,
+  BlockInfoRaw,
+  FlowNodeRegisterMsgRaw,
+  CentralPubkeyEmpowerMsgRaw,
+  ConsumeChainRaw,
+  ConsumeChainEdgeRaw,
+  ConsumeChainResponseDTORaw,
+} from '@nmsci/sdk'
+
+// 以下为可视化专属类型（非后端 DTO）。
 export type QueryMode = 'start' | 'end' | 'node'
 export type LoopStatus = 'all' | 'looped' | 'open'
 export type EdgeStatus = 'looped' | 'open'
-
-export interface ApiResponse<T> {
-  code: number
-  message: string
-  data: T
-}
-
-export interface SliceResponseDTO<T> {
-  content: T[]
-  page: number
-  size: number
-  numberOfElements: number
-  hasNext: boolean
-  hasPrevious: boolean
-}
-
-export interface ConsumeChainRaw {
-  id: string
-  start: string
-  end: string
-  amount: number
-  currencyType: number
-  isLoop: boolean
-  tailMountTimestamp: number
-}
-
-export interface ConsumeChainEdgeRaw {
-  id: string
-  source: string
-  target: string
-  amount: number
-  currencyType: number
-  chain: string
-  relatedTransactionRecord: string
-  relatedTransactionMount: string
-  relatedTransactionMountTimestamp: number
-  isLoop: boolean
-}
-
-export interface ConsumeChainResponseDTORaw {
-  consumeChain: ConsumeChainRaw
-  consumeChainEdges: ConsumeChainEdgeRaw[]
-}
-
-export interface FlowNodeRegisterMsgRaw {
-  id: string
-  msgType?: number
-  registerDifficultyTarget?: string
-  nonce?: number
-  flowNodePubkey?: string
-  flowNodeSignature?: string
-  rawBytes?: string
-  txid?: string
-  confirmTimestamp?: number
-}
 
 export interface ChainGraphNode {
   id: string
