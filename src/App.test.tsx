@@ -209,6 +209,29 @@ describe('App initial state', () => {
     expect(request.searchParams.get('nodePubkey')).toBe(pubkey)
     expect(request.searchParams.get('nodeId')).toBeNull()
   })
+
+  it('lists looped chains and highlights one when selected from the loops panel', async () => {
+    stubFetchByUrl((url) => {
+      if (url.pathname === '/consume-chains') {
+        return jsonResponse(sliceResponse([chainRow('open-1', 1), loopedChainRow('loop-1')], { page: 0 }))
+      }
+      throw new Error(`Unexpected URL ${url.href}`)
+    })
+    render(<App />)
+
+    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), { target: { value: 'node-1' } })
+    fireEvent.click(screen.getByRole('button', { name: /^load$/i }))
+
+    expect(await screen.findByText('Loops (1)')).toBeTruthy()
+    const loopRow = screen.getByRole('button', { name: /LOOP-1.*hops/i })
+    expect(loopRow).toHaveAttribute('aria-pressed', 'false')
+
+    fireEvent.click(loopRow)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /LOOP-1.*hops/i })).toHaveAttribute('aria-pressed', 'true')
+    })
+  })
 })
 
 function stubFetchByUrl(handler: (url: URL, init?: RequestInit) => Response): ReturnType<typeof vi.fn> {
@@ -216,6 +239,21 @@ function stubFetchByUrl(handler: (url: URL, init?: RequestInit) => Response): Re
     const url = new URL(String(input), 'http://localhost')
     if (url.pathname.startsWith('/api/')) {
       url.pathname = url.pathname.slice('/api'.length)
+    }
+    // 选中节点/边会触发回流率查询；统一给个默认响应，免得每个用例都要处理。
+    if (url.pathname === '/returning-flow-rates') {
+      return jsonResponse({
+        code: 200,
+        message: 'ok',
+        data: {
+          returningFlowRate: 0,
+          loopedAmount: 0,
+          unloopedAmount: 0,
+          targetTotalLoopedAmount: 0,
+          targetTotalUnloopedAmount: 0,
+          currencyType: 1,
+        },
+      })
     }
     return handler(url, init)
   })
@@ -285,6 +323,13 @@ function chainRow(
       },
     ],
   }
+}
+
+function loopedChainRow(id: string): ConsumeChainResponseDTORaw {
+  const row = chainRow(id, 1, 'node-a', 'node-b')
+  row.consumeChain.isLoop = true
+  row.consumeChainEdges = row.consumeChainEdges.map((edge) => ({ ...edge, isLoop: true }))
+  return row
 }
 
 function flowNodeDetail(id: string) {

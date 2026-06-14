@@ -3,14 +3,18 @@ import { formatAmount } from '../lib/chainGraph'
 import { formatMicros } from '../lib/format'
 import type { ChainGraphEdge, ConsumeChainResponseDTO } from '../lib/types'
 import { DetailRow } from './DetailRow'
+import type { FlowRateView } from './NodeInspector'
 import { PanelHeader } from './PanelHeader'
+import { ReturnFlowCard } from './ReturnFlowCard'
 
 export function EdgeInspector({
   chain,
   edge,
+  flowRate,
 }: {
   chain: ConsumeChainResponseDTO | null
   edge: ChainGraphEdge
+  flowRate: FlowRateView
 }) {
   return (
     <div className="inspector-content">
@@ -32,6 +36,7 @@ export function EdgeInspector({
           <DetailRow label="Tail mount" value={formatMicros(chain.consumeChain.tailMountTimestamp)} />
         </>
       ) : null}
+      <ReturnFlowCard data={flowRate.data} error={flowRate.error} mode="edge" status={flowRate.status} />
     </div>
   )
 }
