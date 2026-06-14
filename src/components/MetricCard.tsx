@@ -14,8 +14,10 @@ export function MetricCard({
   return (
     <div className={`metric-card ${tone ?? ''}`}>
       <span className="metric-icon">{icon}</span>
-      <span>{label}</span>
-      <strong>{value}</strong>
+      <span className="metric-body">
+        <span className="metric-label">{label}</span>
+        <strong>{value}</strong>
+      </span>
     </div>
   )
 }
