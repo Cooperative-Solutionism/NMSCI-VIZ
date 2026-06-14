@@ -1,19 +1,35 @@
 import cytoscape, { type Core, type NodeSingular } from 'cytoscape'
 import { Download, Maximize2, ZoomIn, ZoomOut } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatAmount } from '../lib/chainGraph'
 import { deterministicOffset, type Point } from '../lib/graphLayout'
 import { readGraphTokens } from '../lib/tokens'
-import type { ChainGraph, ChainGraphEdge, ChainGraphNode } from '../lib/types'
+import type { CanvasPosition, ChainGraph, ChainGraphEdge, ChainGraphNode } from '../lib/types'
 
 interface NetworkGraphProps {
   graph: ChainGraph
   selectedId: string | null
   onSelectNode: (node: ChainGraphNode) => void
   onSelectEdge: (edge: ChainGraphEdge) => void
+  onAddFlowNode?: (position: CanvasPosition) => void
+  onAddConsumeNode?: (position: CanvasPosition) => void
 }
 
-export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: NetworkGraphProps) {
+interface ContextMenuState {
+  x: number
+  y: number
+  position: CanvasPosition
+}
+
+export function NetworkGraph({
+  graph,
+  selectedId,
+  onSelectNode,
+  onSelectEdge,
+  onAddFlowNode,
+  onAddConsumeNode,
+}: NetworkGraphProps) {
+  const [menu, setMenu] = useState<ContextMenuState | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const cyRef = useRef<Core | null>(null)
   const nodeMapRef = useRef(new Map<string, ChainGraphNode>())
@@ -167,6 +183,19 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
       const edge = edgeMapRef.current.get(event.target.id())
       if (edge) onSelectEdgeRef.current(edge)
     })
+    // 任意点击关闭右键菜单。
+    cy.on('tap', () => setMenu(null))
+    // 右键空白处：在落点弹出"添加节点"菜单（携带 model 坐标供落点定位）。
+    cy.on('cxttap', (event) => {
+      if (event.target !== cy) {
+        setMenu(null)
+        return
+      }
+      const rendered = event.renderedPosition
+      const model = event.position
+      if (!rendered || !model) return
+      setMenu({ x: rendered.x, y: rendered.y, position: { x: model.x, y: model.y } })
+    })
 
     cyRef.current = cy
     return () => {
@@ -212,6 +241,20 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
     if (selectedId) cy.getElementById(selectedId).select()
   }, [selectedChainId, selectedId])
 
+  useEffect(() => {
+    if (!menu) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenu(null)
+    }
+    const onClick = () => setMenu(null)
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('click', onClick)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('click', onClick)
+    }
+  }, [menu])
+
   const handleDownloadPng = useCallback(() => {
     const cy = cyRef.current
     if (!cy) return
@@ -223,7 +266,7 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
   }, [])
 
   return (
-    <div className="graph-shell">
+    <div className="graph-shell" onContextMenu={(event) => event.preventDefault()}>
       <div
         ref={containerRef}
         className="graph-canvas"
@@ -231,6 +274,30 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
         tabIndex={0}
         aria-label={`Consumption chain network graph with ${graph.nodes.length} nodes and ${graph.edges.length} edges`}
       />
+      {menu ? (
+        <div className="graph-context-menu" role="menu" style={{ left: menu.x, top: menu.y }}>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onAddFlowNode?.(menu.position)
+              setMenu(null)
+            }}
+          >
+            Add flow node
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onAddConsumeNode?.(menu.position)
+              setMenu(null)
+            }}
+          >
+            Add consume node
+          </button>
+        </div>
+      ) : null}
       <div className="sr-only graph-access-list" aria-label="Keyboard graph selection">
         <h3>Graph nodes</h3>
         {graph.nodes.map((node) => (

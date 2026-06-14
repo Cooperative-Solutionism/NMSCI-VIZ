@@ -63,7 +63,11 @@ import {
   type LocalFlowNodeAuthorization,
   type LocalFlowNodeRegistration,
 } from './lib/flowNodeStorage'
-import { loadLocalConsumeNodes, type LocalConsumeNode } from './lib/consumeNodeStorage'
+import {
+  loadLocalConsumeNodes,
+  saveLocalConsumeNodes,
+  type LocalConsumeNode,
+} from './lib/consumeNodeStorage'
 type FlowNodeBusyState = 'difficulty' | 'register' | 'authorize' | null
 
 const defaultApiBase = import.meta.env.VITE_API_BASE ?? '/api'
@@ -137,7 +141,7 @@ function App() {
         ? `${rows.length} row${rows.length === 1 ? '' : 's'} hidden by the current-page filter.`
         : 'No chains matched. Try loop status: All or another mode.'
   const [localFlowNodes, setLocalFlowNodes] = useState<LocalFlowNode[]>(() => loadLocalFlowNodes())
-  const [localConsumeNodes] = useState<LocalConsumeNode[]>(() => loadLocalConsumeNodes())
+  const [localConsumeNodes, setLocalConsumeNodes] = useState<LocalConsumeNode[]>(() => loadLocalConsumeNodes())
   const canvasGraph = useMemo(
     () => mergeLocalNodes(graph, localFlowNodes, localConsumeNodes),
     [graph, localFlowNodes, localConsumeNodes],
@@ -193,6 +197,53 @@ function App() {
       return nextNodes
     })
   }, [])
+
+  const persistLocalConsumeNodes = useCallback(
+    (updater: (currentNodes: LocalConsumeNode[]) => LocalConsumeNode[]) => {
+      setLocalConsumeNodes((currentNodes) => {
+        const nextNodes = updater(currentNodes)
+        saveLocalConsumeNodes(nextNodes)
+        return nextNodes
+      })
+    },
+    [],
+  )
+
+  const handleAddFlowNodeAt = useCallback((position: { x: number; y: number }) => {
+    const keypair = generateKeyPair()
+    const now = new Date().toISOString()
+    const node: LocalFlowNode = {
+      id: makeMessageId(),
+      label: shortId(keypair.publicKey),
+      privateKeyHex: keypair.privateKey,
+      publicKeyHex: keypair.publicKey,
+      createdAt: now,
+      updatedAt: now,
+      position,
+      authorizations: [],
+    }
+    persistLocalFlowNodes((currentNodes) => [node, ...currentNodes])
+    setSelectedLocalPubkey(node.publicKeyHex)
+    setFlowNodeError(null)
+    setFlowNodeStatus('Flow node added to canvas.')
+  }, [persistLocalFlowNodes])
+
+  const handleAddConsumeNodeAt = useCallback((position: { x: number; y: number }) => {
+    const keypair = generateKeyPair()
+    const now = new Date().toISOString()
+    const node: LocalConsumeNode = {
+      id: makeMessageId(),
+      label: shortId(keypair.publicKey),
+      privateKeyHex: keypair.privateKey,
+      publicKeyHex: keypair.publicKey,
+      createdAt: now,
+      updatedAt: now,
+      position,
+    }
+    persistLocalConsumeNodes((currentNodes) => [node, ...currentNodes])
+    setFlowNodeError(null)
+    setFlowNodeStatus('Consume node added to canvas.')
+  }, [persistLocalConsumeNodes])
 
   const handleGenerateFlowNode = useCallback(() => {
     const keypair = generateKeyPair()
@@ -772,6 +823,8 @@ function App() {
                 selectedId={effectiveSelection?.id ?? null}
                 onSelectNode={selectNode}
                 onSelectEdge={selectEdge}
+                onAddFlowNode={handleAddFlowNodeAt}
+                onAddConsumeNode={handleAddConsumeNodeAt}
               />
             </Suspense>
           </ErrorBoundary>
