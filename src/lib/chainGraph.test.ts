@@ -5,6 +5,7 @@ import {
   buildGraphFromConsumeChains,
   chainColor,
   formatAmount,
+  formatVolumeByCurrency,
   mergeConsumeChains,
   shortId,
 } from './chainGraph'
@@ -98,13 +99,52 @@ describe('chain graph mapping', () => {
     })
     expect(graph.edges[0]!.color).toBe(graph.edges[1]!.color)
     expect(graph.edges[0]!.color).not.toBe(graph.edges[2]!.color)
+
+    // 节点吞吐量只计入关联边金额（不再叠加链额）：node 1111 = a1(5000) + b1(3200)。
+    const startNode = graph.nodes.find((node) => node.id === '11111111-1111-4111-8111-111111111111')
+    expect(startNode?.volumeByCurrency).toEqual(new Map([[1, 8200n]]))
+
     expect(graph.stats).toEqual({
       totalChains: 2,
       loopedChains: 1,
       openChains: 1,
-      volume: 15700n,
-      currencyType: 1,
+      volumeByCurrency: new Map([[1, 15700n]]),
     })
+  })
+
+  it('aggregates volume per currency and never sums across currencies', () => {
+    const mixed = [
+      chainRows[0]!,
+      normalizeConsumeChainResponseDTO({
+        consumeChain: {
+          id: 'chain-au',
+          start: 'node-a',
+          end: 'node-b',
+          amount: 2_500_000,
+          currencyType: 0,
+          isLoop: false,
+          tailMountTimestamp: 1,
+        },
+        consumeChainEdges: [
+          {
+            id: 'edge-au',
+            source: 'node-a',
+            target: 'node-b',
+            amount: 2_500_000,
+            currencyType: 0,
+            chain: 'chain-au',
+            relatedTransactionRecord: 'r',
+            relatedTransactionMount: 'm',
+            relatedTransactionMountTimestamp: 1,
+            isLoop: false,
+          },
+        ],
+      }),
+    ]
+
+    const graph = buildGraphFromConsumeChains(mixed)
+    expect(graph.stats.volumeByCurrency).toEqual(new Map([[1, 12500n], [0, 2_500_000n]]))
+    expect(formatVolumeByCurrency(graph.stats.volumeByCurrency)).toBe('2,500,000 ug Au · 125.00 CNY')
   })
 
   it('builds backend URLs for node-centered start and end queries', () => {
@@ -131,6 +171,15 @@ describe('chain graph mapping', () => {
       page: 1,
       size: 100,
     })).toBe('/api/consume-chains?nodeId=node-3&page=1&size=100')
+
+    const pubkey = `02${'a'.repeat(64)}`
+    expect(buildConsumeChainUrl('/api', {
+      mode: 'start',
+      nodeId: pubkey,
+      loopStatus: 'all',
+      page: 0,
+      size: 50,
+    })).toBe(`/api/consume-chains?startPubkey=${pubkey}&page=0&size=50`)
   })
 
   it('formats operational labels without losing raw ids', () => {

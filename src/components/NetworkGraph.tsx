@@ -265,7 +265,6 @@ function syncNodes(cy: Core, nodes: ChainGraphNode[], edges: ChainGraphEdge[]): 
       existingNode.data({
         ...existingNode.data(),
         label: node.label,
-        volume: node.volume,
       })
       continue
     }
@@ -274,7 +273,6 @@ function syncNodes(cy: Core, nodes: ChainGraphNode[], edges: ChainGraphEdge[]): 
       data: {
         id: node.id,
         label: node.label,
-        volume: node.volume,
       },
       group: 'nodes',
       position: positionForNewNode(cy, node.id, edges),

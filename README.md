@@ -1,38 +1,79 @@
 # NMSCI Visualization
 
-Node-centered consume chain explorer for the NMSCI service.
+Browser explorer for the NMSCI consumption network, plus a flow-node operator
+console. Built with Vite + React 19 + TypeScript and talks to the backend through
+the [`@nmsci/sdk`](https://www.npmjs.com/package/@nmsci/sdk) package.
 
 ## Features
 
-- Query consume chains by start or end flow node.
-- Toggle looped/open chain filters and client-side currency filtering.
-- Render directed consumption paths with Cytoscape.
-- Inspect selected node or edge metadata.
+### Analyst — explore consumption chains
 
-## Backend Contract
+- Query consume chains by **start**, **end**, or **node** (途经) — accepting either a
+  flow-node **UUID** or a 66-hex **public key** (auto-detected; the backend resolves a
+  pubkey to its node id, see API §1.7).
+- Filter by loop status (all / looped / open). Looped chains are the circular-trade
+  signal the system is named for.
+- Currency is a **current-page view filter** (the `/consume-chains` endpoint has no
+  server-side currency parameter); the footer reports visible vs. backend row counts so
+  the page-scoped nature is explicit.
+- Render directed consumption paths with Cytoscape and inspect any selected node or
+  edge. "Extend start/end/node" grows the graph from a node; pagination pauses while a
+  graph is extended (reload the query to resume).
+- Volume is aggregated **per currency** — CNY (cents) and Au (micrograms) are never
+  summed into one figure.
 
-The explorer calls the current NMSCI consume-chain endpoints:
+### Operator — register & authorize a flow node
 
-- `GET /consume-chain/by-start?start=<uuid>&isLoop?&page=0&size=50`
-- `GET /consume-chain/by-end?end=<uuid>&isLoop?&page=0&size=50`
+- Generate a local secp256k1 keypair (stored in `localStorage`).
+- "Use latest" pulls the current register difficulty (nBits hex) and central public key
+  from the latest block.
+- Register the node (mines a PoW nonce, signs, serializes, and POSTs the message).
+- Authorize a central public key (signs and POSTs the empowerment message).
+- "Query this node" fills the node's public key into the query so its chains are
+  immediately findable.
 
-Responses are expected as `ResponseResult<SliceResponseDTO<ConsumeChainResponseDTO>>`.
+> Security note: generated private keys are stored **unencrypted** in `localStorage`.
+> Treat them as test keys; "Export private key" copies the secret to the clipboard
+> behind a confirm dialog.
 
-During local development the UI uses `/api` by default. Vite proxies `/api/*`
-to `http://localhost:8080/*`, so browser requests stay same-origin and avoid
-CORS failures.
+## Backend contract
+
+Consume-chain queries hit the current collection-root endpoint via the SDK:
+
+```
+GET /consume-chains?startId|endId|nodeId|startPubkey|endPubkey|nodePubkey=<value>
+                    &isLoop=<bool>&page=0&size=50
+```
+
+Responses are `ResponseResult<SliceResponseDTO<ConsumeChainResponseDTO>>`. The flow-node
+console additionally uses `GET /blocks/latest`, `POST /flow-node-registrations`, and
+`POST /central-pubkey-empowerments`. See the backend `docs/API.md` for the full surface
+(36 endpoints; this UI currently uses a subset).
+
+## Configuration
+
+| Env var | Default | Purpose |
+| --- | --- | --- |
+| `VITE_API_BASE` | `/api` | Base path the SDK client requests at runtime. |
+| `VITE_PROXY_TARGET` | `http://localhost:8080` | Dev-server proxy target for `/api/*`. |
+
+During local development the UI uses `/api`; Vite proxies `/api/*` to the proxy target
+(stripping the `/api` prefix) so browser requests stay same-origin and avoid CORS.
+Copy `.env.example` to `.env.local` to override.
 
 ## Development
 
 ```bash
 npm install
-npm run dev -- --host 127.0.0.1 --port 5178
+npm run dev            # Vite dev server
 ```
 
-Quality checks:
+Quality checks (all run in CI):
 
 ```bash
-npm test
-npm run lint
-npm run build
+npm run lint           # eslint
+npm run build          # tsc -b && vite build
+npm test               # vitest
+npm run test:coverage  # vitest with v8 coverage thresholds
+npm run format         # prettier --write
 ```

@@ -54,7 +54,7 @@ describe('App initial state', () => {
     render(<App />)
 
     expect(screen.queryByRole('button', { name: /demo/i })).toBeNull()
-    expect((screen.getByLabelText('Flow node UUID') as HTMLTextAreaElement).value).toBe('')
+    expect((screen.getByLabelText('Flow node id / pubkey') as HTMLTextAreaElement).value).toBe('')
     expect(screen.getByText('No chain data in the current filter.')).toBeTruthy()
     expect(screen.getByLabelText('Data status').textContent).toContain('No data')
   })
@@ -79,22 +79,20 @@ describe('App initial state', () => {
     })])
   })
 
-  it('can copy the selected generated flow node id into the query UUID field', async () => {
+  it('fills the selected flow node public key into the query field', async () => {
     render(<App />)
 
     fireEvent.click(screen.getByRole('button', { name: /generate flow node/i }))
 
-    let generatedId = ''
     await waitFor(() => {
-      const raw = localStorage.getItem('nmsci.flowNodes.v1')
-      const saved = JSON.parse(raw ?? '{"nodes":[]}') as { nodes: Array<{ id: string }> }
-      generatedId = saved.nodes[0]?.id ?? ''
-      expect(generatedId).not.toBe('')
+      expect((screen.getByLabelText('Local flow node') as HTMLSelectElement).value)
+        .toBe('02'.padEnd(66, '1'))
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /fill node uuid/i }))
+    fireEvent.click(screen.getByRole('button', { name: /query this node/i }))
 
-    expect((screen.getByLabelText('Flow node UUID') as HTMLTextAreaElement).value).toBe(generatedId)
+    expect((screen.getByLabelText('Flow node id / pubkey') as HTMLTextAreaElement).value)
+      .toBe('02'.padEnd(66, '1'))
   })
 
   it('loads a hex register difficulty target returned by the backend', async () => {
@@ -131,7 +129,7 @@ describe('App initial state', () => {
     })
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText('Flow node UUID'), { target: { value: 'node-1' } })
+    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), { target: { value: 'node-1' } })
     fireEvent.change(screen.getByLabelText('Page'), { target: { value: '7' } })
     fireEvent.click(screen.getByRole('button', { name: /^load$/i }))
 
@@ -154,7 +152,7 @@ describe('App initial state', () => {
     })
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText('Flow node UUID'), { target: { value: 'node-1' } })
+    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), { target: { value: 'node-1' } })
     fireEvent.change(screen.getByLabelText(/Currency/), { target: { value: '1' } })
     fireEvent.click(screen.getByRole('button', { name: /^load$/i }))
 
@@ -180,7 +178,7 @@ describe('App initial state', () => {
     })
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText('Flow node UUID'), { target: { value: 'node-1' } })
+    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), { target: { value: 'node-1' } })
     fireEvent.click(screen.getByRole('button', { name: /^load$/i }))
     fireEvent.click(await screen.findByRole('button', { name: /select node node-a/i }))
     fireEvent.click(await screen.findByRole('button', { name: /extend start/i }))
@@ -191,37 +189,25 @@ describe('App initial state', () => {
     expect(screen.getByText(/Extended graph view/i)).toBeTruthy()
   })
 
-  it('loads backend detail for the automatically selected fallback node', async () => {
+  it('queries by public key when a 66-hex value is entered', async () => {
     const fetchMock = stubFetchByUrl((url) => {
       if (url.pathname === '/consume-chains') {
-        return jsonResponse(sliceResponse([{
-          consumeChain: {
-            id: 'chain-node-only',
-            start: 'node-a',
-            end: 'node-b',
-            amount: 1200,
-            currencyType: 1,
-            isLoop: false,
-            tailMountTimestamp: 1_700_000_000_000_000,
-          },
-          consumeChainEdges: [],
-        }], { page: 0 }))
-      }
-      if (url.pathname === '/flow-node-registrations/node-a') {
-        return jsonResponse(flowNodeDetail('node-a'))
+        return jsonResponse(sliceResponse([chainRow('chain-cny', 1)], { page: 0 }))
       }
       throw new Error(`Unexpected URL ${url.href}`)
     })
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText('Flow node UUID'), { target: { value: 'node-1' } })
+    const pubkey = `02${'a'.repeat(64)}`
+    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), { target: { value: pubkey } })
     fireEvent.click(screen.getByRole('button', { name: /^load$/i }))
 
     await waitFor(() => {
-      expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/flow-node-registrations/node-a')))
-        .toBe(true)
+      expect(fetchMock).toHaveBeenCalled()
     })
-    expect(await screen.findByText('20ffffff')).toBeTruthy()
+    const request = new URL(String(fetchMock.mock.calls[0]![0]), 'http://localhost')
+    expect(request.searchParams.get('nodePubkey')).toBe(pubkey)
+    expect(request.searchParams.get('nodeId')).toBeNull()
   })
 })
 

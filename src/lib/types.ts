@@ -15,12 +15,17 @@ export type {
 export type QueryMode = 'start' | 'end' | 'node'
 export type LoopStatus = 'all' | 'looped' | 'open'
 export type EdgeStatus = 'looped' | 'open'
+export type IdentityKind = 'id' | 'pubkey'
+
+// 按币种归集的金额（key = currencyType）。混币求和无意义，故所有聚合都按币种分桶。
+export type VolumeByCurrency = Map<number, bigint>
 
 export interface ChainGraphNode {
   id: string
   label: string
   chainCount: number
-  volume: bigint
+  // 节点吞吐量 = 关联边金额之和，按币种分桶（不再把链额与边额重复计入同一节点）。
+  volumeByCurrency: VolumeByCurrency
 }
 
 export interface ChainGraphEdge {
@@ -42,8 +47,8 @@ export interface ChainGraphStats {
   totalChains: number
   loopedChains: number
   openChains: number
-  volume: bigint
-  currencyType: number
+  // 总流量按币种分桶（CNY 分 与 Au 微克 不可相加）。
+  volumeByCurrency: VolumeByCurrency
 }
 
 export interface ChainGraph {

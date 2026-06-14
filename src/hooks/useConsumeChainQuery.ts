@@ -11,6 +11,7 @@ import type {
   ChainGraphEdge,
   ChainGraphNode,
   ConsumeChainResponseDTO,
+  ConsumeChainResponseDTORaw,
   LoopStatus,
   QueryMode,
   SliceResponseDTO,
@@ -35,8 +36,23 @@ export function useConsumeChainQuery(apiBase: string, defaultPageSize: number) {
   const [extendLoading, setExtendLoading] = useState<QueryMode | null>(null)
   const [extended, setExtended] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [warning, setWarning] = useState<string | null>(null)
   const client = useMemo(() => new ApiClient({ baseUrl: apiBase }), [apiBase])
   const graphRequestGenerationRef = useRef(0)
+
+  // 改任一查询参数都视为退出「扩展态」：合并视图随之失效，下一次 Load/翻页取回干净数据。
+  const changeMode = useCallback((next: QueryMode) => {
+    setMode(next)
+    setExtended(false)
+  }, [])
+  const changeNodeId = useCallback((next: string) => {
+    setNodeId(next)
+    setExtended(false)
+  }, [])
+  const changeLoopStatus = useCallback((next: LoopStatus) => {
+    setLoopStatus(next)
+    setExtended(false)
+  }, [])
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -88,6 +104,7 @@ export function useConsumeChainQuery(apiBase: string, defaultPageSize: number) {
 
     setLoading(true)
     setError(null)
+    setWarning(null)
     setPage(normalizedPage)
     setSize(normalizedSize)
 
@@ -98,12 +115,13 @@ export function useConsumeChainQuery(apiBase: string, defaultPageSize: number) {
         { page: normalizedPage, size: normalizedSize },
       )
       if (generation !== graphRequestGenerationRef.current) return
-      const content = result.data.content.map(normalizeConsumeChainResponseDTO)
+      const { content, skipped } = normalizeRowsSafely(result.data.content)
       setRows(content)
       setSlice({ ...result.data, content })
       setOrigin('backend')
       setSelection(null)
       setExtended(false)
+      setWarning(skipWarning(skipped))
     } catch (queryError) {
       if (generation !== graphRequestGenerationRef.current) return
       setError(errorMessage(queryError, 'Unknown request error'))
@@ -135,11 +153,12 @@ export function useConsumeChainQuery(apiBase: string, defaultPageSize: number) {
         { page: 0, size: normalizedSize },
       )
       if (generation !== graphRequestGenerationRef.current) return
-      const content = result.data.content.map(normalizeConsumeChainResponseDTO)
+      const { content, skipped } = normalizeRowsSafely(result.data.content)
       setRows((currentRows) => mergeConsumeChains(currentRows, content))
       setSlice({ ...result.data, content })
       setOrigin('backend')
       setExtended(true)
+      setWarning(skipWarning(skipped))
     } catch (queryError) {
       if (generation !== graphRequestGenerationRef.current) return
       setError(errorMessage(queryError, 'Unknown request error'))
@@ -183,13 +202,14 @@ export function useConsumeChainQuery(apiBase: string, defaultPageSize: number) {
     selectedEdge,
     selectedNode,
     setCurrencyFilter,
-    setLoopStatus,
-    setMode,
-    setNodeId,
+    setLoopStatus: changeLoopStatus,
+    setMode: changeMode,
+    setNodeId: changeNodeId,
     setPage,
     setSize,
     size,
     slice,
+    warning,
   }
 }
 
@@ -205,4 +225,27 @@ function makeSlice(
     hasNext: false,
     hasPrevious: false,
   }
+}
+
+// 逐行归一化：单条链含超过 2^53 的金额时 SDK 的 toSafeBigInt 会抛错，
+// 这里跳过该行并计数，避免一条超大额链让整页查询失败（仅是临时前端兜底，根因需 SDK 侧字符串传输 int64）。
+function normalizeRowsSafely(rawRows: ConsumeChainResponseDTORaw[]): {
+  content: ConsumeChainResponseDTO[]
+  skipped: number
+} {
+  const content: ConsumeChainResponseDTO[] = []
+  let skipped = 0
+  for (const raw of rawRows) {
+    try {
+      content.push(normalizeConsumeChainResponseDTO(raw))
+    } catch {
+      skipped += 1
+    }
+  }
+  return { content, skipped }
+}
+
+function skipWarning(skipped: number): string | null {
+  if (skipped <= 0) return null
+  return `${skipped} chain${skipped === 1 ? '' : 's'} skipped: amount exceeds the precision-safe range (>2^53).`
 }
