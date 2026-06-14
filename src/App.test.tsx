@@ -6,6 +6,8 @@ import type { ChainGraph, ChainGraphEdge, ChainGraphNode, ConsumeChainResponseDT
 vi.mock('./components/NetworkGraph', () => ({
   NetworkGraph: ({
     graph,
+    onAddConsumeNode,
+    onAddFlowNode,
     onSelectEdge,
     onSelectNode,
   }: {
@@ -13,8 +15,16 @@ vi.mock('./components/NetworkGraph', () => ({
     selectedId: string | null
     onSelectEdge: (edge: ChainGraphEdge) => void
     onSelectNode: (node: ChainGraphNode) => void
+    onAddFlowNode?: (position: { x: number; y: number }) => void
+    onAddConsumeNode?: (position: { x: number; y: number }) => void
   }) => (
     <div data-testid="network-graph">
+      <button type="button" onClick={() => onAddFlowNode?.({ x: 12, y: 34 })}>
+        canvas add flow node
+      </button>
+      <button type="button" onClick={() => onAddConsumeNode?.({ x: 56, y: 78 })}>
+        canvas add consume node
+      </button>
       {graph.nodes.map((node) => (
         <button key={node.id} type="button" onClick={() => onSelectNode(node)}>
           Select node {node.id}
@@ -385,6 +395,26 @@ describe('App initial state', () => {
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as { nodes: unknown[] }
       expect(saved.nodes).toHaveLength(0)
+    })
+  })
+
+  it('adds flow and consume nodes to the canvas via the context menu actions', async () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: /canvas add flow node/i }))
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
+        nodes: Array<{ position?: { x: number; y: number } }>
+      }
+      expect(saved.nodes[0]?.position).toEqual({ x: 12, y: 34 })
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /canvas add consume node/i }))
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('nmsci.consumeNodes.v1') ?? '{"nodes":[]}') as {
+        nodes: Array<{ position?: { x: number; y: number } }>
+      }
+      expect(saved.nodes[0]?.position).toEqual({ x: 56, y: 78 })
     })
   })
 
