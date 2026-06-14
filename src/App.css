@@ -209,6 +209,10 @@
   gap: 10px;
 }
 
+.action-row.two {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+}
+
 .primary-button,
 .ghost-button,
 .secondary-button {
@@ -294,6 +298,63 @@
   margin-top: 2px;
   border-top: 1px solid var(--line);
   padding-top: 15px;
+}
+
+.flow-node-block {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  border-top: 1px solid var(--line);
+  padding-top: 15px;
+}
+
+.node-key-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(247, 248, 245, 0.72);
+  padding: 10px;
+}
+
+.node-key-box .detail-row {
+  grid-template-columns: 68px minmax(0, 1fr);
+}
+
+.operation-message {
+  margin: 0;
+  border: 1px solid rgba(8, 119, 108, 0.22);
+  border-radius: 6px;
+  background: var(--teal-soft);
+  color: #075f57;
+  font-size: 13px;
+  padding: 9px 10px;
+}
+
+.operation-message.error {
+  border-color: rgba(173, 62, 50, 0.32);
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.raw-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.raw-preview span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.raw-preview code {
+  display: block;
+  max-height: 86px;
+  overflow: auto;
 }
 
 .disabled-field {
@@ -671,7 +732,8 @@
   }
 
   .form-grid,
-  .action-row {
+  .action-row,
+  .action-row.two {
     grid-template-columns: 1fr;
   }
 

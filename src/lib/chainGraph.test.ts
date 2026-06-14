@@ -112,7 +112,7 @@ describe('chain graph mapping', () => {
       loopStatus: 'open',
       page: 2,
       size: 25,
-    })).toBe('/api/consume-chain/by-start?start=node-1&isLoop=false&page=2&size=25')
+    })).toBe('/api/consume-chains?startId=node-1&isLoop=false&page=2&size=25')
 
     expect(buildConsumeChainUrl('http://localhost:8080/', {
       mode: 'end',
@@ -120,7 +120,7 @@ describe('chain graph mapping', () => {
       loopStatus: 'looped',
       page: 0,
       size: 10,
-    })).toBe('http://localhost:8080/consume-chain/by-end?end=node+2&isLoop=true&page=0&size=10')
+    })).toBe('http://localhost:8080/consume-chains?endId=node+2&isLoop=true&page=0&size=10')
 
     expect(buildConsumeChainUrl('/api', {
       mode: 'node',
@@ -128,7 +128,7 @@ describe('chain graph mapping', () => {
       loopStatus: 'all',
       page: 1,
       size: 100,
-    })).toBe('/api/consume-chain/by-node?node=node-3&page=1&size=100')
+    })).toBe('/api/consume-chains?nodeId=node-3&page=1&size=100')
   })
 
   it('formats operational labels without losing raw ids', () => {
