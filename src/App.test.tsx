@@ -264,6 +264,45 @@ describe('App initial state', () => {
     expect(await screen.findByText(/Record txid/i)).toBeTruthy()
     expect(screen.getByText('recordtxid')).toBeTruthy()
   })
+
+  it('discovers a node via the browser and fills its public key', async () => {
+    const pubkey = `02${'d'.repeat(64)}`
+    stubFetchByUrl((url) => {
+      if (url.pathname === '/flow-nodes') {
+        return jsonResponse({
+          code: 200,
+          message: 'ok',
+          data: {
+            content: [
+              {
+                id: 'n1',
+                flowNodePubkey: pubkey,
+                registered: true,
+                authorized: false,
+                locked: false,
+                currentCentralPubkeyAuthorized: false,
+              },
+            ],
+            page: 0,
+            size: 10,
+            numberOfElements: 1,
+            hasNext: false,
+            hasPrevious: false,
+          },
+        })
+      }
+      throw new Error(`Unexpected URL ${url.href}`)
+    })
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: /browse nodes/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^browse$/i }))
+
+    const row = await screen.findByRole('button', { name: /02DDDDDDDD/i })
+    fireEvent.click(row)
+
+    expect((screen.getByLabelText('Flow node id / pubkey') as HTMLTextAreaElement).value).toBe(pubkey)
+  })
 })
 
 function stubFetchByUrl(handler: (url: URL, init?: RequestInit) => Response): ReturnType<typeof vi.fn> {

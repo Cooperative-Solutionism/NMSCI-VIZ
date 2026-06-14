@@ -25,6 +25,7 @@ import {
   Field,
   LoopsPanel,
   MetricCard,
+  NodeBrowser,
   NodeInspector,
   PanelHeader,
 } from './components'
@@ -154,6 +155,12 @@ function App() {
     setFlowNodeError(null)
     setFlowNodeStatus('Request curl copied.')
   }, [requestUrl])
+  const handlePickNode = useCallback((pubkey: string) => {
+    setMode('node')
+    setNodeId(pubkey)
+    setFlowNodeError(null)
+    setFlowNodeStatus('Picked node public key filled into query — click Load.')
+  }, [setMode, setNodeId])
   const handlePreviousPage = useCallback(() => {
     const nextPage = Math.max(0, page - 1)
     void runQuery(nextPage)
@@ -478,6 +485,8 @@ function App() {
             <span>Request</span>
             <code>{requestUrl}</code>
           </div>
+
+          <NodeBrowser apiBase={apiBase} onPick={handlePickNode} />
 
           {error ? <p className="error-banner">{error}. Current graph was kept unchanged.</p> : null}
           {warning ? <p className="info-banner">{warning}</p> : null}
