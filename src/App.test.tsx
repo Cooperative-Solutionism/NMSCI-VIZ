@@ -55,7 +55,7 @@ describe('App initial state', () => {
 
     expect(screen.queryByRole('button', { name: /demo/i })).toBeNull()
     expect((screen.getByLabelText('Flow node id / pubkey') as HTMLTextAreaElement).value).toBe('')
-    expect(screen.getByText('No chain data in the current filter.')).toBeTruthy()
+    expect(screen.getByText('Run a query to explore the consumption network.')).toBeTruthy()
     expect(screen.getByLabelText('Data status').textContent).toContain('No data')
   })
 
@@ -232,6 +232,38 @@ describe('App initial state', () => {
       expect(screen.getByRole('button', { name: /LOOP-1.*hops/i })).toHaveAttribute('aria-pressed', 'true')
     })
   })
+
+  it('shows onboarding guidance and disables export before any query', () => {
+    render(<App />)
+
+    expect(screen.getByText('Explore the consumption network')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^csv$/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /^json$/i })).toBeDisabled()
+  })
+
+  it('opens transaction evidence for a selected edge', async () => {
+    stubFetchByUrl((url) => {
+      if (url.pathname === '/consume-chains') {
+        return jsonResponse(sliceResponse([chainRow('chain-1', 1)], { page: 0 }))
+      }
+      if (url.pathname === '/transaction-records/chain-1-record') {
+        return jsonResponse(transactionRecord('chain-1-record'))
+      }
+      if (url.pathname === '/transaction-mounts/chain-1-mount') {
+        return jsonResponse(transactionMount('chain-1-mount'))
+      }
+      throw new Error(`Unexpected URL ${url.href}`)
+    })
+    render(<App />)
+
+    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), { target: { value: 'node-1' } })
+    fireEvent.click(screen.getByRole('button', { name: /^load$/i }))
+
+    fireEvent.click(await screen.findByRole('button', { name: /open transaction/i }))
+
+    expect(await screen.findByText(/Record txid/i)).toBeTruthy()
+    expect(screen.getByText('recordtxid')).toBeTruthy()
+  })
 })
 
 function stubFetchByUrl(handler: (url: URL, init?: RequestInit) => Response): ReturnType<typeof vi.fn> {
@@ -330,6 +362,53 @@ function loopedChainRow(id: string): ConsumeChainResponseDTORaw {
   row.consumeChain.isLoop = true
   row.consumeChainEdges = row.consumeChainEdges.map((edge) => ({ ...edge, isLoop: true }))
   return row
+}
+
+function transactionRecord(id: string) {
+  return {
+    code: 200,
+    message: 'ok',
+    data: {
+      id,
+      msgType: 2,
+      amount: 5000,
+      currencyType: 1,
+      transactionDifficultyTarget: '1d00ffff',
+      nonce: 1,
+      consumeNodePubkey: '03'.padEnd(66, 'a'),
+      flowNodePubkey: '02'.padEnd(66, 'b'),
+      centralPubkey: '02'.padEnd(66, 'c'),
+      consumeNodeSignature: 'aa',
+      flowNodeSignature: 'bb',
+      confirmTimestamp: 1_700_000_000_000_000,
+      centralSignature: 'cc',
+      rawBytes: '00',
+      txid: 'recordtxid',
+    },
+  }
+}
+
+function transactionMount(id: string) {
+  return {
+    code: 200,
+    message: 'ok',
+    data: {
+      id,
+      msgType: 3,
+      mountedTransactionRecordId: 'chain-1-record',
+      transactionDifficultyTarget: '1d00ffff',
+      nonce: 1,
+      consumeNodePubkey: '03'.padEnd(66, 'a'),
+      flowNodePubkey: '02'.padEnd(66, 'b'),
+      centralPubkey: '02'.padEnd(66, 'c'),
+      consumeNodeSignature: 'aa',
+      flowNodeSignature: 'bb',
+      confirmTimestamp: 1_700_000_000_000_000,
+      centralSignature: 'cc',
+      rawBytes: '00',
+      txid: 'mounttxid',
+    },
+  }
 }
 
 function flowNodeDetail(id: string) {

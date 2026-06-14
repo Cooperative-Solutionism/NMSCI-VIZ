@@ -1,6 +1,6 @@
 import cytoscape, { type Core, type NodeSingular } from 'cytoscape'
-import { Maximize2, ZoomIn, ZoomOut } from 'lucide-react'
-import { useEffect, useMemo, useRef } from 'react'
+import { Download, Maximize2, ZoomIn, ZoomOut } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { formatAmount } from '../lib/chainGraph'
 import { deterministicOffset, type Point } from '../lib/graphLayout'
 import { readGraphTokens } from '../lib/tokens'
@@ -195,6 +195,16 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
     if (selectedId) cy.getElementById(selectedId).select()
   }, [selectedChainId, selectedId])
 
+  const handleDownloadPng = useCallback(() => {
+    const cy = cyRef.current
+    if (!cy) return
+    const uri = cy.png({ full: true, scale: 2, bg: '#ffffff' })
+    const link = document.createElement('a')
+    link.href = uri
+    link.download = 'nmsci-graph.png'
+    link.click()
+  }, [])
+
   return (
     <div className="graph-shell">
       <div
@@ -242,6 +252,14 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
           onClick={() => cyRef.current?.fit(undefined, 48)}
         >
           <Maximize2 size={16} />
+        </button>
+        <button
+          type="button"
+          aria-label="Download PNG"
+          title="Download PNG"
+          onClick={handleDownloadPng}
+        >
+          <Download size={16} />
         </button>
       </div>
       <div className="legend">

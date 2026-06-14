@@ -6,12 +6,15 @@ import { DetailRow } from './DetailRow'
 import type { FlowRateView } from './NodeInspector'
 import { PanelHeader } from './PanelHeader'
 import { ReturnFlowCard } from './ReturnFlowCard'
+import { TransactionEvidence } from './TransactionEvidence'
 
 export function EdgeInspector({
+  apiBase,
   chain,
   edge,
   flowRate,
 }: {
+  apiBase: string
   chain: ConsumeChainResponseDTO | null
   edge: ChainGraphEdge
   flowRate: FlowRateView
@@ -37,6 +40,11 @@ export function EdgeInspector({
         </>
       ) : null}
       <ReturnFlowCard data={flowRate.data} error={flowRate.error} mode="edge" status={flowRate.status} />
+      <TransactionEvidence
+        apiBase={apiBase}
+        mountId={edge.relatedTransactionMount}
+        recordId={edge.relatedTransactionRecord}
+      />
     </div>
   )
 }

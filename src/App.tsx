@@ -42,6 +42,7 @@ import { useNodeDetail } from './hooks/useNodeDetail'
 import { useReturningFlowRate } from './hooks/useReturningFlowRate'
 import { normalizeNBitsHex } from './lib/difficulty'
 import { errorMessage } from './lib/errors'
+import { edgesToCsv, rowsToJson, toCurl } from './lib/exporters'
 import { extractLoops } from './lib/loops'
 import { formatDateTime, maskSecret, shortHex } from './lib/format'
 import {
@@ -122,6 +123,12 @@ function App() {
     const edge = graph.edges.find((candidate) => candidate.chainId === chainId)
     if (edge) selectEdge(edge)
   }, [graph.edges, selectEdge])
+  const inspectorEmptyMessage =
+    origin === 'idle'
+      ? 'Run a query to explore the consumption network.'
+      : filteredRows.length === 0 && rows.length > 0
+        ? `${rows.length} row${rows.length === 1 ? '' : 's'} hidden by the current-page filter.`
+        : 'No chains matched. Try loop status: All or another mode.'
   const [localFlowNodes, setLocalFlowNodes] = useState<LocalFlowNode[]>(() => loadLocalFlowNodes())
   const [selectedLocalPubkey, setSelectedLocalPubkey] = useState(() => localFlowNodes[0]?.publicKeyHex ?? '')
   const [registerDifficultyTarget, setRegisterDifficultyTarget] = useState('')
@@ -136,6 +143,17 @@ function App() {
       ?? localFlowNodes[0]
       ?? null
   }, [localFlowNodes, selectedLocalPubkey])
+  const handleExportCsv = useCallback(() => {
+    downloadText('consume-chain-edges.csv', 'text/csv;charset=utf-8', edgesToCsv(graph.edges))
+  }, [graph.edges])
+  const handleExportJson = useCallback(() => {
+    downloadText('consume-chains.json', 'application/json', rowsToJson(filteredRows))
+  }, [filteredRows])
+  const handleCopyCurl = useCallback(async () => {
+    await navigator.clipboard.writeText(toCurl(requestUrl))
+    setFlowNodeError(null)
+    setFlowNodeStatus('Request curl copied.')
+  }, [requestUrl])
   const handlePreviousPage = useCallback(() => {
     const nextPage = Math.max(0, page - 1)
     void runQuery(nextPage)
@@ -606,6 +624,26 @@ function App() {
         </aside>
 
         <section id="network-graph" className="graph-panel" aria-label="Network visualization" aria-busy={loading}>
+          <div className="export-bar" role="group" aria-label="Export">
+            <button className="ghost-button" type="button" disabled={graph.edges.length === 0} onClick={handleExportCsv}>
+              CSV
+            </button>
+            <button className="ghost-button" type="button" disabled={filteredRows.length === 0} onClick={handleExportJson}>
+              JSON
+            </button>
+            <button className="ghost-button" type="button" onClick={() => void handleCopyCurl()}>
+              Copy curl
+            </button>
+          </div>
+          {origin === 'idle' ? (
+            <div className="graph-welcome">
+              <h2>Explore the consumption network</h2>
+              <p>
+                Enter a flow node UUID or 66-hex public key, choose a mode (Start / End / Node), and
+                Load. Looped chains are circular trades — open the Loops panel to rank them.
+              </p>
+            </div>
+          ) : null}
           <div className="metrics-strip">
             <MetricCard label="Total chains" value={graph.stats.totalChains.toString()} icon={<GitBranch size={17} />} />
             <MetricCard label="Looped" value={graph.stats.loopedChains.toString()} tone="looped" icon={<Activity size={17} />} />
@@ -643,7 +681,7 @@ function App() {
           </div>
 
           {selectedEdge ? (
-            <EdgeInspector edge={selectedEdge} chain={selectedChain} flowRate={flowRateView} />
+            <EdgeInspector apiBase={apiBase} edge={selectedEdge} chain={selectedChain} flowRate={flowRateView} />
           ) : selectedNode ? (
             <NodeInspector
               detailError={nodeDetailError}
@@ -658,7 +696,7 @@ function App() {
               state={nodeState}
             />
           ) : (
-            <div className="empty-state">No chain data in the current filter.</div>
+            <div className="empty-state">{inspectorEmptyMessage}</div>
           )}
         </aside>
       </section>
@@ -684,6 +722,16 @@ function App() {
       </footer>
     </main>
   )
+}
+
+function downloadText(filename: string, mime: string, content: string): void {
+  const blob = new Blob([content], { type: mime })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 export default App
