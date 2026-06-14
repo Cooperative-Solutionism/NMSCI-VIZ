@@ -1,47 +1,45 @@
-import { ApiClient, getFlowNodeRegisterMsgById } from '@nmsci/sdk'
+import { ApiClient, getFlowNodeState, type FlowNodeStateResponseDTO } from '@nmsci/sdk'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { errorMessage } from '../lib/errors'
-import type { FlowNodeRegisterMsgRaw } from '../lib/types'
 
 export type NodeDetailStatus = 'idle' | 'loading' | 'loaded' | 'error'
 
-export function useNodeDetail(apiBase: string, selectedNodeId: string | null) {
-  const [nodeDetailsById, setNodeDetailsById] = useState<Record<string, FlowNodeRegisterMsgRaw>>({})
+// 流转节点状态只能按公钥查询（后端无「按 UUID 查节点」端点，API.md §5）。
+// 图节点 id 是 UUID，因此仅当上游能提供公钥时才发起查询，否则保持 idle，不再误打注册消息端点。
+export function useNodeDetail(apiBase: string, selectedPubkey: string | null) {
+  const [stateByPubkey, setStateByPubkey] = useState<Record<string, FlowNodeStateResponseDTO>>({})
   const [nodeDetailStatus, setNodeDetailStatus] = useState<NodeDetailStatus>('idle')
   const [nodeDetailError, setNodeDetailError] = useState<string | null>(null)
   const client = useMemo(() => new ApiClient({ baseUrl: apiBase }), [apiBase])
-  const nodeDetailGenerationRef = useRef<Record<string, number>>({})
+  const generationRef = useRef<Record<string, number>>({})
 
-  const loadNodeDetail = useCallback(async (targetNodeId: string) => {
-    const generation = (nodeDetailGenerationRef.current[targetNodeId] ?? 0) + 1
-    nodeDetailGenerationRef.current[targetNodeId] = generation
+  const loadNodeState = useCallback(async (pubkey: string) => {
+    const generation = (generationRef.current[pubkey] ?? 0) + 1
+    generationRef.current[pubkey] = generation
     setNodeDetailStatus('loading')
     setNodeDetailError(null)
 
     try {
-      const detail = await getFlowNodeRegisterMsgById(client, targetNodeId)
-      if (generation !== nodeDetailGenerationRef.current[targetNodeId]) return
-      setNodeDetailsById((currentDetails) => ({
-        ...currentDetails,
-        [targetNodeId]: detail.data,
-      }))
+      const detail = await getFlowNodeState(client, pubkey)
+      if (generation !== generationRef.current[pubkey]) return
+      setStateByPubkey((current) => ({ ...current, [pubkey]: detail.data }))
       setNodeDetailStatus('loaded')
     } catch (detailError) {
-      if (generation !== nodeDetailGenerationRef.current[targetNodeId]) return
+      if (generation !== generationRef.current[pubkey]) return
       setNodeDetailStatus('error')
-      setNodeDetailError(errorMessage(detailError, 'Unknown node detail error'))
+      setNodeDetailError(errorMessage(detailError, 'Unknown node state error'))
     }
   }, [client])
 
   useEffect(() => {
-    if (!selectedNodeId || nodeDetailsById[selectedNodeId]) return
-    void Promise.resolve().then(() => loadNodeDetail(selectedNodeId))
-  }, [loadNodeDetail, nodeDetailsById, selectedNodeId])
+    if (!selectedPubkey || stateByPubkey[selectedPubkey]) return
+    void Promise.resolve().then(() => loadNodeState(selectedPubkey))
+  }, [loadNodeState, selectedPubkey, stateByPubkey])
 
   return {
-    loadNodeDetail,
+    loadNodeState,
     nodeDetailError,
     nodeDetailStatus,
-    nodeDetailsById,
+    nodeState: selectedPubkey ? stateByPubkey[selectedPubkey] : undefined,
   }
 }

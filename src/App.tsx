@@ -4,7 +4,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleDot,
-  Copy,
   Database,
   Filter,
   GitBranch,
@@ -35,7 +34,7 @@ import {
   sendCentralPubkeyEmpowerMsg,
   sendFlowNodeRegisterMsg,
 } from '@nmsci/sdk'
-import { formatAmount, shortId } from './lib/chainGraph'
+import { formatVolumeByCurrency, shortId } from './lib/chainGraph'
 import { statusLabel } from './lib/consumeChainFilters'
 import { useConsumeChainQuery, type CurrencyFilter } from './hooks/useConsumeChainQuery'
 import { useNodeDetail } from './hooks/useNodeDetail'
@@ -97,12 +96,13 @@ function App() {
     setSize,
     size,
     slice,
+    warning,
   } = useConsumeChainQuery(apiBase, defaultPageSize)
   const {
     nodeDetailError,
     nodeDetailStatus,
-    nodeDetailsById,
-  } = useNodeDetail(apiBase, selectedNode?.id ?? null)
+    nodeState,
+  } = useNodeDetail(apiBase, null)
   const [localFlowNodes, setLocalFlowNodes] = useState<LocalFlowNode[]>(() => loadLocalFlowNodes())
   const [selectedLocalPubkey, setSelectedLocalPubkey] = useState(() => localFlowNodes[0]?.publicKeyHex ?? '')
   const [registerDifficultyTarget, setRegisterDifficultyTarget] = useState('')
@@ -112,7 +112,6 @@ function App() {
   const [flowNodeError, setFlowNodeError] = useState<string | null>(null)
   const [lastFlowNodeRawBytes, setLastFlowNodeRawBytes] = useState('')
   const client = useMemo(() => new ApiClient({ baseUrl: apiBase }), [apiBase])
-  const selectedNodeDetail = selectedNode ? nodeDetailsById[selectedNode.id] : undefined
   const selectedLocalNode = useMemo(() => {
     return localFlowNodes.find((localNode) => localNode.publicKeyHex === selectedLocalPubkey)
       ?? localFlowNodes[0]
@@ -155,12 +154,13 @@ function App() {
     setLastFlowNodeRawBytes('')
   }, [persistLocalFlowNodes])
 
-  const handleFillSelectedFlowNodeId = useCallback(() => {
+  const handleQuerySelectedFlowNode = useCallback(() => {
     if (!selectedLocalNode) return
-    setNodeId(queryIdForLocalFlowNode(selectedLocalNode))
+    setMode('node')
+    setNodeId(selectedLocalNode.publicKeyHex)
     setFlowNodeError(null)
-    setFlowNodeStatus('Flow node UUID filled into query.')
-  }, [selectedLocalNode, setNodeId])
+    setFlowNodeStatus('Flow node public key filled into query.')
+  }, [selectedLocalNode, setMode, setNodeId])
 
   const handleCopyText = useCallback(async (value: string, label: string) => {
     await navigator.clipboard.writeText(value)
@@ -363,7 +363,7 @@ function App() {
             </div>
           </Field>
 
-          <Field label="Flow node UUID">
+          <Field label="Flow node id / pubkey">
             <textarea
               rows={3}
               value={nodeId}
@@ -371,6 +371,7 @@ function App() {
               spellCheck={false}
             />
           </Field>
+          <p className="field-hint">UUID or 66-hex public key (auto-detected)</p>
 
           <Field label="Loop status">
             <div className="segmented compact" role="group" aria-label="Loop status">
@@ -442,6 +443,7 @@ function App() {
           </div>
 
           {error ? <p className="error-banner">{error}. Current graph was kept unchanged.</p> : null}
+          {warning ? <p className="info-banner">{warning}</p> : null}
           {extended ? <p className="info-banner">Extended graph view; reload the query to resume pagination.</p> : null}
 
           <div className="flow-node-block">
@@ -491,15 +493,15 @@ function App() {
                   )}
                 />
                 <DetailRow
-                  label="Node ID"
-                  value={(
+                  label="Register id"
+                  value={selectedLocalNode.registration?.id ? (
                     <span className="copyable-value">
-                      <code>{queryIdForLocalFlowNode(selectedLocalNode)}</code>
-                      <button type="button" onClick={() => void handleCopyText(queryIdForLocalFlowNode(selectedLocalNode), 'Node ID')}>
+                      <code>{selectedLocalNode.registration.id}</code>
+                      <button type="button" onClick={() => void handleCopyText(selectedLocalNode.registration?.id ?? '', 'Register id')}>
                         Copy
                       </button>
                     </span>
-                  )}
+                  ) : '—'}
                 />
                 <DetailRow label="Secret" value={<code>{maskSecret(selectedLocalNode.privateKeyHex)}</code>} />
                 <DetailRow label="Saved" value={formatDateTime(selectedLocalNode.createdAt)} />
@@ -508,10 +510,10 @@ function App() {
                 <button
                   className="secondary-button"
                   type="button"
-                  onClick={handleFillSelectedFlowNodeId}
+                  onClick={handleQuerySelectedFlowNode}
                 >
-                  <Copy size={15} />
-                  Fill node UUID
+                  <Search size={15} />
+                  Query this node
                 </button>
                 <button
                   className="secondary-button"
@@ -591,7 +593,7 @@ function App() {
             <MetricCard label="Open" value={graph.stats.openChains.toString()} tone="open" icon={<Network size={17} />} />
             <MetricCard
               label="Volume"
-              value={formatAmount(graph.stats.volume, graph.stats.currencyType)}
+              value={formatVolumeByCurrency(graph.stats.volumeByCurrency)}
               icon={<Database size={17} />}
             />
           </div>
@@ -623,7 +625,6 @@ function App() {
             <EdgeInspector edge={selectedEdge} chain={selectedChain} />
           ) : selectedNode ? (
             <NodeInspector
-              detail={selectedNodeDetail}
               detailError={nodeDetailError}
               detailStatus={nodeDetailStatus}
               disabled={loading}
@@ -632,6 +633,7 @@ function App() {
               onExtendEnd={() => void extendFromNode(selectedNode, 'end')}
               onExtendNode={() => void extendFromNode(selectedNode, 'node')}
               onExtendStart={() => void extendFromNode(selectedNode, 'start')}
+              state={nodeState}
             />
           ) : (
             <div className="empty-state">No chain data in the current filter.</div>
@@ -660,13 +662,6 @@ function App() {
       </footer>
     </main>
   )
-}
-
-function queryIdForLocalFlowNode(node: LocalFlowNode): string {
-  if (node.registration?.status === 'sent' && node.registration.id) {
-    return node.registration.id
-  }
-  return node.id
 }
 
 export default App

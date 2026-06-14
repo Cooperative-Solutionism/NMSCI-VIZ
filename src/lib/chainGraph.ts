@@ -4,19 +4,25 @@ import type {
   ChainGraphNode,
   ConsumeChainQuery,
   ConsumeChainResponseDTO,
+  VolumeByCurrency,
 } from './types'
+import { consumeChainParamName, detectIdentityKind } from './consumeChainFilters'
 import { readGraphTokens } from './tokens'
 
 export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTO[]): ChainGraph {
   const nodes = new Map<string, ChainGraphNode>()
   const edges: ChainGraphEdge[] = []
+  const volumeByCurrency: VolumeByCurrency = new Map()
+  let loopedChains = 0
 
   for (const row of rows) {
-    touchNode(nodes, row.consumeChain.start, row.consumeChain.amount)
+    if (row.consumeChain.isLoop) loopedChains += 1
+    addAmount(volumeByCurrency, row.consumeChain.currencyType, row.consumeChain.amount)
 
+    // 节点吞吐量仅由边贡献（链的 start/end 必为首尾边的端点），避免链额+边额对同一节点重复计数。
     for (const edge of row.consumeChainEdges) {
-      touchNode(nodes, edge.source, edge.amount)
-      touchNode(nodes, edge.target, edge.amount)
+      touchNode(nodes, edge.source, edge.amount, edge.currencyType)
+      touchNode(nodes, edge.target, edge.amount, edge.currencyType)
       edges.push({
         id: edge.id,
         source: edge.source,
@@ -33,7 +39,11 @@ export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTO[]): Ch
       })
     }
 
-    touchNode(nodes, row.consumeChain.end, row.consumeChain.amount)
+    // 无边的退化链（理论上不出现）仍需让 start/end 入图。
+    if (row.consumeChainEdges.length === 0) {
+      touchNode(nodes, row.consumeChain.start, 0n, row.consumeChain.currencyType)
+      touchNode(nodes, row.consumeChain.end, 0n, row.consumeChain.currencyType)
+    }
   }
 
   return {
@@ -41,24 +51,19 @@ export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTO[]): Ch
     edges,
     stats: {
       totalChains: rows.length,
-      loopedChains: rows.filter((row) => row.consumeChain.isLoop).length,
-      openChains: rows.filter((row) => !row.consumeChain.isLoop).length,
-      volume: rows.reduce((sum, row) => sum + row.consumeChain.amount, 0n),
-      currencyType: rows[0]?.consumeChain.currencyType ?? 1,
+      loopedChains,
+      openChains: rows.length - loopedChains,
+      volumeByCurrency,
     },
   }
 }
 
-// 展示用：还原 SDK queryConsumeChains 实际请求的 URL（集合根 + id 模式查询参数）。
+// 展示用：还原 SDK queryConsumeChains 实际请求的 URL（集合根 + id/pubkey 模式查询参数）。
 export function buildConsumeChainUrl(baseUrl: string, query: ConsumeChainQuery): string {
   const normalizedBaseUrl = baseUrl.replace(/\/+$/, '')
-  const nodeParamByMode: Record<ConsumeChainQuery['mode'], string> = {
-    start: 'startId',
-    end: 'endId',
-    node: 'nodeId',
-  }
   const params = new URLSearchParams()
-  params.set(nodeParamByMode[query.mode], query.nodeId)
+  const trimmed = query.nodeId.trim()
+  params.set(consumeChainParamName(query.mode, detectIdentityKind(trimmed)), trimmed)
 
   if (query.loopStatus !== 'all') {
     params.set('isLoop', String(query.loopStatus === 'looped'))
@@ -103,6 +108,19 @@ export function formatAmount(amount: number | bigint, currencyType: number): str
   return `${normalizedAmount.toLocaleString()} #${currencyType}`
 }
 
+// 把按币种分桶的金额渲染成单行（"125.00 CNY · 2,500,000 ug Au"）。空桶显示 0。
+export function formatVolumeByCurrency(volumeByCurrency: VolumeByCurrency): string {
+  if (volumeByCurrency.size === 0) return formatAmount(0n, 1)
+  return [...volumeByCurrency.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([currencyType, amount]) => formatAmount(amount, currencyType))
+    .join(' · ')
+}
+
+function addAmount(target: VolumeByCurrency, currencyType: number, amount: bigint): void {
+  target.set(currencyType, (target.get(currencyType) ?? 0n) + amount)
+}
+
 export function chainColor(chainId: string): string {
   const chainPalette = readGraphTokens().chainPalette
   let hash = 0
@@ -112,18 +130,25 @@ export function chainColor(chainId: string): string {
   return chainPalette[hash % chainPalette.length] ?? '#0f766e'
 }
 
-function touchNode(nodes: Map<string, ChainGraphNode>, id: string, amount: bigint): void {
+function touchNode(
+  nodes: Map<string, ChainGraphNode>,
+  id: string,
+  amount: bigint,
+  currencyType: number,
+): void {
   const existing = nodes.get(id)
   if (existing) {
     existing.chainCount += 1
-    existing.volume += amount
+    addAmount(existing.volumeByCurrency, currencyType, amount)
     return
   }
 
+  const volumeByCurrency: VolumeByCurrency = new Map()
+  addAmount(volumeByCurrency, currencyType, amount)
   nodes.set(id, {
     id,
     label: shortId(id),
     chainCount: 1,
-    volume: amount,
+    volumeByCurrency,
   })
 }
