@@ -8,14 +8,34 @@
   --muted: #61706a;
   --soft: #eef2eb;
   --teal: #08776c;
+  --teal-rgb: 8 119 108;
   --teal-soft: #e3f4ef;
   --green: #178f69;
   --amber: #d88a21;
   --amber-soft: #fbefd9;
   --red: #ad3e32;
   --red-soft: #f8e7e2;
-  --blue: #286f9f;
   --shadow: 0 20px 40px rgba(32, 45, 39, 0.09);
+  --graph-panel-bg: #edf1ea;
+  --graph-node-bg: #f8fafc;
+  --graph-node-border: #b9c6d3;
+  --graph-node-text: #16202a;
+  --graph-node-selected-bg: #effdfa;
+  --graph-node-selected-border: #08776c;
+  --graph-edge-text: #334155;
+  --graph-edge-label-bg: #ffffff;
+  --chain-1: #0f766e;
+  --chain-2: #b45309;
+  --chain-3: #2563eb;
+  --chain-4: #be123c;
+  --chain-5: #6d28d9;
+  --chain-6: #15803d;
+  --chain-7: #c2410c;
+  --chain-8: #0369a1;
+  --chain-9: #a21caf;
+  --chain-10: #4d7c0f;
+  --chain-11: #b91c1c;
+  --chain-12: #0e7490;
   --font-sans:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono:
@@ -31,6 +51,36 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111815;
+    --surface: #17211d;
+    --surface-muted: #1d2924;
+    --line: #304039;
+    --line-strong: #5c7168;
+    --text: #edf7f1;
+    --muted: #a8bbb2;
+    --soft: #22312b;
+    --teal: #4fc4b5;
+    --teal-rgb: 79 196 181;
+    --teal-soft: #173c37;
+    --green: #4fbf87;
+    --amber: #e4a84a;
+    --amber-soft: #3b2d16;
+    --red: #ef8c7f;
+    --red-soft: #3c211f;
+    --shadow: 0 20px 44px rgba(0, 0, 0, 0.28);
+    --graph-panel-bg: #111815;
+    --graph-node-bg: #1d2924;
+    --graph-node-border: #5c7168;
+    --graph-node-text: #edf7f1;
+    --graph-node-selected-bg: #173c37;
+    --graph-node-selected-border: #4fc4b5;
+    --graph-edge-text: #d9e5df;
+    --graph-edge-label-bg: #17211d;
+  }
 }
 
 * {
@@ -56,6 +106,20 @@ button {
 
 button:disabled {
   cursor: not-allowed;
+}
+
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible),
+[tabindex]:focus:not(:focus-visible) {
+  outline: none;
 }
 
 code {

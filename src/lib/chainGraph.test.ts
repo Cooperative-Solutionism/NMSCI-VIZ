@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { normalizeConsumeChainResponseDTO } from '@nmsci/sdk'
 import {
   buildConsumeChainUrl,
   buildGraphFromConsumeChains,
@@ -9,7 +10,7 @@ import {
 } from './chainGraph'
 import type { ConsumeChainResponseDTORaw } from './types'
 
-const chainRows: ConsumeChainResponseDTORaw[] = [
+const rawChainRows: ConsumeChainResponseDTORaw[] = [
   {
     consumeChain: {
       id: 'chain-a',
@@ -73,6 +74,7 @@ const chainRows: ConsumeChainResponseDTORaw[] = [
     ],
   },
 ]
+const chainRows = rawChainRows.map(normalizeConsumeChainResponseDTO)
 
 describe('chain graph mapping', () => {
   it('deduplicates nodes, maps directed edges, and aggregates metrics', () => {
@@ -91,16 +93,16 @@ describe('chain graph mapping', () => {
       target: '22222222-2222-4222-8222-222222222222',
       chainId: 'chain-a',
       status: 'looped',
-      amount: 5000,
+      amount: 5000n,
       color: chainColor('chain-a'),
     })
-    expect(graph.edges[0].color).toBe(graph.edges[1].color)
-    expect(graph.edges[0].color).not.toBe(graph.edges[2].color)
+    expect(graph.edges[0]!.color).toBe(graph.edges[1]!.color)
+    expect(graph.edges[0]!.color).not.toBe(graph.edges[2]!.color)
     expect(graph.stats).toEqual({
       totalChains: 2,
       loopedChains: 1,
       openChains: 1,
-      volume: 15700,
+      volume: 15700n,
       currencyType: 1,
     })
   })
@@ -140,14 +142,14 @@ describe('chain graph mapping', () => {
   })
 
   it('merges extended consume chains by chain id without duplicating existing graph rows', () => {
-    const duplicate = {
-      ...chainRows[0],
+    const duplicate = normalizeConsumeChainResponseDTO({
+      ...rawChainRows[0]!,
       consumeChain: {
-        ...chainRows[0].consumeChain,
+        ...rawChainRows[0]!.consumeChain,
         amount: 999999,
       },
-    }
-    const extra: ConsumeChainResponseDTORaw = {
+    })
+    const extra = normalizeConsumeChainResponseDTO({
       consumeChain: {
         id: 'chain-c',
         start: '44444444-4444-4444-8444-444444444444',
@@ -171,11 +173,11 @@ describe('chain graph mapping', () => {
           isLoop: false,
         },
       ],
-    }
+    })
 
     const merged = mergeConsumeChains(chainRows, [duplicate, extra])
 
     expect(merged.map((row) => row.consumeChain.id)).toEqual(['chain-a', 'chain-b', 'chain-c'])
-    expect(merged[0].consumeChain.amount).toBe(12500)
+    expect(merged[0]!.consumeChain.amount).toBe(12500n)
   })
 })

@@ -2,6 +2,8 @@ import cytoscape, { type Core, type NodeSingular } from 'cytoscape'
 import { Maximize2, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEffect, useMemo, useRef } from 'react'
 import { formatAmount } from '../lib/chainGraph'
+import { deterministicOffset, type Point } from '../lib/graphLayout'
+import { readGraphTokens } from '../lib/tokens'
 import type { ChainGraph, ChainGraphEdge, ChainGraphNode } from '../lib/types'
 
 interface NetworkGraphProps {
@@ -11,15 +13,9 @@ interface NetworkGraphProps {
   onSelectEdge: (edge: ChainGraphEdge) => void
 }
 
-interface Point {
-  x: number
-  y: number
-}
-
 export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: NetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const cyRef = useRef<Core | null>(null)
-  const initializedRef = useRef(false)
   const nodeMapRef = useRef(new Map<string, ChainGraphNode>())
   const edgeMapRef = useRef(new Map<string, ChainGraphEdge>())
   const onSelectNodeRef = useRef(onSelectNode)
@@ -50,6 +46,7 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
 
   useEffect(() => {
     if (!containerRef.current) return
+    const tokens = readGraphTokens()
 
     const cy = cytoscape({
       container: containerRef.current,
@@ -60,10 +57,10 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
         {
           selector: 'node',
           style: {
-            'background-color': '#f8fafc',
-            'border-color': '#b9c6d3',
+            'background-color': tokens.nodeBackground,
+            'border-color': tokens.nodeBorder,
             'border-width': 1.4,
-            color: '#16202a',
+            color: tokens.nodeText,
             content: 'data(label)',
             'font-family': 'Inter, ui-sans-serif, system-ui',
             'font-size': 11,
@@ -77,15 +74,15 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
         {
           selector: 'node:selected',
           style: {
-            'background-color': '#effdfa',
-            'border-color': '#08776c',
+            'background-color': tokens.nodeSelectedBackground,
+            'border-color': tokens.nodeSelectedBorder,
             'border-width': 3,
           },
         },
         {
           selector: 'edge',
           style: {
-            color: '#334155',
+            color: tokens.edgeText,
             'curve-style': 'bezier',
             'font-family': 'Inter, ui-sans-serif, system-ui',
             'font-size': 10,
@@ -96,7 +93,7 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
             'target-arrow-color': 'data(color)',
             'target-arrow-shape': 'triangle',
             'target-distance-from-node': 2,
-            'text-background-color': '#ffffff',
+            'text-background-color': tokens.edgeLabelBackground,
             'text-background-opacity': 0.92,
             'text-background-padding': '3px',
             'text-rotation': 'autorotate',
@@ -109,6 +106,18 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
             opacity: 0.16,
             'text-background-opacity': 0,
             'text-opacity': 0.2,
+          },
+        },
+        {
+          selector: 'edge[status = "open"]',
+          style: {
+            'line-style': 'dashed',
+          },
+        },
+        {
+          selector: 'edge[status = "looped"]',
+          style: {
+            'line-style': 'solid',
           },
         },
         {
@@ -146,7 +155,6 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
     return () => {
       cy.destroy()
       cyRef.current = null
-      initializedRef.current = false
     }
   }, [])
 
@@ -167,7 +175,6 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
         nodeRepulsion: 9500,
         idealEdgeLength: 132,
       }).run()
-      initializedRef.current = true
     }
   }, [graph.edges, graph.nodes])
 
@@ -190,7 +197,27 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
 
   return (
     <div className="graph-shell">
-      <div ref={containerRef} className="graph-canvas" aria-label="Consumption chain network graph" />
+      <div
+        ref={containerRef}
+        className="graph-canvas"
+        role="img"
+        tabIndex={0}
+        aria-label={`Consumption chain network graph with ${graph.nodes.length} nodes and ${graph.edges.length} edges`}
+      />
+      <div className="sr-only graph-access-list" aria-label="Keyboard graph selection">
+        <h3>Graph nodes</h3>
+        {graph.nodes.map((node) => (
+          <button key={node.id} type="button" onClick={() => onSelectNode(node)}>
+            Select node {node.id}
+          </button>
+        ))}
+        <h3>Graph edges</h3>
+        {graph.edges.map((edge) => (
+          <button key={edge.id} type="button" onClick={() => onSelectEdge(edge)}>
+            Select {edge.status} edge {edge.id}
+          </button>
+        ))}
+      </div>
       <div className="graph-tools" aria-label="Graph controls">
         <button
           type="button"
@@ -314,17 +341,4 @@ function findNeighborPosition(cy: Core, nodeId: string, edges: ChainGraphEdge[])
     }
   }
   return null
-}
-
-function deterministicOffset(id: string): Point {
-  let hash = 0
-  for (let index = 0; index < id.length; index += 1) {
-    hash = (hash * 33 + id.charCodeAt(index)) >>> 0
-  }
-  const angle = (hash % 360) * (Math.PI / 180)
-  const radius = 126 + (hash % 48)
-  return {
-    x: Math.cos(angle) * radius,
-    y: Math.sin(angle) * radius,
-  }
 }

@@ -3,11 +3,11 @@ import type {
   ChainGraphEdge,
   ChainGraphNode,
   ConsumeChainQuery,
-  ConsumeChainResponseDTORaw,
-  EdgeStatus,
+  ConsumeChainResponseDTO,
 } from './types'
+import { readGraphTokens } from './tokens'
 
-export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTORaw[]): ChainGraph {
+export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTO[]): ChainGraph {
   const nodes = new Map<string, ChainGraphNode>()
   const edges: ChainGraphEdge[] = []
 
@@ -43,7 +43,7 @@ export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTORaw[]):
       totalChains: rows.length,
       loopedChains: rows.filter((row) => row.consumeChain.isLoop).length,
       openChains: rows.filter((row) => !row.consumeChain.isLoop).length,
-      volume: rows.reduce((sum, row) => sum + row.consumeChain.amount, 0),
+      volume: rows.reduce((sum, row) => sum + row.consumeChain.amount, 0n),
       currencyType: rows[0]?.consumeChain.currencyType ?? 1,
     },
   }
@@ -75,10 +75,10 @@ export function shortId(id: string): string {
 }
 
 export function mergeConsumeChains(
-  currentRows: ConsumeChainResponseDTORaw[],
-  nextRows: ConsumeChainResponseDTORaw[],
-): ConsumeChainResponseDTORaw[] {
-  const rowsByChainId = new Map<string, ConsumeChainResponseDTORaw>()
+  currentRows: ConsumeChainResponseDTO[],
+  nextRows: ConsumeChainResponseDTO[],
+): ConsumeChainResponseDTO[] {
+  const rowsByChainId = new Map<string, ConsumeChainResponseDTO>()
   for (const row of currentRows) {
     rowsByChainId.set(row.consumeChain.id, row)
   }
@@ -90,47 +90,29 @@ export function mergeConsumeChains(
   return Array.from(rowsByChainId.values())
 }
 
-export function formatAmount(amount: number, currencyType: number): string {
+export function formatAmount(amount: number | bigint, currencyType: number): string {
+  const normalizedAmount = typeof amount === 'bigint' ? amount : BigInt(Math.trunc(amount))
   if (currencyType === 1) {
-    return `${(amount / 100).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })} CNY`
+    const whole = normalizedAmount / 100n
+    const cents = normalizedAmount % 100n
+    return `${whole.toLocaleString()}.${cents.toString().padStart(2, '0')} CNY`
   }
   if (currencyType === 0) {
-    return `${amount.toLocaleString()} ug Au`
+    return `${normalizedAmount.toLocaleString()} ug Au`
   }
-  return `${amount.toLocaleString()} #${currencyType}`
+  return `${normalizedAmount.toLocaleString()} #${currencyType}`
 }
-
-export function edgeColor(status: EdgeStatus): string {
-  return status === 'looped' ? '#178f69' : '#d88a21'
-}
-
-const chainPalette = [
-  '#0f766e',
-  '#b45309',
-  '#2563eb',
-  '#be123c',
-  '#6d28d9',
-  '#15803d',
-  '#c2410c',
-  '#0369a1',
-  '#a21caf',
-  '#4d7c0f',
-  '#b91c1c',
-  '#0e7490',
-]
 
 export function chainColor(chainId: string): string {
+  const chainPalette = readGraphTokens().chainPalette
   let hash = 0
   for (let index = 0; index < chainId.length; index += 1) {
     hash = (hash * 31 + chainId.charCodeAt(index)) >>> 0
   }
-  return chainPalette[hash % chainPalette.length]
+  return chainPalette[hash % chainPalette.length] ?? '#0f766e'
 }
 
-function touchNode(nodes: Map<string, ChainGraphNode>, id: string, amount: number): void {
+function touchNode(nodes: Map<string, ChainGraphNode>, id: string, amount: bigint): void {
   const existing = nodes.get(id)
   if (existing) {
     existing.chainCount += 1

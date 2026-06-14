@@ -1,7 +1,7 @@
 export interface LocalFlowNodeRegistration {
   id: string
   rawBytesHex: string
-  registerDifficultyTarget: number
+  registerDifficultyTarget: string
   nonce: number
   txid?: string
   status: 'sent' | 'failed'
@@ -61,19 +61,12 @@ export function saveLocalFlowNodes(
   storage.setItem(flowNodeStorageKey, JSON.stringify(document))
 }
 
-export function upsertLocalFlowNode(
-  node: LocalFlowNode,
-  storage: Storage = window.localStorage,
+export function patchLocalFlowNode(
+  nodes: LocalFlowNode[],
+  id: string,
+  patch: Partial<LocalFlowNode>,
 ): LocalFlowNode[] {
-  const nodes = loadLocalFlowNodes(storage)
-  const existingIndex = nodes.findIndex((currentNode) => currentNode.id === node.id)
-  if (existingIndex >= 0) {
-    nodes[existingIndex] = node
-  } else {
-    nodes.unshift(node)
-  }
-  saveLocalFlowNodes(nodes, storage)
-  return nodes
+  return nodes.map((node) => (node.id === id ? { ...node, ...patch } : node))
 }
 
 function isLocalFlowNode(value: unknown): value is LocalFlowNode {
