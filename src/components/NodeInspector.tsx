@@ -1,17 +1,25 @@
 import { CircleDot } from 'lucide-react'
-import type { FlowNodeStateResponseDTO } from '@nmsci/sdk'
+import type { FlowNodeStateResponseDTO, ReturningFlowRateResponseDTO } from '@nmsci/sdk'
 import { formatVolumeByCurrency, shortId } from '../lib/chainGraph'
 import type { ChainGraphNode, QueryMode } from '../lib/types'
 import { DetailRow } from './DetailRow'
 import { PanelHeader } from './PanelHeader'
+import { ReturnFlowCard } from './ReturnFlowCard'
 
 type NodeDetailStatus = 'idle' | 'loading' | 'loaded' | 'error'
+
+export interface FlowRateView {
+  data: ReturningFlowRateResponseDTO | null
+  error: string | null
+  status: NodeDetailStatus
+}
 
 export function NodeInspector({
   detailError,
   detailStatus,
   disabled,
   extendLoading,
+  flowRate,
   node,
   onExtendEnd,
   onExtendNode,
@@ -22,6 +30,7 @@ export function NodeInspector({
   detailStatus: NodeDetailStatus
   disabled: boolean
   extendLoading: QueryMode | null
+  flowRate: FlowRateView
   node: ChainGraphNode
   onExtendEnd: () => void
   onExtendNode: () => void
@@ -76,6 +85,7 @@ export function NodeInspector({
       ) : detailStatus === 'idle' ? (
         <div className="detail-state">Node state needs the flow node public key (select via a pubkey query).</div>
       ) : null}
+      <ReturnFlowCard data={flowRate.data} error={flowRate.error} mode="node" status={flowRate.status} />
     </div>
   )
 }

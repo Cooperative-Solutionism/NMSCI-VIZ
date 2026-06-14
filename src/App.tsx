@@ -23,6 +23,7 @@ import {
   EdgeInspector,
   ErrorBoundary,
   Field,
+  LoopsPanel,
   MetricCard,
   NodeInspector,
   PanelHeader,
@@ -38,8 +39,10 @@ import { formatVolumeByCurrency, shortId } from './lib/chainGraph'
 import { statusLabel } from './lib/consumeChainFilters'
 import { useConsumeChainQuery, type CurrencyFilter } from './hooks/useConsumeChainQuery'
 import { useNodeDetail } from './hooks/useNodeDetail'
+import { useReturningFlowRate } from './hooks/useReturningFlowRate'
 import { normalizeNBitsHex } from './lib/difficulty'
 import { errorMessage } from './lib/errors'
+import { extractLoops } from './lib/loops'
 import { formatDateTime, maskSecret, shortHex } from './lib/format'
 import {
   buildEmpowerMessage,
@@ -103,6 +106,22 @@ function App() {
     nodeDetailStatus,
     nodeState,
   } = useNodeDetail(apiBase, null)
+  const loops = useMemo(() => extractLoops(filteredRows), [filteredRows])
+  const selectedChainId = selectedEdge?.chainId ?? null
+  const returningFlow = useReturningFlowRate(
+    apiBase,
+    selectedNode?.id ?? selectedEdge?.target ?? null,
+    selectedEdge?.source ?? null,
+  )
+  const flowRateView = {
+    data: returningFlow.data,
+    error: returningFlow.error,
+    status: returningFlow.status,
+  }
+  const handleSelectLoop = useCallback((chainId: string) => {
+    const edge = graph.edges.find((candidate) => candidate.chainId === chainId)
+    if (edge) selectEdge(edge)
+  }, [graph.edges, selectEdge])
   const [localFlowNodes, setLocalFlowNodes] = useState<LocalFlowNode[]>(() => loadLocalFlowNodes())
   const [selectedLocalPubkey, setSelectedLocalPubkey] = useState(() => localFlowNodes[0]?.publicKeyHex ?? '')
   const [registerDifficultyTarget, setRegisterDifficultyTarget] = useState('')
@@ -611,6 +630,8 @@ function App() {
         </section>
 
         <aside className="inspector-panel" aria-label="Selection inspector">
+          <LoopsPanel loops={loops} onSelectLoop={handleSelectLoop} selectedChainId={selectedChainId} />
+
           <div className="inspector-heading">
             <h2>
               {effectiveSelection?.kind === 'node'
@@ -622,13 +643,14 @@ function App() {
           </div>
 
           {selectedEdge ? (
-            <EdgeInspector edge={selectedEdge} chain={selectedChain} />
+            <EdgeInspector edge={selectedEdge} chain={selectedChain} flowRate={flowRateView} />
           ) : selectedNode ? (
             <NodeInspector
               detailError={nodeDetailError}
               detailStatus={nodeDetailStatus}
               disabled={loading}
               extendLoading={extendLoading}
+              flowRate={flowRateView}
               node={selectedNode}
               onExtendEnd={() => void extendFromNode(selectedNode, 'end')}
               onExtendNode={() => void extendFromNode(selectedNode, 'node')}
