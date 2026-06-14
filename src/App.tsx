@@ -28,6 +28,7 @@ import {
   NodeBrowser,
   NodeInspector,
   PanelHeader,
+  SystemStatusStrip,
 } from './components'
 import {
   ApiClient,
@@ -41,6 +42,7 @@ import { statusLabel } from './lib/consumeChainFilters'
 import { useConsumeChainQuery, type CurrencyFilter } from './hooks/useConsumeChainQuery'
 import { useNodeDetail } from './hooks/useNodeDetail'
 import { useReturningFlowRate } from './hooks/useReturningFlowRate'
+import { useSystemStatus } from './hooks/useSystemStatus'
 import { normalizeNBitsHex } from './lib/difficulty'
 import { errorMessage } from './lib/errors'
 import { edgesToCsv, rowsToJson, toCurl } from './lib/exporters'
@@ -108,6 +110,8 @@ function App() {
     nodeDetailStatus,
     nodeState,
   } = useNodeDetail(apiBase, null)
+  const systemStatus = useSystemStatus(apiBase)
+  const centralLocked = systemStatus.data?.currentCentralPubkeyLocked ?? false
   const loops = useMemo(() => extractLoops(filteredRows), [filteredRows])
   const selectedChainId = selectedEdge?.chainId ?? null
   const returningFlow = useReturningFlowRate(
@@ -138,12 +142,17 @@ function App() {
   const [flowNodeStatus, setFlowNodeStatus] = useState<string | null>(null)
   const [flowNodeError, setFlowNodeError] = useState<string | null>(null)
   const [lastFlowNodeRawBytes, setLastFlowNodeRawBytes] = useState('')
+  const [miningAttempts, setMiningAttempts] = useState<number | null>(null)
   const client = useMemo(() => new ApiClient({ baseUrl: apiBase }), [apiBase])
   const selectedLocalNode = useMemo(() => {
     return localFlowNodes.find((localNode) => localNode.publicKeyHex === selectedLocalPubkey)
       ?? localFlowNodes[0]
       ?? null
   }, [localFlowNodes, selectedLocalPubkey])
+  const { nodeState: localNodeState, loadNodeState: reloadLocalNodeState } = useNodeDetail(
+    apiBase,
+    selectedLocalNode?.publicKeyHex ?? null,
+  )
   const handleExportCsv = useCallback(() => {
     downloadText('consume-chain-edges.csv', 'text/csv;charset=utf-8', edgesToCsv(graph.edges))
   }, [graph.edges])
@@ -245,6 +254,7 @@ function App() {
 
     setFlowNodeBusy('register')
     setFlowNodeError(null)
+    setMiningAttempts(0)
 
     let difficultyTarget = ''
     let rawBytesHex = ''
@@ -252,12 +262,15 @@ function App() {
     try {
       difficultyTarget = normalizeNBitsHex(registerDifficultyTarget, 'Register difficulty target')
       const messageId = makeMessageId()
-      const built = await buildRegisterMessage({
-        uuid: messageId,
-        privateKeyHex: selectedLocalNode.privateKeyHex,
-        publicKeyHex: selectedLocalNode.publicKeyHex,
-        difficultyHex: difficultyTarget,
-      })
+      const built = await buildRegisterMessage(
+        {
+          uuid: messageId,
+          privateKeyHex: selectedLocalNode.privateKeyHex,
+          publicKeyHex: selectedLocalNode.publicKeyHex,
+          difficultyHex: difficultyTarget,
+        },
+        (attempts) => setMiningAttempts(attempts),
+      )
       rawBytesHex = built.rawBytesHex
       nonce = built.nonce
       const response = (await sendFlowNodeRegisterMsg(client, built.bytes)).data
@@ -278,6 +291,7 @@ function App() {
       }))
       setLastFlowNodeRawBytes(built.rawBytesHex)
       setFlowNodeStatus(`Registered ${shortId(selectedLocalNode.publicKeyHex)} with nonce ${built.nonce}.`)
+      void reloadLocalNodeState(selectedLocalNode.publicKeyHex)
     } catch (operationError) {
       const message = errorMessage(operationError, 'Flow node registration failed')
       const failedAt = new Date().toISOString()
@@ -296,8 +310,9 @@ function App() {
       setFlowNodeError(message)
     } finally {
       setFlowNodeBusy(null)
+      setMiningAttempts(null)
     }
-  }, [client, persistLocalFlowNodes, registerDifficultyTarget, selectedLocalNode])
+  }, [client, persistLocalFlowNodes, reloadLocalNodeState, registerDifficultyTarget, selectedLocalNode])
 
   const handleAuthorizeCentralPubkey = useCallback(async () => {
     if (!selectedLocalNode) return
@@ -331,13 +346,14 @@ function App() {
       }))
       setLastFlowNodeRawBytes(built.rawBytesHex)
       setFlowNodeStatus(`Authorized central pubkey ${shortId(normalizedCentralPubkey)}.`)
+      void reloadLocalNodeState(selectedLocalNode.publicKeyHex)
     } catch (operationError) {
       const message = errorMessage(operationError, 'Central pubkey authorization failed')
       setFlowNodeError(message)
     } finally {
       setFlowNodeBusy(null)
     }
-  }, [centralPubkey, client, persistLocalFlowNodes, selectedLocalNode])
+  }, [centralPubkey, client, persistLocalFlowNodes, reloadLocalNodeState, selectedLocalNode])
 
   const politeMessage = flowNodeStatus
     ?? (origin === 'backend' ? `Query complete: ${filteredRows.length} visible rows.` : '')
@@ -364,6 +380,7 @@ function App() {
           <span>{graph.nodes.length} nodes</span>
           <span>{graph.edges.length} edges</span>
         </div>
+        <SystemStatusStrip status={systemStatus.data} />
       </header>
 
       <section className="workspace">
@@ -553,6 +570,14 @@ function App() {
                 <DetailRow label="Saved" value={formatDateTime(selectedLocalNode.createdAt)} />
                 <DetailRow label="Register" value={selectedLocalNode.registration?.status ?? '-'} />
                 <DetailRow label="Auth count" value={selectedLocalNode.authorizations.length} />
+                <DetailRow
+                  label="On-chain"
+                  value={
+                    localNodeState
+                      ? `${localNodeState.registered ? 'registered' : 'unregistered'}${localNodeState.authorized ? ' · authorized' : ''}${localNodeState.locked ? ' · locked' : ''}`
+                      : '—'
+                  }
+                />
                 <button
                   className="secondary-button"
                   type="button"
@@ -579,15 +604,24 @@ function App() {
                 placeholder="1d00ffff"
               />
             </Field>
+            {centralLocked ? (
+              <p className="operation-message error">
+                Central public key is frozen; registration and authorization are disabled.
+              </p>
+            ) : null}
             <button
               className="primary-button"
               type="button"
-              disabled={!selectedLocalNode || registerDifficultyTarget.trim().length === 0 || flowNodeBusy !== null}
+              disabled={!selectedLocalNode || registerDifficultyTarget.trim().length === 0 || flowNodeBusy !== null || centralLocked}
               aria-describedby={!selectedLocalNode || registerDifficultyTarget.trim().length === 0 ? 'register-disabled-reason' : undefined}
               onClick={() => void handleRegisterFlowNode()}
             >
               <BadgeCheck size={16} />
-              {flowNodeBusy === 'register' ? 'Registering' : 'Register node'}
+              {flowNodeBusy === 'register'
+                ? miningAttempts != null
+                  ? `Mining ${miningAttempts.toLocaleString()}`
+                  : 'Registering'
+                : 'Register node'}
             </button>
             {!selectedLocalNode || registerDifficultyTarget.trim().length === 0 ? (
               <span id="register-disabled-reason" className="sr-only">
@@ -607,7 +641,7 @@ function App() {
             <button
               className="primary-button"
               type="button"
-              disabled={!selectedLocalNode || centralPubkey.trim().length === 0 || flowNodeBusy !== null}
+              disabled={!selectedLocalNode || centralPubkey.trim().length === 0 || flowNodeBusy !== null || centralLocked}
               aria-describedby={!selectedLocalNode || centralPubkey.trim().length === 0 ? 'authorize-disabled-reason' : undefined}
               onClick={() => void handleAuthorizeCentralPubkey()}
             >

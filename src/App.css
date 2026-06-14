@@ -1086,3 +1086,20 @@
 .node-browser-pager button:disabled {
   opacity: 0.5;
 }
+
+/* 系统状态条 */
+.system-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.frozen-badge {
+  border-radius: 4px;
+  background: var(--red-soft);
+  color: var(--red);
+  font-weight: 600;
+  padding: 2px 8px;
+}
