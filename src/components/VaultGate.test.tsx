@@ -20,7 +20,8 @@ describe('VaultGate', () => {
     expect(screen.getByText(/保护你的私钥/)).toBeTruthy()
     const input = screen.getByLabelText('新保险库口令')
     const button = screen.getByRole('button', { name: /创建保险库/ })
-    expect((button as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(button)
+    expect(onSetup).not.toHaveBeenCalled()
 
     fireEvent.change(input, { target: { value: 'super-secret' } })
     fireEvent.click(screen.getByRole('button', { name: /创建保险库/ }))

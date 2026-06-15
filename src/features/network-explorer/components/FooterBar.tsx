@@ -38,7 +38,7 @@ export function FooterBar({
         >
           <ChevronLeft size={16} />
         </button>
-        <span>{loading ? '页面加载中' : origin === 'backend' ? '实时切片' : '无切片'}</span>
+        <span>{loading ? '页面加载中…' : origin === 'backend' ? '实时切片' : '无切片'}</span>
         <button
           type="button"
           disabled={loading || extended || origin !== 'backend' || !slice.hasNext}

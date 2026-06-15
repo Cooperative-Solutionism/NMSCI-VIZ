@@ -18,9 +18,15 @@ export function ReturnFlowCard({
   return (
     <>
       <div className="section-title">回流</div>
-      {status === 'loading' ? <div className="detail-state">正在加载回流率...</div> : null}
+      {status === 'loading' ? (
+        <div className="detail-state" role="status">
+          正在加载回流率…
+        </div>
+      ) : null}
       {status === 'error' ? (
-        <div className="detail-state error">{error ?? '回流率请求失败。'}</div>
+        <div className="detail-state error" role="alert">
+          {error ?? '回流率请求失败。'}
+        </div>
       ) : null}
       {status === 'loaded' && data ? (
         mode === 'edge' ? (

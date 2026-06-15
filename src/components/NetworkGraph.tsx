@@ -1,6 +1,13 @@
 import cytoscape, { type Core, type EdgeSingular, type NodeSingular } from 'cytoscape'
 import { Download, Maximize2, ZoomIn, ZoomOut } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react'
 import { formatAmount } from '../lib/chainGraph'
 import { deterministicOffset, type Point } from '../lib/graphLayout'
 import { readGraphTokens } from '../lib/tokens'
@@ -265,23 +272,70 @@ export function NetworkGraph({
     link.click()
   }, [])
 
+  const zoomBy = useCallback((delta: number) => {
+    const cy = cyRef.current
+    if (!cy) return
+    cy.zoom(cy.zoom() + delta)
+  }, [])
+
+  const openMenuAtCenter = useCallback(() => {
+    const cy = cyRef.current
+    const container = containerRef.current
+    if (!cy || !container) return
+    const extent = cy.extent()
+    setMenu({
+      x: container.clientWidth / 2,
+      y: container.clientHeight / 2,
+      position: {
+        x: (extent.x1 + extent.x2) / 2,
+        y: (extent.y1 + extent.y2) / 2,
+      },
+    })
+  }, [])
+
+  const handleCanvasKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (event.key === '+' || event.key === '=') {
+        event.preventDefault()
+        zoomBy(0.15)
+      } else if (event.key === '-') {
+        event.preventDefault()
+        zoomBy(-0.15)
+      } else if (event.key === '0') {
+        event.preventDefault()
+        cyRef.current?.fit(undefined, 48)
+      } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+        event.preventDefault()
+        openMenuAtCenter()
+      } else if (event.key === 'Escape') {
+        setMenu(null)
+      }
+    },
+    [openMenuAtCenter, zoomBy],
+  )
+
   return (
     <div className="graph-shell" onContextMenu={(event) => event.preventDefault()}>
-      {/* 画布需可聚焦以供键盘用户使用；P3 将补 onKeyDown（遍历/缩放/加节点）使其成为真正的交互式 widget。 */}
-      {/* eslint-disable jsx-a11y/no-noninteractive-tabindex */}
+      {/* Cytoscape owns this custom canvas widget; keyboard affordances are wired below. */}
+      {/* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
       <div
         ref={containerRef}
         className="graph-canvas"
-        role="img"
+        role="application"
+        aria-roledescription="交互式网络图谱"
         tabIndex={0}
         aria-label={`消费链网络图谱，包含 ${graph.nodes.length} 个节点和 ${graph.edges.length} 条边`}
+        onKeyDown={handleCanvasKeyDown}
       />
-      {/* eslint-enable jsx-a11y/no-noninteractive-tabindex */}
+      {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
       {menu ? (
-        <div className="graph-context-menu" role="menu" style={{ left: menu.x, top: menu.y }}>
+        <div
+          className="graph-context-menu"
+          aria-label="添加节点"
+          style={{ left: menu.x, top: menu.y }}
+        >
           <button
             type="button"
-            role="menuitem"
             onClick={() => {
               onAddFlowNode?.(menu.position)
               setMenu(null)
@@ -291,7 +345,6 @@ export function NetworkGraph({
           </button>
           <button
             type="button"
-            role="menuitem"
             onClick={() => {
               onAddConsumeNode?.(menu.position)
               setMenu(null)
@@ -305,31 +358,21 @@ export function NetworkGraph({
         <h3>图谱节点</h3>
         {graph.nodes.map((node) => (
           <button key={node.id} type="button" onClick={() => onSelectNode(node)}>
-            选择节点 {node.id}
+            选择节点 <span translate="no">{node.id}</span>
           </button>
         ))}
         <h3>图谱边</h3>
         {graph.edges.map((edge) => (
           <button key={edge.id} type="button" onClick={() => onSelectEdge(edge)}>
-            选择{edge.status === 'looped' ? '成环' : '开放'}边 {edge.id}
+            选择{edge.status === 'looped' ? '成环' : '开放'}边 <span translate="no">{edge.id}</span>
           </button>
         ))}
       </div>
       <div className="graph-tools" aria-label="图谱控制">
-        <button
-          type="button"
-          aria-label="放大"
-          title="放大"
-          onClick={() => cyRef.current?.zoom(cyRef.current.zoom() + 0.15)}
-        >
+        <button type="button" aria-label="放大" title="放大" onClick={() => zoomBy(0.15)}>
           <ZoomIn size={16} />
         </button>
-        <button
-          type="button"
-          aria-label="缩小"
-          title="缩小"
-          onClick={() => cyRef.current?.zoom(cyRef.current.zoom() - 0.15)}
-        >
+        <button type="button" aria-label="缩小" title="缩小" onClick={() => zoomBy(-0.15)}>
           <ZoomOut size={16} />
         </button>
         <button

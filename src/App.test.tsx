@@ -108,6 +108,7 @@ describe('App initial state', () => {
   afterEach(() => {
     cleanup()
     vi.unstubAllGlobals()
+    window.history.replaceState(null, '', '/')
   })
 
   beforeEach(() => {

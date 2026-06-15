@@ -29,14 +29,17 @@ export function ConsumeNodeOperatePanel({
           label="公钥"
           value={
             <span className="copyable-value">
-              <code>{node.publicKeyHex}</code>
+              <code translate="no">{node.publicKeyHex}</code>
               <button type="button" onClick={() => onCopy(node.publicKeyHex, '公钥')}>
                 复制
               </button>
             </span>
           }
         />
-        <DetailRow label="私钥" value={<code>{maskSecret(node.privateKeyHex)}</code>} />
+        <DetailRow
+          label="私钥"
+          value={<code translate="no">{maskSecret(node.privateKeyHex)}</code>}
+        />
         <DetailRow label="保存时间" value={formatDateTime(node.createdAt)} />
         <button className="secondary-button" type="button" onClick={onExportPrivateKey}>
           导出私钥
@@ -49,8 +52,16 @@ export function ConsumeNodeOperatePanel({
         </button>
       </div>
       <p className="field-hint">创建交易记录时可将此消费节点作为来源。</p>
-      {status ? <p className="operation-message">{status}</p> : null}
-      {error ? <p className="operation-message error">{error}</p> : null}
+      {status ? (
+        <p className="operation-message" aria-live="polite">
+          {status}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="operation-message error" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   )
 }

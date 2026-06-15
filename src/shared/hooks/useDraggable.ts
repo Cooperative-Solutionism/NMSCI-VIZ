@@ -26,37 +26,65 @@ export function useDraggable({ boundsRef, margin = 8 }: UseDraggableOptions = {}
 
   useEffect(() => () => cleanupRef.current?.(), [])
 
+  const clampPosition = useCallback(
+    (element: HTMLElement, next: Point): Point => {
+      const bounds = boundsRef?.current
+      if (!bounds) return next
+      const maxX = Math.max(margin, bounds.clientWidth - element.offsetWidth - margin)
+      const maxY = Math.max(margin, bounds.clientHeight - element.offsetHeight - margin)
+      return {
+        x: Math.min(Math.max(margin, next.x), maxX),
+        y: Math.min(Math.max(margin, next.y), maxY),
+      }
+    },
+    [boundsRef, margin],
+  )
+
+  const currentPosition = useCallback((element: HTMLElement): Point => {
+    const parentRect = (element.offsetParent as HTMLElement | null)?.getBoundingClientRect()
+    const rect = element.getBoundingClientRect()
+    return {
+      x: positionRef.current?.x ?? rect.left - (parentRect?.left ?? 0),
+      y: positionRef.current?.y ?? rect.top - (parentRect?.top ?? 0),
+    }
+  }, [])
+
+  const setElementPosition = useCallback(
+    (element: HTMLElement, next: Point) => {
+      const clamped = clampPosition(element, next)
+      element.style.left = `${clamped.x}px`
+      element.style.top = `${clamped.y}px`
+      positionRef.current = clamped
+      setPosition(clamped)
+      return clamped
+    },
+    [clampPosition],
+  )
+
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
       if (event.button !== 0) return
+      const isDedicatedHandle = event.currentTarget.hasAttribute('data-drag-handle')
       if (
+        !isDedicatedHandle &&
         (event.target as HTMLElement).closest('button, a, input, textarea, select, [data-no-drag]')
       )
         return
       const el = elementRef.current
       if (!el) return
 
-      const parentRect = (el.offsetParent as HTMLElement | null)?.getBoundingClientRect()
-      const rect = el.getBoundingClientRect()
-      const baseX = positionRef.current?.x ?? rect.left - (parentRect?.left ?? 0)
-      const baseY = positionRef.current?.y ?? rect.top - (parentRect?.top ?? 0)
+      const base = currentPosition(el)
       const pointerX = event.clientX
       const pointerY = event.clientY
-      let last: Point = { x: baseX, y: baseY }
+      let last: Point = base
 
       const handleMove = (move: PointerEvent) => {
-        let x = baseX + (move.clientX - pointerX)
-        let y = baseY + (move.clientY - pointerY)
-        const bounds = boundsRef?.current
-        if (bounds) {
-          const maxX = Math.max(margin, bounds.clientWidth - el.offsetWidth - margin)
-          const maxY = Math.max(margin, bounds.clientHeight - el.offsetHeight - margin)
-          x = Math.min(Math.max(margin, x), maxX)
-          y = Math.min(Math.max(margin, y), maxY)
-        }
-        last = { x, y }
-        el.style.left = `${x}px`
-        el.style.top = `${y}px`
+        last = clampPosition(el, {
+          x: base.x + (move.clientX - pointerX),
+          y: base.y + (move.clientY - pointerY),
+        })
+        el.style.left = `${last.x}px`
+        el.style.top = `${last.y}px`
       }
       const teardown = () => {
         window.removeEventListener('pointermove', handleMove)
@@ -76,12 +104,22 @@ export function useDraggable({ boundsRef, margin = 8 }: UseDraggableOptions = {}
       setDragging(true)
       event.preventDefault()
     },
-    [boundsRef, margin],
+    [clampPosition, currentPosition],
+  )
+
+  const nudgeBy = useCallback(
+    (delta: Point) => {
+      const el = elementRef.current
+      if (!el) return
+      const current = currentPosition(el)
+      setElementPosition(el, { x: current.x + delta.x, y: current.y + delta.y })
+    },
+    [currentPosition, setElementPosition],
   )
 
   const style: CSSProperties | undefined = position
     ? { left: position.x, top: position.y }
     : undefined
 
-  return { elementRef, onPointerDown, dragging, style }
+  return { elementRef, onPointerDown, dragging, nudgeBy, style }
 }

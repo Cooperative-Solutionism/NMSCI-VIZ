@@ -47,7 +47,7 @@ export function NodeInspector({
           disabled={disabled}
           onClick={onExtendNode}
         >
-          {extendLoading === 'node' ? '加载中' : '加载节点'}
+          {extendLoading === 'node' ? '加载中…' : '加载节点'}
         </button>
         <button
           className="secondary-button"
@@ -55,7 +55,7 @@ export function NodeInspector({
           disabled={disabled}
           onClick={onExtendStart}
         >
-          {extendLoading === 'start' ? '扩展中' : '扩展起点'}
+          {extendLoading === 'start' ? '扩展中…' : '扩展起点'}
         </button>
         <button
           className="secondary-button"
@@ -63,17 +63,23 @@ export function NodeInspector({
           disabled={disabled}
           onClick={onExtendEnd}
         >
-          {extendLoading === 'end' ? '扩展中' : '扩展终点'}
+          {extendLoading === 'end' ? '扩展中…' : '扩展终点'}
         </button>
       </div>
-      <DetailRow label="节点" value={<code>{node.id}</code>} />
+      <DetailRow label="节点" value={<code translate="no">{node.id}</code>} />
       <DetailRow label="标签" value={shortId(node.id)} />
       <DetailRow label="关联链数" value={node.chainCount} />
       <DetailRow label="吞吐量" value={formatVolumeByCurrency(node.volumeByCurrency)} />
       <div className="section-title">节点状态</div>
-      {detailStatus === 'loading' ? <div className="detail-state">正在加载节点状态...</div> : null}
+      {detailStatus === 'loading' ? (
+        <div className="detail-state" role="status">
+          正在加载节点状态…
+        </div>
+      ) : null}
       {detailStatus === 'error' ? (
-        <div className="detail-state error">{detailError ?? '节点状态请求失败。'}</div>
+        <div className="detail-state error" role="alert">
+          {detailError ?? '节点状态请求失败。'}
+        </div>
       ) : null}
       {state ? (
         <>

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { formatInteger } from '../lib/format'
 import { Field } from './Field'
 
 export interface TransactionRecordDraft {
@@ -52,21 +53,50 @@ export function TransactionRecordForm({
   const [difficultyHex, setDifficultyHex] = useState(defaultDifficulty)
   const [amountTouched, setAmountTouched] = useState(false)
   const [centralTouched, setCentralTouched] = useState(false)
+  const consumeNodeRef = useRef<HTMLSelectElement | null>(null)
+  const amountRef = useRef<HTMLInputElement | null>(null)
+  const difficultyRef = useRef<HTMLInputElement | null>(null)
+  const centralRef = useRef<HTMLTextAreaElement | null>(null)
 
   const amountError = amountIssue(amount)
   const centralError = centralPubkeyIssue(centralPubkey)
-  const ready =
-    consumeNodePubkey.length > 0 &&
-    !amountError &&
-    !centralError &&
-    difficultyHex.trim().length > 0 &&
-    !busy
+  const handleSubmit = () => {
+    if (busy) return
+    setAmountTouched(true)
+    setCentralTouched(true)
+    if (consumeNodePubkey.length === 0) {
+      consumeNodeRef.current?.focus()
+      return
+    }
+    if (amountError) {
+      amountRef.current?.focus()
+      return
+    }
+    if (difficultyHex.trim().length === 0) {
+      difficultyRef.current?.focus()
+      return
+    }
+    if (centralError) {
+      centralRef.current?.focus()
+      return
+    }
+    onCreate({
+      consumeNodePubkey,
+      amount: amount.trim(),
+      currencyType: Number(currencyType),
+      centralPubkey: centralPubkey.trim(),
+      difficultyHex: difficultyHex.trim(),
+    })
+  }
 
   return (
     <div className="record-form">
       <div className="section-title">新建交易记录</div>
       <Field label="消费节点">
         <select
+          ref={consumeNodeRef}
+          name="consumeNodePubkey"
+          autoComplete="off"
           value={consumeNodePubkey}
           onChange={(event) => setConsumeNodePubkey(event.currentTarget.value)}
         >
@@ -81,12 +111,15 @@ export function TransactionRecordForm({
       <div className="form-grid">
         <Field label="金额">
           <input
+            ref={amountRef}
+            name="amount"
+            autoComplete="off"
             value={amount}
             inputMode="numeric"
             onChange={(event) => setAmount(event.currentTarget.value)}
             onBlur={() => setAmountTouched(true)}
             aria-invalid={amountTouched && amountError ? true : undefined}
-            placeholder="最小单位"
+            placeholder="例如 5000…"
           />
           {amountTouched && amountError ? (
             <span className="field-error" role="alert">
@@ -96,6 +129,8 @@ export function TransactionRecordForm({
         </Field>
         <Field label="记录币种">
           <select
+            name="currencyType"
+            autoComplete="off"
             value={currencyType}
             onChange={(event) => setCurrencyType(event.currentTarget.value)}
           >
@@ -106,20 +141,28 @@ export function TransactionRecordForm({
       </div>
       <Field label="交易难度">
         <input
+          ref={difficultyRef}
+          name="difficultyHex"
+          autoComplete="off"
+          inputMode="text"
+          spellCheck={false}
           value={difficultyHex}
           onChange={(event) => setDifficultyHex(event.currentTarget.value)}
-          placeholder="1d00ffff"
+          placeholder="例如 1d00ffff…"
         />
       </Field>
       <Field label="记录中心公钥">
         <textarea
+          ref={centralRef}
+          name="centralPubkey"
+          autoComplete="off"
           rows={2}
           value={centralPubkey}
           spellCheck={false}
           onChange={(event) => setCentralPubkey(event.currentTarget.value)}
           onBlur={() => setCentralTouched(true)}
           aria-invalid={centralTouched && centralError ? true : undefined}
-          placeholder="33 字节压缩公钥 hex"
+          placeholder="例如 02 后接 64 位 hex…"
         />
         {centralTouched && centralError ? (
           <span className="field-error" role="alert">
@@ -127,28 +170,23 @@ export function TransactionRecordForm({
           </span>
         ) : null}
       </Field>
-      <button
-        className="primary-button"
-        type="button"
-        disabled={!ready}
-        onClick={() =>
-          onCreate({
-            consumeNodePubkey,
-            amount: amount.trim(),
-            currencyType: Number(currencyType),
-            centralPubkey: centralPubkey.trim(),
-            difficultyHex: difficultyHex.trim(),
-          })
-        }
-      >
+      <button className="primary-button" type="button" disabled={busy} onClick={handleSubmit}>
         {busy
           ? miningAttempts != null
-            ? `挖矿 ${miningAttempts.toLocaleString()}`
-            : '提交中'
+            ? `挖矿 ${formatInteger(miningAttempts)}…`
+            : '提交中…'
           : '创建记录'}
       </button>
-      {status ? <p className="operation-message">{status}</p> : null}
-      {error ? <p className="operation-message error">{error}</p> : null}
+      {status ? (
+        <p className="operation-message" aria-live="polite">
+          {status}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="operation-message error" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   )
 }

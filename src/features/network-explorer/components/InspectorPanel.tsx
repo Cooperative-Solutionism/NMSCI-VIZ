@@ -142,7 +142,7 @@ export function InspectorPanel({
                 <div className="section-title">已创建记录</div>
                 {localTxRecords.map((record) => (
                   <div key={record.id} className="detail-row">
-                    <span>{shortId(record.id)}</span>
+                    <span translate="no">{shortId(record.id)}</span>
                     <strong>{formatAmount(BigInt(record.amount), record.currencyType)}</strong>
                   </div>
                 ))}

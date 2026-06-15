@@ -11,15 +11,20 @@ import {
   Plus,
   Search,
 } from 'lucide-react'
-import { useState, type RefObject } from 'react'
+import { type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react'
 import { Field, NodeBrowser, PanelHeader, VaultGate } from '../../../components'
 import { statusLabel } from '../../../lib/consumeChainFilters'
 import { useDraggable } from '../../../shared/hooks/useDraggable'
+import { useUrlBooleanParam, useUrlStateParam } from '../../../shared/hooks/useUrlQueryParam'
 import type { CurrencyFilter } from '../../../hooks/useConsumeChainQuery'
 import type { LoopStatus, QueryMode } from '../../../lib/types'
 import type { VaultStatus } from '../../../hooks/useKeyVault'
 
 type LeftTab = 'query' | 'browse' | 'keys'
+
+function isLeftTab(value: string): value is LeftTab {
+  return value === 'query' || value === 'browse' || value === 'keys'
+}
 
 export function QueryPanel({
   apiBase,
@@ -88,14 +93,31 @@ export function QueryPanel({
   warning: string | null
   workspaceRef: RefObject<HTMLElement | null>
 }) {
-  const [leftTab, setLeftTab] = useState<LeftTab>('query')
-  const [panelCollapsed, setPanelCollapsed] = useState(false)
+  const [leftTab, setLeftTab] = useUrlStateParam<LeftTab>('panel', 'query', isLeftTab)
+  const [panelCollapsed, setPanelCollapsed] = useUrlBooleanParam('panelCollapsed')
   const {
     dragging: panelDragging,
     elementRef: panelRef,
+    nudgeBy,
     onPointerDown: handlePanelPointerDown,
     style: panelStyle,
   } = useDraggable({ boundsRef: workspaceRef })
+  const handlePanelKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    const step = event.shiftKey ? 48 : 12
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault()
+      nudgeBy({ x: -step, y: 0 })
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault()
+      nudgeBy({ x: step, y: 0 })
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      nudgeBy({ x: 0, y: -step })
+    } else if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      nudgeBy({ x: 0, y: step })
+    }
+  }
 
   return (
     <>
@@ -117,12 +139,20 @@ export function QueryPanel({
         aria-label="消费链查询"
         aria-hidden={panelCollapsed}
       >
-        <div className="floating-head" onPointerDown={handlePanelPointerDown}>
-          <div className="floating-title">
+        <div className="floating-head">
+          <button
+            className="floating-drag-handle"
+            type="button"
+            data-drag-handle
+            onPointerDown={handlePanelPointerDown}
+            onKeyDown={handlePanelKeyDown}
+            aria-label="拖动控制台面板"
+            title="拖动控制台面板"
+          >
             <GripVertical className="floating-grip" size={15} aria-hidden />
             <Layers size={15} />
             <span>控制台</span>
-          </div>
+          </button>
           <button
             className="floating-collapse"
             type="button"
@@ -171,6 +201,8 @@ export function QueryPanel({
             <>
               <Field label="API 基址">
                 <input
+                  name="apiBase"
+                  autoComplete="off"
                   value={apiBase}
                   onChange={(event) => onApiBaseChange(event.currentTarget.value)}
                   spellCheck={false}
@@ -208,6 +240,8 @@ export function QueryPanel({
 
               <Field label="流转节点 ID / 公钥">
                 <textarea
+                  name="nodeId"
+                  autoComplete="off"
                   rows={3}
                   value={nodeId}
                   onChange={(event) => onSetNodeId(event.currentTarget.value)}
@@ -234,6 +268,8 @@ export function QueryPanel({
               <div className="form-grid">
                 <Field label="币种">
                   <select
+                    name="currencyFilter"
+                    autoComplete="off"
                     value={currencyFilter}
                     onChange={(event) =>
                       onSetCurrencyFilter(event.currentTarget.value as CurrencyFilter)
@@ -247,6 +283,9 @@ export function QueryPanel({
                 </Field>
                 <Field label="页码">
                   <input
+                    name="page"
+                    autoComplete="off"
+                    inputMode="numeric"
                     min={0}
                     type="number"
                     value={page}
@@ -255,6 +294,9 @@ export function QueryPanel({
                 </Field>
                 <Field label="每页数量">
                   <input
+                    name="size"
+                    autoComplete="off"
+                    inputMode="numeric"
                     min={1}
                     max={200}
                     type="number"
@@ -273,7 +315,7 @@ export function QueryPanel({
                   onClick={() => void onRunQuery(0)}
                 >
                   <Search size={16} />
-                  {loading ? '加载中' : '加载'}
+                  {loading ? '加载中…' : '加载'}
                 </button>
                 {nodeId.trim().length === 0 ? (
                   <span id="load-disabled-reason" className="sr-only">
@@ -284,13 +326,23 @@ export function QueryPanel({
 
               <div className="request-preview">
                 <span>请求</span>
-                <code>{requestUrl}</code>
+                <code translate="no">{requestUrl}</code>
               </div>
 
-              {error ? <p className="error-banner">{error}。当前图谱已保持不变。</p> : null}
-              {warning ? <p className="info-banner">{warning}</p> : null}
+              {error ? (
+                <p className="error-banner" role="alert">
+                  {error}。当前图谱已保持不变。
+                </p>
+              ) : null}
+              {warning ? (
+                <p className="info-banner" aria-live="polite">
+                  {warning}
+                </p>
+              ) : null}
               {extended ? (
-                <p className="info-banner">已扩展图谱视图；重新加载查询可恢复分页。</p>
+                <p className="info-banner" aria-live="polite">
+                  已扩展图谱视图；重新加载查询可恢复分页。
+                </p>
               ) : null}
             </>
           ) : null}
@@ -352,7 +404,9 @@ export function QueryPanel({
                   : '解锁密钥保险库后可添加或导入节点；私钥会加密存储。'}
               </p>
               {registrationError && showKeyringError ? (
-                <p className="operation-message error">{registrationError}</p>
+                <p className="operation-message error" role="alert">
+                  {registrationError}
+                </p>
               ) : null}
             </div>
           ) : null}

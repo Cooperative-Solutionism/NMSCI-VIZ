@@ -152,7 +152,6 @@
   justify-content: space-between;
   gap: 8px;
   padding: 12px 12px 0;
-  cursor: grab;
   touch-action: none;
   user-select: none;
 }
@@ -162,19 +161,29 @@
   user-select: none;
 }
 
-.query-panel.dragging .floating-head {
+.query-panel.dragging .floating-drag-handle {
   cursor: grabbing;
 }
 
-.floating-title {
+.floating-drag-handle {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  border: 0;
+  background: transparent;
   color: var(--text);
+  cursor: grab;
   font-size: 12px;
   font-weight: 900;
   letter-spacing: 0.08em;
+  padding: 0;
   text-transform: uppercase;
+}
+
+.floating-drag-handle:focus-visible {
+  border-radius: 6px;
+  outline: 2px solid var(--teal);
+  outline-offset: 3px;
 }
 
 .floating-grip {

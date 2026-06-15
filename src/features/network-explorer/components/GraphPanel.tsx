@@ -98,7 +98,7 @@ export function GraphPanel({
       </div>
 
       <ErrorBoundary label="图谱加载失败">
-        <Suspense fallback={<div className="graph-loading">正在加载图谱...</div>}>
+        <Suspense fallback={<div className="graph-loading">正在加载图谱…</div>}>
           <NetworkGraph
             graph={canvasGraph}
             selectedId={selectedId}

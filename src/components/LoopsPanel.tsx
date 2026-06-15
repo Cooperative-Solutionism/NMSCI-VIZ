@@ -45,7 +45,9 @@ export function LoopsPanel({
                 aria-pressed={loop.chainId === selectedChainId}
                 onClick={() => onSelectLoop(loop.chainId)}
               >
-                <span className="loop-id">{shortId(loop.chainId)}</span>
+                <span className="loop-id" translate="no">
+                  {shortId(loop.chainId)}
+                </span>
                 <span className="loop-amount">{formatAmount(loop.amount, loop.currencyType)}</span>
                 <span className="loop-len">{loop.length} 跳</span>
               </button>

@@ -51,26 +51,25 @@ export function VaultGate({ status, error, onSetup, onUnlock, onLock }: VaultGat
       </p>
       <div className="action-row two">
         <input
+          name="vaultPassphrase"
           type="password"
           aria-label={isSetup ? '新保险库口令' : '保险库口令'}
           autoComplete={isSetup ? 'new-password' : 'current-password'}
-          placeholder="口令"
           value={passphrase}
           onChange={(event) => setPassphrase(event.currentTarget.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter') submit()
           }}
         />
-        <button
-          className="primary-button"
-          type="button"
-          disabled={passphrase.length === 0}
-          onClick={submit}
-        >
+        <button className="primary-button" type="button" onClick={submit}>
           {isSetup ? '创建保险库' : '解锁'}
         </button>
       </div>
-      {error ? <p className="operation-message error">{error}</p> : null}
+      {error ? (
+        <p className="operation-message error" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { BadgeCheck, KeyRound, RefreshCw, Search, ShieldCheck } from 'lucide-react'
 import type { FlowNodeStateResponseDTO } from '@nmsci/sdk'
-import { formatDateTime, maskSecret } from '../lib/format'
+import { formatDateTime, formatInteger, maskSecret } from '../lib/format'
 import type { LocalFlowNode } from '../lib/flowNodeStorage'
 import { DetailRow } from './DetailRow'
 import { Field } from './Field'
@@ -70,7 +70,7 @@ export function FlowNodeOperatePanel({
           label="公钥"
           value={
             <span className="copyable-value">
-              <code>{node.publicKeyHex}</code>
+              <code translate="no">{node.publicKeyHex}</code>
               <button type="button" onClick={() => onCopy(node.publicKeyHex, '公钥')}>
                 复制
               </button>
@@ -82,7 +82,7 @@ export function FlowNodeOperatePanel({
           value={
             node.registration?.id ? (
               <span className="copyable-value">
-                <code>{node.registration.id}</code>
+                <code translate="no">{node.registration.id}</code>
                 <button
                   type="button"
                   onClick={() => onCopy(node.registration?.id ?? '', '注册 ID')}
@@ -95,7 +95,10 @@ export function FlowNodeOperatePanel({
             )
           }
         />
-        <DetailRow label="私钥" value={<code>{maskSecret(node.privateKeyHex)}</code>} />
+        <DetailRow
+          label="私钥"
+          value={<code translate="no">{maskSecret(node.privateKeyHex)}</code>}
+        />
         <DetailRow label="保存时间" value={formatDateTime(node.createdAt)} />
         <DetailRow label="注册状态" value={formatRegistrationStatus(node.registration?.status)} />
         <DetailRow label="授权数" value={node.authorizations.length} />
@@ -118,10 +121,13 @@ export function FlowNodeOperatePanel({
       <div className="section-title">注册</div>
       <Field label="注册难度目标">
         <input
+          name="registerDifficultyTarget"
+          autoComplete="off"
           value={registerDifficultyTarget}
           onChange={(event) => onDifficultyChange(event.currentTarget.value)}
           inputMode="text"
-          placeholder="1d00ffff"
+          spellCheck={false}
+          placeholder="例如 1d00ffff…"
         />
       </Field>
       <button
@@ -131,10 +137,12 @@ export function FlowNodeOperatePanel({
         onClick={onFetchDifficulty}
       >
         <RefreshCw size={15} />
-        {busy === 'difficulty' ? '加载中' : '使用最新难度'}
+        {busy === 'difficulty' ? '加载中…' : '使用最新难度'}
       </button>
       {centralLocked ? (
-        <p className="operation-message error">中心公钥已冻结，注册和授权已禁用。</p>
+        <p className="operation-message error" role="alert">
+          中心公钥已冻结，注册和授权已禁用。
+        </p>
       ) : null}
       <button
         className="primary-button"
@@ -145,19 +153,21 @@ export function FlowNodeOperatePanel({
         <BadgeCheck size={16} />
         {busy === 'register'
           ? miningAttempts != null
-            ? `挖矿 ${miningAttempts.toLocaleString()}`
-            : '注册中'
+            ? `挖矿 ${formatInteger(miningAttempts)}…`
+            : '注册中…'
           : '注册节点'}
       </button>
 
       <div className="section-title">授权中心公钥</div>
       <Field label="中心公钥">
         <textarea
+          name="authorizationCentralPubkey"
+          autoComplete="off"
           rows={3}
           value={centralPubkey}
           onChange={(event) => onCentralPubkeyChange(event.currentTarget.value)}
           spellCheck={false}
-          placeholder="33 字节压缩公钥 hex"
+          placeholder="例如 02 后接 64 位 hex…"
         />
       </Field>
       <button
@@ -167,7 +177,7 @@ export function FlowNodeOperatePanel({
         onClick={onAuthorize}
       >
         <ShieldCheck size={16} />
-        {busy === 'authorize' ? '授权中' : '授权中心'}
+        {busy === 'authorize' ? '授权中…' : '授权中心'}
       </button>
 
       {onCreateRecord || onCreateMount ? (
@@ -186,12 +196,20 @@ export function FlowNodeOperatePanel({
         </>
       ) : null}
 
-      {status ? <p className="operation-message">{status}</p> : null}
-      {error ? <p className="operation-message error">{error}</p> : null}
+      {status ? (
+        <p className="operation-message" aria-live="polite">
+          {status}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="operation-message error" role="alert">
+          {error}
+        </p>
+      ) : null}
       {lastRawBytes ? (
         <div className="raw-preview">
           <span>最近原始消息</span>
-          <code>{lastRawBytes}</code>
+          <code translate="no">{lastRawBytes}</code>
         </div>
       ) : null}
     </div>

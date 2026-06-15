@@ -1,9 +1,14 @@
 import { Search } from 'lucide-react'
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import { useFlowNodeDirectory } from '../hooks/useFlowNodeDirectory'
 import { shortHex } from '../lib/format'
+import { useUrlBooleanParam, useUrlNumberParam } from '../shared/hooks/useUrlQueryParam'
 
 const PAGE_SIZE = 10
+
+function normalizePage(value: number): number {
+  return Math.max(0, Math.trunc(value))
+}
 
 export function NodeBrowser({
   apiBase,
@@ -13,11 +18,11 @@ export function NodeBrowser({
   onPick: (pubkey: string) => void
 }) {
   const directory = useFlowNodeDirectory(apiBase)
-  const [open, setOpen] = useState(false)
-  const [registered, setRegistered] = useState(false)
-  const [authorized, setAuthorized] = useState(false)
-  const [locked, setLocked] = useState(false)
-  const [page, setPage] = useState(0)
+  const [open, setOpen] = useUrlBooleanParam('nodeBrowserOpen')
+  const [registered, setRegistered] = useUrlBooleanParam('nodeRegistered')
+  const [authorized, setAuthorized] = useUrlBooleanParam('nodeAuthorized')
+  const [locked, setLocked] = useUrlBooleanParam('nodeLocked')
+  const [page, setPage] = useUrlNumberParam('nodeBrowserPage', 0, normalizePage)
 
   const browse = useCallback(
     (targetPage: number) => {
@@ -31,7 +36,7 @@ export function NodeBrowser({
         size: PAGE_SIZE,
       })
     },
-    [authorized, directory, locked, registered],
+    [authorized, directory, locked, registered, setPage],
   )
 
   return (
@@ -66,9 +71,13 @@ export function NodeBrowser({
             onClick={() => browse(0)}
           >
             <Search size={15} />
-            {directory.loading ? '加载中' : '浏览'}
+            {directory.loading ? '加载中…' : '浏览'}
           </button>
-          {directory.error ? <p className="operation-message error">{directory.error}</p> : null}
+          {directory.error ? (
+            <p className="operation-message error" role="alert">
+              {directory.error}
+            </p>
+          ) : null}
           {directory.items.length > 0 ? (
             <ul className="node-browser-list">
               {directory.items.map((item) => (
@@ -78,7 +87,9 @@ export function NodeBrowser({
                     className="node-browser-row"
                     onClick={() => onPick(item.flowNodePubkey)}
                   >
-                    <span className="node-browser-key">{shortHex(item.flowNodePubkey)}</span>
+                    <span className="node-browser-key" translate="no">
+                      {shortHex(item.flowNodePubkey)}
+                    </span>
                     <span className="node-browser-badges">
                       {item.registered ? <em className="badge reg">注册</em> : null}
                       {item.authorized ? <em className="badge auth">授权</em> : null}

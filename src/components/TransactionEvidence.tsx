@@ -51,19 +51,32 @@ export function TransactionEvidence({
           打开交易
         </button>
       ) : null}
-      {status === 'loading' ? <div className="detail-state">正在加载交易...</div> : null}
-      {status === 'error' ? <div className="detail-state error">{error}</div> : null}
+      {status === 'loading' ? (
+        <div className="detail-state" role="status">
+          正在加载交易…
+        </div>
+      ) : null}
+      {status === 'error' ? (
+        <div className="detail-state error" role="alert">
+          {error}
+        </div>
+      ) : null}
       {record ? (
         <>
           <DetailRow label="金额" value={formatAmount(record.amount, record.currencyType)} />
-          <DetailRow label="消费节点" value={<code>{record.consumeNodePubkey}</code>} />
-          <DetailRow label="流转节点" value={<code>{record.flowNodePubkey}</code>} />
-          <DetailRow label="中心公钥" value={<code>{record.centralPubkey}</code>} />
+          <DetailRow
+            label="消费节点"
+            value={<code translate="no">{record.consumeNodePubkey}</code>}
+          />
+          <DetailRow label="流转节点" value={<code translate="no">{record.flowNodePubkey}</code>} />
+          <DetailRow label="中心公钥" value={<code translate="no">{record.centralPubkey}</code>} />
           <DetailRow label="确认时间" value={formatMicros(record.confirmTimestamp)} />
-          <DetailRow label="记录 txid" value={<code>{record.txid}</code>} />
+          <DetailRow label="记录 txid" value={<code translate="no">{record.txid}</code>} />
         </>
       ) : null}
-      {mount ? <DetailRow label="挂载 txid" value={<code>{mount.txid}</code>} /> : null}
+      {mount ? (
+        <DetailRow label="挂载 txid" value={<code translate="no">{mount.txid}</code>} />
+      ) : null}
     </div>
   )
 }
