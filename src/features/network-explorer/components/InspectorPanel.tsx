@@ -1,0 +1,203 @@
+import {
+  ConsumeNodeOperatePanel,
+  EdgeInspector,
+  ErrorBoundary,
+  FlowNodeOperatePanel,
+  LoopsPanel,
+  NodeInspector,
+  TransactionMountForm,
+  TransactionRecordForm,
+} from '../../../components'
+import { formatAmount, shortId } from '../../../lib/chainGraph'
+import type { LocalConsumeNode } from '../../../lib/consumeNodeStorage'
+import type { LocalFlowNode } from '../../../lib/flowNodeStorage'
+import type { LocalTxRecord } from '../../../lib/txRecordStorage'
+import type {
+  ChainGraphEdge,
+  ChainGraphNode,
+  ConsumeChainResponseDTO,
+  QueryMode,
+} from '../../../lib/types'
+import type { FlowRateView } from '../../../components/NodeInspector'
+import type { RegistrationController } from '../../keyring/hooks/useRegistrationController'
+import type { useNodeDetail } from '../../../hooks/useNodeDetail'
+
+type NodeDetail = ReturnType<typeof useNodeDetail>
+
+export function InspectorPanel({
+  apiBase,
+  centralLocked,
+  effectiveSelection,
+  extendFromNode,
+  extendLoading,
+  flowRateView,
+  inspectorEmptyMessage,
+  loading,
+  localConsumeNodes,
+  localNodeState,
+  localTxRecords,
+  loops,
+  nodeDetail,
+  nodeActions,
+  onSelectLoop,
+  registration,
+  selectedChain,
+  selectedChainId,
+  selectedEdge,
+  selectedLocalConsumeNode,
+  selectedLocalNode,
+  selectedNode,
+}: {
+  apiBase: string
+  centralLocked: boolean
+  effectiveSelection: { kind: 'node'; id: string } | { kind: 'edge'; id: string } | null
+  extendFromNode: (node: ChainGraphNode, mode: QueryMode) => Promise<void>
+  extendLoading: QueryMode | null
+  flowRateView: FlowRateView
+  inspectorEmptyMessage: string
+  loading: boolean
+  localConsumeNodes: LocalConsumeNode[]
+  localNodeState: NodeDetail['nodeState']
+  localTxRecords: LocalTxRecord[]
+  loops: ReturnType<typeof import('../../../lib/loops').extractLoops>
+  nodeDetail: NodeDetail
+  nodeActions: {
+    handleCopyText: (value: string, label: string) => Promise<void>
+    handleDeleteConsumeNode: () => void
+    handleDeleteLocalNode: () => void
+    handleExportConsumeKey: () => Promise<void>
+    handleExportPrivateKey: () => Promise<void>
+    handleQuerySelectedFlowNode: () => void
+    handleRenameConsumeNode: () => void
+    handleRenameLocalNode: () => void
+  }
+  onSelectLoop: (chainId: string) => void
+  registration: RegistrationController
+  selectedChain: ConsumeChainResponseDTO | null
+  selectedChainId: string | null
+  selectedEdge: ChainGraphEdge | null
+  selectedLocalConsumeNode: LocalConsumeNode | null
+  selectedLocalNode: LocalFlowNode | null
+  selectedNode: ChainGraphNode | null
+}) {
+  return (
+    <aside className="inspector-panel" aria-label="Selection inspector">
+      <LoopsPanel loops={loops} onSelectLoop={onSelectLoop} selectedChainId={selectedChainId} />
+
+      <div className="inspector-heading">
+        <h2>
+          {selectedLocalNode
+            ? 'Flow node'
+            : selectedLocalConsumeNode
+              ? 'Consume node'
+              : effectiveSelection?.kind === 'node'
+                ? 'Selected node'
+                : effectiveSelection?.kind === 'edge'
+                  ? 'Selected edge'
+                  : 'Selection'}
+        </h2>
+      </div>
+
+      <ErrorBoundary label="Inspector panel failed">
+        {selectedLocalNode ? (
+          <>
+            <FlowNodeOperatePanel
+              busy={registration.busy}
+              centralLocked={centralLocked}
+              centralPubkey={registration.centralPubkey}
+              error={registration.error}
+              lastRawBytes={registration.lastRawBytes}
+              miningAttempts={registration.miningAttempts}
+              node={selectedLocalNode}
+              nodeState={localNodeState}
+              onAuthorize={() => void registration.authorizeCentralPubkey()}
+              onCentralPubkeyChange={registration.setCentralPubkey}
+              onCopy={(value, label) => void nodeActions.handleCopyText(value, label)}
+              onCreateMount={registration.toggleMountForm}
+              onCreateRecord={registration.toggleRecordForm}
+              onDelete={nodeActions.handleDeleteLocalNode}
+              onDifficultyChange={registration.setRegisterDifficultyTarget}
+              onExportPrivateKey={() => void nodeActions.handleExportPrivateKey()}
+              onFetchDifficulty={() => void registration.fetchRegisterDifficulty()}
+              onQuery={nodeActions.handleQuerySelectedFlowNode}
+              onRegister={() => void registration.registerFlowNode()}
+              onRename={nodeActions.handleRenameLocalNode}
+              registerDifficultyTarget={registration.registerDifficultyTarget}
+              status={registration.status}
+            />
+            {registration.recordFormOpen ? (
+              <TransactionRecordForm
+                busy={registration.busy === 'record'}
+                consumeNodes={localConsumeNodes}
+                defaultCentralPubkey={registration.centralPubkey}
+                defaultDifficulty={registration.txDifficulty}
+                error={registration.error}
+                miningAttempts={registration.miningAttempts}
+                onCreate={(draft) => void registration.createTransactionRecord(draft)}
+                status={registration.status}
+              />
+            ) : null}
+            {registration.recordFormOpen && localTxRecords.length > 0 ? (
+              <div className="record-list">
+                <div className="section-title">Created records</div>
+                {localTxRecords.map((record) => (
+                  <div key={record.id} className="detail-row">
+                    <span>{shortId(record.id)}</span>
+                    <strong>{formatAmount(BigInt(record.amount), record.currencyType)}</strong>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {registration.mountFormOpen ? (
+              <TransactionMountForm
+                busy={registration.busy === 'mount'}
+                canViewChain={registration.mountedPubkey !== null}
+                defaultDifficulty={registration.txDifficulty}
+                error={registration.error}
+                miningAttempts={registration.miningAttempts}
+                onMount={(recordId, difficultyHex) =>
+                  void registration.createTransactionMount(recordId, difficultyHex)
+                }
+                onViewChain={registration.viewConsumeChain}
+                records={localTxRecords}
+                status={registration.status}
+              />
+            ) : null}
+          </>
+        ) : selectedLocalConsumeNode ? (
+          <ConsumeNodeOperatePanel
+            error={registration.error}
+            node={selectedLocalConsumeNode}
+            onCopy={(value, label) => void nodeActions.handleCopyText(value, label)}
+            onDelete={nodeActions.handleDeleteConsumeNode}
+            onExportPrivateKey={() => void nodeActions.handleExportConsumeKey()}
+            onRename={nodeActions.handleRenameConsumeNode}
+            status={registration.status}
+          />
+        ) : selectedEdge ? (
+          <EdgeInspector
+            apiBase={apiBase}
+            edge={selectedEdge}
+            chain={selectedChain}
+            flowRate={flowRateView}
+          />
+        ) : selectedNode ? (
+          <NodeInspector
+            detailError={nodeDetail.nodeDetailError}
+            detailStatus={nodeDetail.nodeDetailStatus}
+            disabled={loading}
+            extendLoading={extendLoading}
+            flowRate={flowRateView}
+            node={selectedNode}
+            onExtendEnd={() => void extendFromNode(selectedNode, 'end')}
+            onExtendNode={() => void extendFromNode(selectedNode, 'node')}
+            onExtendStart={() => void extendFromNode(selectedNode, 'start')}
+            state={nodeDetail.nodeState}
+          />
+        ) : (
+          <div className="empty-state">{inspectorEmptyMessage}</div>
+        )}
+      </ErrorBoundary>
+    </aside>
+  )
+}

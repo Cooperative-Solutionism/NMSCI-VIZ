@@ -1,7 +1,12 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import type { ChainGraph, ChainGraphEdge, ChainGraphNode, ConsumeChainResponseDTORaw } from './lib/types'
+import type {
+  ChainGraph,
+  ChainGraphEdge,
+  ChainGraphNode,
+  ConsumeChainResponseDTORaw,
+} from './lib/types'
 
 vi.mock('./components/NetworkGraph', () => ({
   NetworkGraph: ({
@@ -66,7 +71,9 @@ vi.mock('@nmsci/sdk', async (importOriginal) => {
     // 与上面固定夹具保持一致：占位私钥派生回占位公钥，让 App 的密钥对完整性校验通过；
     // 其余私钥走真实派生（不影响导入路径的真实性）。
     getPublicKeyFromPrivate: (privateKeyHex: string) =>
-      privateKeyHex === '0'.repeat(63) + '1' ? '02'.padEnd(66, '1') : actual.getPublicKeyFromPrivate(privateKeyHex),
+      privateKeyHex === '0'.repeat(63) + '1'
+        ? '02'.padEnd(66, '1')
+        : actual.getPublicKeyFromPrivate(privateKeyHex),
     mineNonce: async (
       _prefix: Uint8Array,
       _suffix: Uint8Array,
@@ -107,6 +114,18 @@ describe('App initial state', () => {
     localStorage.clear()
   })
 
+  function openQueryTab() {
+    fireEvent.click(screen.getByRole('tab', { name: /^query$/i }))
+  }
+
+  function openBrowseTab() {
+    fireEvent.click(screen.getByRole('tab', { name: /^browse$/i }))
+  }
+
+  function openKeysTab() {
+    fireEvent.click(screen.getByRole('tab', { name: /^keys$/i }))
+  }
+
   it('starts without demo data or a demo reset action', () => {
     render(<App />)
 
@@ -119,6 +138,7 @@ describe('App initial state', () => {
   it('adds a flow node from the keys toolbar and persists it', async () => {
     render(<App />)
 
+    openKeysTab()
     fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
 
     await waitFor(() => {
@@ -138,49 +158,69 @@ describe('App initial state', () => {
   it('fills the selected flow node public key into the query field', async () => {
     render(<App />)
 
+    openKeysTab()
     fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
     fireEvent.click(await screen.findByRole('button', { name: /query this node/i }))
+    openQueryTab()
 
-    expect((screen.getByLabelText('Flow node id / pubkey') as HTMLTextAreaElement).value)
-      .toBe('02'.padEnd(66, '1'))
+    expect((screen.getByLabelText('Flow node id / pubkey') as HTMLTextAreaElement).value).toBe(
+      '02'.padEnd(66, '1'),
+    )
   })
 
   it('loads a hex register difficulty target returned by the backend', async () => {
     const centralPubkey = '03dfb2c7716697bba0a12c21c431f86d4bfe3b536b2ec0b7f32e7f97bbcfb20cbe'
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      code: 200,
-      message: 'ok',
-      data: { height: 2518, registerDifficultyTarget: '20ffffff', centralPubkey },
-    }), {
-      headers: { 'Content-Type': 'application/json' },
-      status: 200,
-    })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              code: 200,
+              message: 'ok',
+              data: { height: 2518, registerDifficultyTarget: '20ffffff', centralPubkey },
+            }),
+            {
+              headers: { 'Content-Type': 'application/json' },
+              status: 200,
+            },
+          ),
+      ),
+    )
     render(<App />)
 
+    openKeysTab()
     fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
     fireEvent.click(await screen.findByRole('button', { name: /use latest difficulty/i }))
 
     await waitFor(() => {
-      expect((screen.getByLabelText('Register difficulty target') as HTMLInputElement).value)
-        .toBe('20ffffff')
+      expect((screen.getByLabelText('Register difficulty target') as HTMLInputElement).value).toBe(
+        '20ffffff',
+      )
     })
-    expect((screen.getByLabelText('Central pubkey') as HTMLTextAreaElement).value).toBe(centralPubkey)
+    expect((screen.getByLabelText('Central pubkey') as HTMLTextAreaElement).value).toBe(
+      centralPubkey,
+    )
     expect(screen.queryByText(/Latest block did not include registerDifficultyTarget/i)).toBeNull()
   })
 
   it('loads changed filters from the first page even when the page input is stale', async () => {
     const fetchMock = stubFetchByUrl((url) => {
       if (url.pathname === '/consume-chains') {
-        return jsonResponse(sliceResponse([chainRow('chain-cny', 1)], {
-          page: Number(url.searchParams.get('page')),
-          hasNext: false,
-        }))
+        return jsonResponse(
+          sliceResponse([chainRow('chain-cny', 1)], {
+            page: Number(url.searchParams.get('page')),
+            hasNext: false,
+          }),
+        )
       }
       throw new Error(`Unexpected URL ${url.href}`)
     })
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), { target: { value: 'node-1' } })
+    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), {
+      target: { value: 'node-1' },
+    })
     fireEvent.change(screen.getByLabelText('Page'), { target: { value: '7' } })
     fireEvent.click(screen.getByRole('button', { name: /^load$/i }))
 
@@ -194,16 +234,20 @@ describe('App initial state', () => {
   it('labels currency as a current-page filter and reports visible row counts', async () => {
     stubFetchByUrl((url) => {
       if (url.pathname === '/consume-chains') {
-        return jsonResponse(sliceResponse([
-          chainRow('chain-cny', 1),
-          chainRow('chain-au', 0),
-        ], { page: 0, hasNext: true }))
+        return jsonResponse(
+          sliceResponse([chainRow('chain-cny', 1), chainRow('chain-au', 0)], {
+            page: 0,
+            hasNext: true,
+          }),
+        )
       }
       throw new Error(`Unexpected URL ${url.href}`)
     })
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), { target: { value: 'node-1' } })
+    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), {
+      target: { value: 'node-1' },
+    })
     fireEvent.change(screen.getByLabelText(/Currency/), { target: { value: '1' } })
     fireEvent.click(screen.getByRole('button', { name: /^load$/i }))
 
@@ -217,10 +261,12 @@ describe('App initial state', () => {
         return jsonResponse(sliceResponse([chainRow('chain-cny', 1)], { page: 0, hasNext: true }))
       }
       if (url.pathname === '/consume-chains' && url.searchParams.get('startId') === 'node-a') {
-        return jsonResponse(sliceResponse([chainRow('chain-extra', 1, 'node-a', 'node-c')], {
-          page: 0,
-          hasNext: true,
-        }))
+        return jsonResponse(
+          sliceResponse([chainRow('chain-extra', 1, 'node-a', 'node-c')], {
+            page: 0,
+            hasNext: true,
+          }),
+        )
       }
       if (url.pathname.startsWith('/flow-node-registrations/')) {
         return jsonResponse(flowNodeDetail(url.pathname.split('/').pop() ?? 'node-a'))
@@ -229,7 +275,9 @@ describe('App initial state', () => {
     })
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), { target: { value: 'node-1' } })
+    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), {
+      target: { value: 'node-1' },
+    })
     fireEvent.click(screen.getByRole('button', { name: /^load$/i }))
     fireEvent.click(await screen.findByRole('button', { name: /select node node-a/i }))
     fireEvent.click(await screen.findByRole('button', { name: /extend start/i }))
@@ -264,13 +312,17 @@ describe('App initial state', () => {
   it('lists looped chains and highlights one when selected from the loops panel', async () => {
     stubFetchByUrl((url) => {
       if (url.pathname === '/consume-chains') {
-        return jsonResponse(sliceResponse([chainRow('open-1', 1), loopedChainRow('loop-1')], { page: 0 }))
+        return jsonResponse(
+          sliceResponse([chainRow('open-1', 1), loopedChainRow('loop-1')], { page: 0 }),
+        )
       }
       throw new Error(`Unexpected URL ${url.href}`)
     })
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), { target: { value: 'node-1' } })
+    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), {
+      target: { value: 'node-1' },
+    })
     fireEvent.click(screen.getByRole('button', { name: /^load$/i }))
 
     expect(await screen.findByText('Loops (1)')).toBeTruthy()
@@ -280,7 +332,10 @@ describe('App initial state', () => {
     fireEvent.click(loopRow)
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /LOOP-1.*hops/i })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByRole('button', { name: /LOOP-1.*hops/i })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
     })
   })
 
@@ -307,7 +362,9 @@ describe('App initial state', () => {
     })
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), { target: { value: 'node-1' } })
+    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), {
+      target: { value: 'node-1' },
+    })
     fireEvent.click(screen.getByRole('button', { name: /^load$/i }))
 
     fireEvent.click(await screen.findByRole('button', { name: /open transaction/i }))
@@ -346,13 +403,16 @@ describe('App initial state', () => {
     })
     render(<App />)
 
+    openBrowseTab()
     fireEvent.click(screen.getByRole('button', { name: /browse nodes/i }))
     fireEvent.click(screen.getByRole('button', { name: /^browse$/i }))
 
     const row = await screen.findByRole('button', { name: /02DDDDDDDD/i })
     fireEvent.click(row)
 
-    expect((screen.getByLabelText('Flow node id / pubkey') as HTMLTextAreaElement).value).toBe(pubkey)
+    expect((screen.getByLabelText('Flow node id / pubkey') as HTMLTextAreaElement).value).toBe(
+      pubkey,
+    )
   })
 
   it('registers a flow node end to end and persists a sent registration', async () => {
@@ -378,15 +438,23 @@ describe('App initial state', () => {
         return jsonResponse({
           code: 200,
           message: 'ok',
-          data: { registered: true, authorized: false, locked: false, currentCentralPubkeyAuthorized: false },
+          data: {
+            registered: true,
+            authorized: false,
+            locked: false,
+            currentCentralPubkeyAuthorized: false,
+          },
         })
       }
       throw new Error(`Unexpected URL ${url.href}`)
     })
     render(<App />)
 
+    openKeysTab()
     fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
-    fireEvent.change(await screen.findByLabelText('Register difficulty target'), { target: { value: '1d00ffff' } })
+    fireEvent.change(await screen.findByLabelText('Register difficulty target'), {
+      target: { value: '1d00ffff' },
+    })
     fireEvent.click(screen.getByRole('button', { name: /register node/i }))
 
     await waitFor(() => {
@@ -405,10 +473,14 @@ describe('App initial state', () => {
   it('renames and deletes a local flow node', async () => {
     render(<App />)
 
+    openKeysTab()
     fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
     await screen.findByRole('button', { name: /register node/i })
 
-    vi.stubGlobal('prompt', vi.fn(() => 'Renamed node'))
+    vi.stubGlobal(
+      'prompt',
+      vi.fn(() => 'Renamed node'),
+    )
     fireEvent.click(screen.getByRole('button', { name: /^rename$/i }))
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
@@ -417,10 +489,15 @@ describe('App initial state', () => {
       expect(saved.nodes[0]?.label).toBe('Renamed node')
     })
 
-    vi.stubGlobal('confirm', vi.fn(() => true))
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true),
+    )
     fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
     await waitFor(() => {
-      const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as { nodes: unknown[] }
+      const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
+        nodes: unknown[]
+      }
       expect(saved.nodes).toHaveLength(0)
     })
   })
@@ -459,13 +536,22 @@ describe('App initial state', () => {
         })
       }
       if (url.pathname === '/transaction-records' && init?.method === 'POST') {
-        return jsonResponse({ code: 200, message: 'ok', data: { id: 'tx-rec-1', txid: 'txid-rec' } })
+        return jsonResponse({
+          code: 200,
+          message: 'ok',
+          data: { id: 'tx-rec-1', txid: 'txid-rec' },
+        })
       }
       if (url.pathname === `/flow-nodes/${pubkey}`) {
         return jsonResponse({
           code: 200,
           message: 'ok',
-          data: { registered: true, authorized: true, locked: false, currentCentralPubkeyAuthorized: true },
+          data: {
+            registered: true,
+            authorized: true,
+            locked: false,
+            currentCentralPubkeyAuthorized: true,
+          },
         })
       }
       throw new Error(`Unexpected URL ${url.href}`)
@@ -473,14 +559,19 @@ describe('App initial state', () => {
     render(<App />)
 
     // a consume node (record source) then a flow node (operator) — flow node ends up selected
+    openKeysTab()
     fireEvent.click(screen.getByRole('button', { name: /^consume node$/i }))
     fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
     fireEvent.click(await screen.findByRole('button', { name: /create transaction record/i }))
 
     fireEvent.change(await screen.findByLabelText('Amount'), { target: { value: '5000' } })
-    fireEvent.change(screen.getByLabelText('Record central pubkey'), { target: { value: '02'.padEnd(66, '2') } })
+    fireEvent.change(screen.getByLabelText('Record central pubkey'), {
+      target: { value: '02'.padEnd(66, '2') },
+    })
     await waitFor(() => {
-      expect((screen.getByLabelText('Transaction difficulty') as HTMLInputElement).value).toBe('1d00ffff')
+      expect((screen.getByLabelText('Transaction difficulty') as HTMLInputElement).value).toBe(
+        '1d00ffff',
+      )
     })
     fireEvent.click(screen.getByRole('button', { name: /^create record$/i }))
 
@@ -491,8 +582,10 @@ describe('App initial state', () => {
       expect(saved.records[0]?.id).toBe('tx-rec-1')
       expect(saved.records[0]?.amount).toBe('5000')
     })
-    const recordPost = fetchMock.mock.calls.find(([input, init]) =>
-      String(input).includes('/transaction-records') && (init as RequestInit | undefined)?.method === 'POST',
+    const recordPost = fetchMock.mock.calls.find(
+      ([input, init]) =>
+        String(input).includes('/transaction-records') &&
+        (init as RequestInit | undefined)?.method === 'POST',
     )
     expect(recordPost).toBeTruthy()
   })
@@ -511,16 +604,29 @@ describe('App initial state', () => {
         })
       }
       if (url.pathname === '/transaction-records' && init?.method === 'POST') {
-        return jsonResponse({ code: 200, message: 'ok', data: { id: '11111111-1111-4111-8111-1111111111aa', txid: 'r' } })
+        return jsonResponse({
+          code: 200,
+          message: 'ok',
+          data: { id: '11111111-1111-4111-8111-1111111111aa', txid: 'r' },
+        })
       }
       if (url.pathname === '/transaction-mounts' && init?.method === 'POST') {
-        return jsonResponse({ code: 200, message: 'ok', data: { id: '22222222-2222-4222-8222-2222222222bb', txid: 'm' } })
+        return jsonResponse({
+          code: 200,
+          message: 'ok',
+          data: { id: '22222222-2222-4222-8222-2222222222bb', txid: 'm' },
+        })
       }
       if (url.pathname === `/flow-nodes/${pubkey}`) {
         return jsonResponse({
           code: 200,
           message: 'ok',
-          data: { registered: true, authorized: true, locked: false, currentCentralPubkeyAuthorized: true },
+          data: {
+            registered: true,
+            authorized: true,
+            locked: false,
+            currentCentralPubkeyAuthorized: true,
+          },
         })
       }
       if (url.pathname === '/consume-chains') {
@@ -530,19 +636,26 @@ describe('App initial state', () => {
     })
     render(<App />)
 
+    openKeysTab()
     fireEvent.click(screen.getByRole('button', { name: /^consume node$/i }))
     fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
 
     // create a record first
     fireEvent.click(await screen.findByRole('button', { name: /create transaction record/i }))
     fireEvent.change(await screen.findByLabelText('Amount'), { target: { value: '5000' } })
-    fireEvent.change(screen.getByLabelText('Record central pubkey'), { target: { value: '02'.padEnd(66, '2') } })
+    fireEvent.change(screen.getByLabelText('Record central pubkey'), {
+      target: { value: '02'.padEnd(66, '2') },
+    })
     await waitFor(() => {
-      expect((screen.getByLabelText('Transaction difficulty') as HTMLInputElement).value).toBe('1d00ffff')
+      expect((screen.getByLabelText('Transaction difficulty') as HTMLInputElement).value).toBe(
+        '1d00ffff',
+      )
     })
     fireEvent.click(screen.getByRole('button', { name: /^create record$/i }))
     await waitFor(() => {
-      expect(localStorage.getItem('nmsci.txRecords.v1')).toContain('11111111-1111-4111-8111-1111111111aa')
+      expect(localStorage.getItem('nmsci.txRecords.v1')).toContain(
+        '11111111-1111-4111-8111-1111111111aa',
+      )
     })
 
     // mount it
@@ -550,8 +663,10 @@ describe('App initial state', () => {
     fireEvent.click(await screen.findByRole('button', { name: /^mount record$/i }))
     await waitFor(() => {
       expect(
-        fetchMock.mock.calls.some(([input, requestInit]) =>
-          String(input).includes('/transaction-mounts') && (requestInit as RequestInit | undefined)?.method === 'POST',
+        fetchMock.mock.calls.some(
+          ([input, requestInit]) =>
+            String(input).includes('/transaction-mounts') &&
+            (requestInit as RequestInit | undefined)?.method === 'POST',
         ),
       ).toBe(true)
     })
@@ -559,17 +674,25 @@ describe('App initial state', () => {
     // view the resulting consume chain — queries by pubkey
     fireEvent.click(await screen.findByRole('button', { name: /view consume chain/i }))
     await waitFor(() => {
-      const chainCall = fetchMock.mock.calls.find(([input]) => String(input).includes('/consume-chains'))
+      const chainCall = fetchMock.mock.calls.find(([input]) =>
+        String(input).includes('/consume-chains'),
+      )
       expect(chainCall).toBeTruthy()
-      expect(new URL(String(chainCall![0]), 'http://localhost').searchParams.get('nodePubkey')).toBe(pubkey)
+      expect(
+        new URL(String(chainCall![0]), 'http://localhost').searchParams.get('nodePubkey'),
+      ).toBe(pubkey)
     })
   })
 
   it('imports a flow node from a pasted private key', async () => {
     const privateKey = '01'.padStart(64, '0')
-    vi.stubGlobal('prompt', vi.fn(() => privateKey))
+    vi.stubGlobal(
+      'prompt',
+      vi.fn(() => privateKey),
+    )
     render(<App />)
 
+    openKeysTab()
     fireEvent.click(screen.getByRole('button', { name: /import flow node/i }))
 
     await waitFor(() => {
@@ -585,7 +708,9 @@ describe('App initial state', () => {
   })
 })
 
-function stubFetchByUrl(handler: (url: URL, init?: RequestInit) => Response): ReturnType<typeof vi.fn> {
+function stubFetchByUrl(
+  handler: (url: URL, init?: RequestInit) => Response,
+): ReturnType<typeof vi.fn> {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const rawUrl = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
     const url = new URL(rawUrl, 'http://localhost')
