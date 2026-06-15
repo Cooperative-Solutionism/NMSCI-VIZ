@@ -35,7 +35,7 @@ export function edgesToCsv(edges: ChainGraphEdge[]): string {
 
 // 把消费链原始结果导出为 JSON（bigint 转字符串，避免序列化失败）。
 export function rowsToJson(rows: ConsumeChainResponseDTO[]): string {
-  return JSON.stringify(rows, (_key, value) => (typeof value === 'bigint' ? value.toString() : value), 2)
+  return JSON.stringify(rows, (_key, value: unknown) => (typeof value === 'bigint' ? value.toString() : value), 2)
 }
 
 export function toCurl(url: string): string {
