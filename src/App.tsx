@@ -29,36 +29,24 @@ import {
   SystemStatusStrip,
   TransactionMountForm,
   TransactionRecordForm,
-  type TransactionRecordDraft,
 } from './components'
 import {
   ApiClient,
   generateKeyPair,
-  getDifficulty,
-  getLastBlock,
   getPublicKeyFromPrivate,
-  sendCentralPubkeyEmpowerMsg,
-  sendFlowNodeRegisterMsg,
-  sendTransactionMountMsg,
-  sendTransactionRecordMsg,
 } from '@nmsci/sdk'
 import { formatAmount, formatVolumeByCurrency, mergeLocalNodes, shortId } from './lib/chainGraph'
 import { statusLabel } from './lib/consumeChainFilters'
 import { useConsumeChainQuery, type CurrencyFilter } from './hooks/useConsumeChainQuery'
+import { useFlowNodeRegistration } from './hooks/useFlowNodeRegistration'
 import { useNodeDetail } from './hooks/useNodeDetail'
 import { useReturningFlowRate } from './hooks/useReturningFlowRate'
 import { useSystemStatus } from './hooks/useSystemStatus'
-import { normalizeNBitsHex } from './lib/difficulty'
 import { errorMessage } from './lib/errors'
 import { edgesToCsv, rowsToJson, toCurl } from './lib/exporters'
 import { extractLoops } from './lib/loops'
 import {
-  buildEmpowerMessage,
-  buildRegisterMessage,
-  buildTransactionMountMessage,
-  buildTransactionRecordMessage,
   makeMessageId,
-  normalizePubkeyHex,
 } from './lib/messageBuilders'
 import {
   loadLocalTxRecords,
@@ -70,8 +58,6 @@ import {
   patchLocalFlowNode,
   saveLocalFlowNodes,
   type LocalFlowNode,
-  type LocalFlowNodeAuthorization,
-  type LocalFlowNodeRegistration,
 } from './lib/flowNodeStorage'
 import {
   loadLocalConsumeNodes,
@@ -80,12 +66,9 @@ import {
   type LocalConsumeNode,
 } from './lib/consumeNodeStorage'
 import type { ChainGraphEdge, ChainGraphNode } from './lib/types'
-type FlowNodeBusyState = 'difficulty' | 'register' | 'authorize' | 'record' | 'mount' | null
 
 const defaultApiBase = import.meta.env.VITE_API_BASE ?? '/api'
 const defaultPageSize = 50
-// 协议金额按 int64 序列化，无独立的经济上限常量；以 int64 结构上界做溢出兜底。
-const INT64_MAX = 9223372036854775807n
 const NetworkGraph = lazy(() =>
   import('./components/NetworkGraph').then((module) => ({ default: module.NetworkGraph })),
 )
@@ -157,23 +140,11 @@ function App() {
   const [localFlowNodes, setLocalFlowNodes] = useState<LocalFlowNode[]>(() => loadLocalFlowNodes())
   const [localConsumeNodes, setLocalConsumeNodes] = useState<LocalConsumeNode[]>(() => loadLocalConsumeNodes())
   const [localTxRecords, setLocalTxRecords] = useState<LocalTxRecord[]>(() => loadLocalTxRecords())
-  const [recordFormOpen, setRecordFormOpen] = useState(false)
-  const [mountFormOpen, setMountFormOpen] = useState(false)
-  const [mountedPubkey, setMountedPubkey] = useState<string | null>(null)
-  // 默认难度从 getDifficulty 拉取；拉取失败时退回此合法 nBits 占位（与表单 placeholder 一致），保证表单仍可用。
-  const [txDifficulty, setTxDifficulty] = useState('1d00ffff')
   const canvasGraph = useMemo(
     () => mergeLocalNodes(graph, localFlowNodes, localConsumeNodes),
     [graph, localFlowNodes, localConsumeNodes],
   )
   const [selectedLocalId, setSelectedLocalId] = useState<string | null>(null)
-  const [registerDifficultyTarget, setRegisterDifficultyTarget] = useState('')
-  const [centralPubkey, setCentralPubkey] = useState('')
-  const [flowNodeBusy, setFlowNodeBusy] = useState<FlowNodeBusyState>(null)
-  const [flowNodeStatus, setFlowNodeStatus] = useState<string | null>(null)
-  const [flowNodeError, setFlowNodeError] = useState<string | null>(null)
-  const [lastFlowNodeRawBytes, setLastFlowNodeRawBytes] = useState('')
-  const [miningAttempts, setMiningAttempts] = useState<number | null>(null)
   const client = useMemo(() => new ApiClient({ baseUrl: apiBase }), [apiBase])
   const selectedLocalNode = useMemo(
     () => localFlowNodes.find((localNode) => localNode.publicKeyHex === selectedLocalId) ?? null,
@@ -187,37 +158,6 @@ function App() {
     apiBase,
     selectedLocalNode?.publicKeyHex ?? null,
   )
-  const handleExportCsv = useCallback(() => {
-    downloadText('consume-chain-edges.csv', 'text/csv;charset=utf-8', edgesToCsv(graph.edges))
-  }, [graph.edges])
-  const handleExportJson = useCallback(() => {
-    downloadText('consume-chains.json', 'application/json', rowsToJson(filteredRows))
-  }, [filteredRows])
-  const handleCopyCurl = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(toCurl(requestUrl))
-      setFlowNodeError(null)
-      setFlowNodeStatus('Request curl copied.')
-    } catch (clipboardError) {
-      setFlowNodeStatus(null)
-      setFlowNodeError(errorMessage(clipboardError, 'Clipboard unavailable'))
-    }
-  }, [requestUrl])
-  const handlePickNode = useCallback((pubkey: string) => {
-    setMode('node')
-    setNodeId(pubkey)
-    setFlowNodeError(null)
-    setFlowNodeStatus('Picked node public key filled into query — click Load.')
-  }, [setMode, setNodeId])
-  const handlePreviousPage = useCallback(() => {
-    const nextPage = Math.max(0, page - 1)
-    void runQuery(nextPage)
-  }, [page, runQuery])
-
-  const handleNextPage = useCallback(() => {
-    void runQuery(page + 1)
-  }, [page, runQuery])
-
   const persistLocalFlowNodes = useCallback((updater: (currentNodes: LocalFlowNode[]) => LocalFlowNode[]) => {
     setLocalFlowNodes((currentNodes) => {
       const nextNodes = updater(currentNodes)
@@ -248,6 +188,55 @@ function App() {
     [],
   )
 
+  const clearSelectedLocalNode = useCallback(() => {
+    setSelectedLocalId(null)
+  }, [])
+
+  const reloadRegistrationNodeState = useCallback((pubkey: string) => {
+    void reloadLocalNodeState(pubkey)
+  }, [reloadLocalNodeState])
+
+  const registration = useFlowNodeRegistration({
+    client,
+    selectedLocalNode,
+    localFlowNodes,
+    localConsumeNodes,
+    localTxRecords,
+    persistLocalFlowNodes,
+    persistTxRecords,
+    reloadLocalNodeState: reloadRegistrationNodeState,
+    runQuery,
+    clearSelectedLocalNode,
+  })
+
+  const handleExportCsv = useCallback(() => {
+    downloadText('consume-chain-edges.csv', 'text/csv;charset=utf-8', edgesToCsv(graph.edges))
+  }, [graph.edges])
+  const handleExportJson = useCallback(() => {
+    downloadText('consume-chains.json', 'application/json', rowsToJson(filteredRows))
+  }, [filteredRows])
+  const handleCopyCurl = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(toCurl(requestUrl))
+      registration.notifyStatus('Request curl copied.')
+    } catch (clipboardError) {
+      registration.notifyError(errorMessage(clipboardError, 'Clipboard unavailable'))
+    }
+  }, [registration, requestUrl])
+  const handlePickNode = useCallback((pubkey: string) => {
+    setMode('node')
+    setNodeId(pubkey)
+    registration.notifyStatus('Picked node public key filled into query — click Load.')
+  }, [registration, setMode, setNodeId])
+  const handlePreviousPage = useCallback(() => {
+    const nextPage = Math.max(0, page - 1)
+    void runQuery(nextPage)
+  }, [page, runQuery])
+
+  const handleNextPage = useCallback(() => {
+    void runQuery(page + 1)
+  }, [page, runQuery])
+
   const handleAddFlowNode = useCallback((position?: { x: number; y: number }) => {
     const keypair = generateKeyPair()
     const now = new Date().toISOString()
@@ -263,10 +252,9 @@ function App() {
     }
     persistLocalFlowNodes((currentNodes) => [node, ...currentNodes])
     setSelectedLocalId(node.publicKeyHex)
-    setFlowNodeError(null)
-    setFlowNodeStatus('Flow node added.')
-    setLastFlowNodeRawBytes('')
-  }, [persistLocalFlowNodes])
+    registration.notifyStatus('Flow node added.')
+    registration.clearLastRawBytes()
+  }, [persistLocalFlowNodes, registration])
 
   const handleAddConsumeNode = useCallback((position?: { x: number; y: number }) => {
     const keypair = generateKeyPair()
@@ -282,9 +270,8 @@ function App() {
     }
     persistLocalConsumeNodes((currentNodes) => [node, ...currentNodes])
     setSelectedLocalId(node.publicKeyHex)
-    setFlowNodeError(null)
-    setFlowNodeStatus('Consume node added.')
-  }, [persistLocalConsumeNodes])
+    registration.notifyStatus('Consume node added.')
+  }, [persistLocalConsumeNodes, registration])
 
   // 画布选择：点本地节点 → 进入对应操作面板；点链节点/边 → 清掉本地选择，走链检查器。
   const handleCanvasSelectNode = useCallback((node: ChainGraphNode) => {
@@ -321,12 +308,11 @@ function App() {
         ...currentNodes.filter((current) => current.publicKeyHex !== publicKeyHex),
       ])
       setSelectedLocalId(publicKeyHex)
-      setFlowNodeError(null)
-      setFlowNodeStatus('Flow node imported.')
+      registration.notifyStatus('Flow node imported.')
     } catch (importError) {
-      setFlowNodeError(errorMessage(importError, 'Invalid private key'))
+      registration.notifyError(errorMessage(importError, 'Invalid private key'))
     }
-  }, [persistLocalFlowNodes])
+  }, [persistLocalFlowNodes, registration])
 
   const handleRenameLocalNode = useCallback(() => {
     if (!selectedLocalNode) return
@@ -336,8 +322,8 @@ function App() {
     persistLocalFlowNodes((currentNodes) =>
       patchLocalFlowNode(currentNodes, selectedLocalNode.id, { label, updatedAt: new Date().toISOString() }),
     )
-    setFlowNodeStatus('Flow node renamed.')
-  }, [persistLocalFlowNodes, selectedLocalNode])
+    registration.notifyStatus('Flow node renamed.')
+  }, [persistLocalFlowNodes, registration, selectedLocalNode])
 
   const handleDeleteLocalNode = useCallback(() => {
     if (!selectedLocalNode) return
@@ -345,9 +331,8 @@ function App() {
     const removedPubkey = selectedLocalNode.publicKeyHex
     persistLocalFlowNodes((currentNodes) => currentNodes.filter((current) => current.publicKeyHex !== removedPubkey))
     setSelectedLocalId(null)
-    setFlowNodeError(null)
-    setFlowNodeStatus('Flow node deleted.')
-  }, [persistLocalFlowNodes, selectedLocalNode])
+    registration.notifyStatus('Flow node deleted.')
+  }, [persistLocalFlowNodes, registration, selectedLocalNode])
 
   const handleRenameConsumeNode = useCallback(() => {
     if (!selectedLocalConsumeNode) return
@@ -357,8 +342,8 @@ function App() {
     persistLocalConsumeNodes((currentNodes) =>
       patchLocalConsumeNode(currentNodes, selectedLocalConsumeNode.id, { label, updatedAt: new Date().toISOString() }),
     )
-    setFlowNodeStatus('Consume node renamed.')
-  }, [persistLocalConsumeNodes, selectedLocalConsumeNode])
+    registration.notifyStatus('Consume node renamed.')
+  }, [persistLocalConsumeNodes, registration, selectedLocalConsumeNode])
 
   const handleDeleteConsumeNode = useCallback(() => {
     if (!selectedLocalConsumeNode) return
@@ -366,28 +351,24 @@ function App() {
     const removedPubkey = selectedLocalConsumeNode.publicKeyHex
     persistLocalConsumeNodes((currentNodes) => currentNodes.filter((current) => current.publicKeyHex !== removedPubkey))
     setSelectedLocalId(null)
-    setFlowNodeError(null)
-    setFlowNodeStatus('Consume node deleted.')
-  }, [persistLocalConsumeNodes, selectedLocalConsumeNode])
+    registration.notifyStatus('Consume node deleted.')
+  }, [persistLocalConsumeNodes, registration, selectedLocalConsumeNode])
 
   const handleQuerySelectedFlowNode = useCallback(() => {
     if (!selectedLocalNode) return
     setMode('node')
     setNodeId(selectedLocalNode.publicKeyHex)
-    setFlowNodeError(null)
-    setFlowNodeStatus('Flow node public key filled into query.')
-  }, [selectedLocalNode, setMode, setNodeId])
+    registration.notifyStatus('Flow node public key filled into query.')
+  }, [registration, selectedLocalNode, setMode, setNodeId])
 
   const handleCopyText = useCallback(async (value: string, label: string) => {
     try {
       await navigator.clipboard.writeText(value)
-      setFlowNodeError(null)
-      setFlowNodeStatus(`${label} copied.`)
+      registration.notifyStatus(`${label} copied.`)
     } catch (clipboardError) {
-      setFlowNodeStatus(null)
-      setFlowNodeError(errorMessage(clipboardError, 'Clipboard unavailable'))
+      registration.notifyError(errorMessage(clipboardError, 'Clipboard unavailable'))
     }
-  }, [])
+  }, [registration])
 
   const handleExportPrivateKey = useCallback(async () => {
     if (!selectedLocalNode) return
@@ -402,274 +383,9 @@ function App() {
     await handleCopyText(selectedLocalConsumeNode.privateKeyHex, 'Private key')
   }, [handleCopyText, selectedLocalConsumeNode])
 
-  const handleToggleRecordForm = useCallback(() => {
-    if (recordFormOpen) {
-      setRecordFormOpen(false)
-      return
-    }
-    // 先拉取交易难度作为表单默认值，再开表单（表单挂载时即带上默认难度）。
-    void (async () => {
-      try {
-        setTxDifficulty((await getDifficulty(client)).data.transaction.nbitsHex)
-      } catch (difficultyError) {
-        // 默认难度拉取失败不阻塞表单（退回默认占位）；记录以便排查后端不可用。
-        console.error('Failed to prefetch transaction difficulty:', difficultyError)
-      }
-      setRecordFormOpen(true)
-    })()
-  }, [client, recordFormOpen])
-
-  const handleCreateTransactionRecord = useCallback(async (draft: TransactionRecordDraft) => {
-    if (!selectedLocalNode) return
-    const consumeNode = localConsumeNodes.find((node) => node.publicKeyHex === draft.consumeNodePubkey)
-    if (!consumeNode) {
-      setFlowNodeError('Add or pick a consume node first.')
-      return
-    }
-    setFlowNodeBusy('record')
-    setFlowNodeError(null)
-    setMiningAttempts(0)
-    try {
-      assertKeypairIntegrity(consumeNode)
-      assertKeypairIntegrity(selectedLocalNode)
-      const amountValue = BigInt(draft.amount)
-      if (amountValue < 1n || amountValue > INT64_MAX) {
-        throw new Error('Amount must be a positive integer within the int64 protocol range.')
-      }
-      const messageId = makeMessageId()
-      const centralPubkeyHex = normalizePubkeyHex(draft.centralPubkey)
-      const built = await buildTransactionRecordMessage(
-        {
-          uuid: messageId,
-          amount: amountValue,
-          currencyType: draft.currencyType,
-          difficultyHex: normalizeNBitsHex(draft.difficultyHex, 'Transaction difficulty'),
-          consumeNodePubkeyHex: consumeNode.publicKeyHex,
-          flowNodePubkeyHex: selectedLocalNode.publicKeyHex,
-          centralPubkeyHex,
-          consumePrivateKeyHex: consumeNode.privateKeyHex,
-          flowPrivateKeyHex: selectedLocalNode.privateKeyHex,
-        },
-        (attempts) => setMiningAttempts(attempts),
-      )
-      const response = (await sendTransactionRecordMsg(client, built.bytes)).data
-      const record: LocalTxRecord = {
-        id: response.id ?? messageId,
-        uuid: messageId,
-        amount: draft.amount,
-        currencyType: draft.currencyType,
-        consumeNodePubkey: consumeNode.publicKeyHex,
-        flowNodePubkey: selectedLocalNode.publicKeyHex,
-        centralPubkey: centralPubkeyHex,
-        txid: response.txid,
-        rawBytesHex: built.rawBytesHex,
-        status: 'sent',
-        createdAt: new Date().toISOString(),
-      }
-      persistTxRecords((current) => [record, ...current])
-      setRecordFormOpen(false)
-      setFlowNodeStatus(`Transaction record created (${shortId(record.id)}).`)
-    } catch (operationError) {
-      setFlowNodeError(errorMessage(operationError, 'Failed to create transaction record'))
-    } finally {
-      setFlowNodeBusy(null)
-      setMiningAttempts(null)
-    }
-  }, [client, localConsumeNodes, persistTxRecords, selectedLocalNode])
-
-  const handleToggleMountForm = useCallback(() => {
-    if (mountFormOpen) {
-      setMountFormOpen(false)
-      return
-    }
-    void (async () => {
-      try {
-        setTxDifficulty((await getDifficulty(client)).data.transaction.nbitsHex)
-      } catch (difficultyError) {
-        // 默认难度拉取失败不阻塞表单（退回默认占位）；记录以便排查后端不可用。
-        console.error('Failed to prefetch transaction difficulty:', difficultyError)
-      }
-      setMountFormOpen(true)
-    })()
-  }, [client, mountFormOpen])
-
-  const handleCreateTransactionMount = useCallback(async (recordId: string, difficultyHex: string) => {
-    const record = localTxRecords.find((candidate) => candidate.id === recordId)
-    if (!record) return
-    const consumeNode = localConsumeNodes.find((node) => node.publicKeyHex === record.consumeNodePubkey)
-    const flowNode = localFlowNodes.find((node) => node.publicKeyHex === record.flowNodePubkey)
-    if (!consumeNode || !flowNode) {
-      setFlowNodeError('The consume/flow node for this record is not in your keyring.')
-      return
-    }
-    setFlowNodeBusy('mount')
-    setFlowNodeError(null)
-    setMiningAttempts(0)
-    setMountedPubkey(null)
-    try {
-      assertKeypairIntegrity(consumeNode)
-      assertKeypairIntegrity(flowNode)
-      const built = await buildTransactionMountMessage(
-        {
-          uuid: makeMessageId(),
-          mountedTransactionRecordId: record.id,
-          difficultyHex: normalizeNBitsHex(difficultyHex, 'Mount difficulty'),
-          consumeNodePubkeyHex: record.consumeNodePubkey,
-          flowNodePubkeyHex: record.flowNodePubkey,
-          centralPubkeyHex: record.centralPubkey,
-          consumePrivateKeyHex: consumeNode.privateKeyHex,
-          flowPrivateKeyHex: flowNode.privateKeyHex,
-        },
-        (attempts) => setMiningAttempts(attempts),
-      )
-      await sendTransactionMountMsg(client, built.bytes)
-      setMountedPubkey(record.flowNodePubkey)
-      setFlowNodeStatus('Transaction mounted. View the consume chain to see it on the graph.')
-    } catch (operationError) {
-      setFlowNodeError(errorMessage(operationError, 'Failed to mount transaction'))
-    } finally {
-      setFlowNodeBusy(null)
-      setMiningAttempts(null)
-    }
-  }, [client, localConsumeNodes, localFlowNodes, localTxRecords])
-
-  const handleViewConsumeChain = useCallback(() => {
-    if (!mountedPubkey) return
-    setSelectedLocalId(null)
-    setMountFormOpen(false)
-    void runQuery(0, { mode: 'node', nodeId: mountedPubkey })
-  }, [mountedPubkey, runQuery])
-
-  const handleFetchRegisterDifficulty = useCallback(async () => {
-    setFlowNodeBusy('difficulty')
-    setFlowNodeError(null)
-
-    try {
-      const block = (await getLastBlock(client)).data
-      if (!block.registerDifficultyTarget) {
-        throw new Error('Latest block did not include registerDifficultyTarget')
-      }
-      setRegisterDifficultyTarget(normalizeNBitsHex(block.registerDifficultyTarget, 'Register difficulty target'))
-      if (block.centralPubkey) {
-        setCentralPubkey(block.centralPubkey)
-      }
-      setFlowNodeStatus(`Latest register difficulty loaded from block ${block.height ?? '-'}.`)
-    } catch (operationError) {
-      setFlowNodeError(errorMessage(operationError, 'Failed to load latest block'))
-    } finally {
-      setFlowNodeBusy(null)
-    }
-  }, [client])
-
-  const handleRegisterFlowNode = useCallback(async () => {
-    if (!selectedLocalNode) return
-
-    setFlowNodeBusy('register')
-    setFlowNodeError(null)
-    setMiningAttempts(0)
-
-    let difficultyTarget = ''
-    let rawBytesHex = ''
-    let nonce = 0
-    try {
-      difficultyTarget = normalizeNBitsHex(registerDifficultyTarget, 'Register difficulty target')
-      const messageId = makeMessageId()
-      const built = await buildRegisterMessage(
-        {
-          uuid: messageId,
-          privateKeyHex: selectedLocalNode.privateKeyHex,
-          publicKeyHex: selectedLocalNode.publicKeyHex,
-          difficultyHex: difficultyTarget,
-        },
-        (attempts) => setMiningAttempts(attempts),
-      )
-      rawBytesHex = built.rawBytesHex
-      nonce = built.nonce
-      const response = (await sendFlowNodeRegisterMsg(client, built.bytes)).data
-      const registration: LocalFlowNodeRegistration = {
-        id: response.id ?? messageId,
-        rawBytesHex: built.rawBytesHex,
-        registerDifficultyTarget: difficultyTarget,
-        nonce: built.nonce,
-        txid: response.txid,
-        status: 'sent',
-        message: 'Register message accepted by backend.',
-        updatedAt: new Date().toISOString(),
-      }
-
-      persistLocalFlowNodes((currentNodes) => patchLocalFlowNode(currentNodes, selectedLocalNode.id, {
-        registration,
-        updatedAt: registration.updatedAt,
-      }))
-      setLastFlowNodeRawBytes(built.rawBytesHex)
-      setFlowNodeStatus(`Registered ${shortId(selectedLocalNode.publicKeyHex)} with nonce ${built.nonce}.`)
-      void reloadLocalNodeState(selectedLocalNode.publicKeyHex)
-    } catch (operationError) {
-      const message = errorMessage(operationError, 'Flow node registration failed')
-      const failedAt = new Date().toISOString()
-      persistLocalFlowNodes((currentNodes) => patchLocalFlowNode(currentNodes, selectedLocalNode.id, {
-        registration: {
-          id: makeMessageId(),
-          rawBytesHex,
-          registerDifficultyTarget: difficultyTarget,
-          nonce,
-          status: 'failed',
-          message,
-          updatedAt: failedAt,
-        },
-        updatedAt: failedAt,
-      }))
-      setFlowNodeError(message)
-    } finally {
-      setFlowNodeBusy(null)
-      setMiningAttempts(null)
-    }
-  }, [client, persistLocalFlowNodes, reloadLocalNodeState, registerDifficultyTarget, selectedLocalNode])
-
-  const handleAuthorizeCentralPubkey = useCallback(async () => {
-    if (!selectedLocalNode) return
-
-    setFlowNodeBusy('authorize')
-    setFlowNodeError(null)
-
-    try {
-      const normalizedCentralPubkey = normalizePubkeyHex(centralPubkey)
-      const messageId = makeMessageId()
-      const built = await buildEmpowerMessage({
-        uuid: messageId,
-        privateKeyHex: selectedLocalNode.privateKeyHex,
-        flowNodePubkeyHex: selectedLocalNode.publicKeyHex,
-        centralPubkeyHex: normalizedCentralPubkey,
-      })
-      const response = (await sendCentralPubkeyEmpowerMsg(client, built.bytes)).data
-      const authorization: LocalFlowNodeAuthorization = {
-        id: response.id ?? messageId,
-        centralPubkeyHex: normalizedCentralPubkey,
-        rawBytesHex: built.rawBytesHex,
-        txid: response.txid,
-        status: 'sent',
-        message: 'Authorization message accepted by backend.',
-        updatedAt: new Date().toISOString(),
-      }
-
-      persistLocalFlowNodes((currentNodes) => patchLocalFlowNode(currentNodes, selectedLocalNode.id, {
-        authorizations: [authorization, ...selectedLocalNode.authorizations],
-        updatedAt: authorization.updatedAt,
-      }))
-      setLastFlowNodeRawBytes(built.rawBytesHex)
-      setFlowNodeStatus(`Authorized central pubkey ${shortId(normalizedCentralPubkey)}.`)
-      void reloadLocalNodeState(selectedLocalNode.publicKeyHex)
-    } catch (operationError) {
-      const message = errorMessage(operationError, 'Central pubkey authorization failed')
-      setFlowNodeError(message)
-    } finally {
-      setFlowNodeBusy(null)
-    }
-  }, [centralPubkey, client, persistLocalFlowNodes, reloadLocalNodeState, selectedLocalNode])
-
-  const politeMessage = flowNodeStatus
+  const politeMessage = registration.status
     ?? (origin === 'backend' ? `Query complete: ${filteredRows.length} visible rows.` : '')
-  const alertMessage = error ?? flowNodeError ?? nodeDetailError ?? ''
+  const alertMessage = error ?? registration.error ?? nodeDetailError ?? ''
 
   return (
     <main className="app-shell">
@@ -843,8 +559,8 @@ function App() {
               Right-click the canvas to add a node, then click a node to register, authorize, or build
               transactions on it.
             </p>
-            {flowNodeError && !selectedLocalNode && !selectedLocalConsumeNode ? (
-              <p className="operation-message error">{flowNodeError}</p>
+            {registration.error && !selectedLocalNode && !selectedLocalConsumeNode ? (
+              <p className="operation-message error">{registration.error}</p>
             ) : null}
           </div>
 
@@ -919,42 +635,42 @@ function App() {
           {selectedLocalNode ? (
             <>
               <FlowNodeOperatePanel
-                busy={flowNodeBusy}
+                busy={registration.busy}
                 centralLocked={centralLocked}
-                centralPubkey={centralPubkey}
-                error={flowNodeError}
-                lastRawBytes={lastFlowNodeRawBytes}
-                miningAttempts={miningAttempts}
+                centralPubkey={registration.centralPubkey}
+                error={registration.error}
+                lastRawBytes={registration.lastRawBytes}
+                miningAttempts={registration.miningAttempts}
                 node={selectedLocalNode}
                 nodeState={localNodeState}
-                onAuthorize={() => void handleAuthorizeCentralPubkey()}
-                onCentralPubkeyChange={setCentralPubkey}
+                onAuthorize={() => void registration.authorizeCentralPubkey()}
+                onCentralPubkeyChange={registration.setCentralPubkey}
                 onCopy={(value, label) => void handleCopyText(value, label)}
-                onCreateMount={handleToggleMountForm}
-                onCreateRecord={handleToggleRecordForm}
+                onCreateMount={registration.toggleMountForm}
+                onCreateRecord={registration.toggleRecordForm}
                 onDelete={handleDeleteLocalNode}
-                onDifficultyChange={setRegisterDifficultyTarget}
+                onDifficultyChange={registration.setRegisterDifficultyTarget}
                 onExportPrivateKey={() => void handleExportPrivateKey()}
-                onFetchDifficulty={() => void handleFetchRegisterDifficulty()}
+                onFetchDifficulty={() => void registration.fetchRegisterDifficulty()}
                 onQuery={handleQuerySelectedFlowNode}
-                onRegister={() => void handleRegisterFlowNode()}
+                onRegister={() => void registration.registerFlowNode()}
                 onRename={handleRenameLocalNode}
-                registerDifficultyTarget={registerDifficultyTarget}
-                status={flowNodeStatus}
+                registerDifficultyTarget={registration.registerDifficultyTarget}
+                status={registration.status}
               />
-              {recordFormOpen ? (
+              {registration.recordFormOpen ? (
                 <TransactionRecordForm
-                  busy={flowNodeBusy === 'record'}
+                  busy={registration.busy === 'record'}
                   consumeNodes={localConsumeNodes}
-                  defaultCentralPubkey={centralPubkey}
-                  defaultDifficulty={txDifficulty}
-                  error={flowNodeError}
-                  miningAttempts={miningAttempts}
-                  onCreate={(draft) => void handleCreateTransactionRecord(draft)}
-                  status={flowNodeStatus}
+                  defaultCentralPubkey={registration.centralPubkey}
+                  defaultDifficulty={registration.txDifficulty}
+                  error={registration.error}
+                  miningAttempts={registration.miningAttempts}
+                  onCreate={(draft) => void registration.createTransactionRecord(draft)}
+                  status={registration.status}
                 />
               ) : null}
-              {recordFormOpen && localTxRecords.length > 0 ? (
+              {registration.recordFormOpen && localTxRecords.length > 0 ? (
                 <div className="record-list">
                   <div className="section-title">Created records</div>
                   {localTxRecords.map((record) => (
@@ -965,29 +681,29 @@ function App() {
                   ))}
                 </div>
               ) : null}
-              {mountFormOpen ? (
+              {registration.mountFormOpen ? (
                 <TransactionMountForm
-                  busy={flowNodeBusy === 'mount'}
-                  canViewChain={mountedPubkey !== null}
-                  defaultDifficulty={txDifficulty}
-                  error={flowNodeError}
-                  miningAttempts={miningAttempts}
-                  onMount={(recordId, difficultyHex) => void handleCreateTransactionMount(recordId, difficultyHex)}
-                  onViewChain={handleViewConsumeChain}
+                  busy={registration.busy === 'mount'}
+                  canViewChain={registration.mountedPubkey !== null}
+                  defaultDifficulty={registration.txDifficulty}
+                  error={registration.error}
+                  miningAttempts={registration.miningAttempts}
+                  onMount={(recordId, difficultyHex) => void registration.createTransactionMount(recordId, difficultyHex)}
+                  onViewChain={registration.viewConsumeChain}
                   records={localTxRecords}
-                  status={flowNodeStatus}
+                  status={registration.status}
                 />
               ) : null}
             </>
           ) : selectedLocalConsumeNode ? (
             <ConsumeNodeOperatePanel
-              error={flowNodeError}
+              error={registration.error}
               node={selectedLocalConsumeNode}
               onCopy={(value, label) => void handleCopyText(value, label)}
               onDelete={handleDeleteConsumeNode}
               onExportPrivateKey={() => void handleExportConsumeKey()}
               onRename={handleRenameConsumeNode}
-              status={flowNodeStatus}
+              status={registration.status}
             />
           ) : selectedEdge ? (
             <EdgeInspector apiBase={apiBase} edge={selectedEdge} chain={selectedChain} flowRate={flowRateView} />
@@ -1042,14 +758,6 @@ function downloadText(filename: string, mime: string, content: string): void {
   link.download = filename
   link.click()
   URL.revokeObjectURL(url)
-}
-
-// 校验存储的密钥对未被篡改：私钥派生出的公钥须与存储公钥一致，
-// 否则签名会用错密钥、在后端校验前白挖 PoW。getPublicKeyFromPrivate 为确定性派生。
-function assertKeypairIntegrity(node: { privateKeyHex: string; publicKeyHex: string }): void {
-  if (getPublicKeyFromPrivate(node.privateKeyHex) !== node.publicKeyHex) {
-    throw new Error('Keypair corruption detected: stored private key does not match its public key.')
-  }
 }
 
 export default App
