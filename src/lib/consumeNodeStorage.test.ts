@@ -6,6 +6,13 @@ import {
   saveLocalConsumeNodes,
   type LocalConsumeNode,
 } from './consumeNodeStorage'
+import type { SecretCodec } from './keyVault'
+
+// 可逆假编解码器（base64 往返），让存储测试无需真实 Web Crypto。
+const fakeCodec: SecretCodec = {
+  encrypt: (plaintext) => Promise.resolve({ iv: 'iv', ct: btoa(plaintext) }),
+  decrypt: (secret) => Promise.resolve(atob(secret.ct)),
+}
 
 function fakeStorage(initial: Record<string, string> = {}): Storage {
   const map = new Map(Object.entries(initial))
@@ -35,17 +42,21 @@ const node: LocalConsumeNode = {
 }
 
 describe('consume node storage', () => {
-  it('round-trips through storage', () => {
+  it('round-trips through storage with the private key encrypted at rest', async () => {
     const storage = fakeStorage()
-    saveLocalConsumeNodes([node], storage)
-    expect(loadLocalConsumeNodes(storage)).toEqual([node])
+    await saveLocalConsumeNodes([node], fakeCodec, storage)
+    expect(storage.getItem(consumeNodeStorageKey)).not.toContain(node.privateKeyHex)
+    expect(await loadLocalConsumeNodes(fakeCodec, storage)).toEqual([node])
   })
 
-  it('returns [] for missing, malformed, or wrong-version documents', () => {
-    expect(loadLocalConsumeNodes(fakeStorage())).toEqual([])
-    expect(loadLocalConsumeNodes(fakeStorage({ [consumeNodeStorageKey]: 'not json' }))).toEqual([])
+  it('returns [] for missing, malformed, or wrong-version documents', async () => {
+    expect(await loadLocalConsumeNodes(fakeCodec, fakeStorage())).toEqual([])
     expect(
-      loadLocalConsumeNodes(
+      await loadLocalConsumeNodes(fakeCodec, fakeStorage({ [consumeNodeStorageKey]: 'not json' })),
+    ).toEqual([])
+    expect(
+      await loadLocalConsumeNodes(
+        fakeCodec,
         fakeStorage({ [consumeNodeStorageKey]: JSON.stringify({ version: 2, nodes: [node] }) }),
       ),
     ).toEqual([])

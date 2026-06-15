@@ -39,6 +39,22 @@ vi.mock('./components/NetworkGraph', () => ({
   ),
 }))
 
+// 用预解锁的保险库 + 可逆 base64 编解码器替身：让集成测试无需真实 Web Crypto/口令交互，
+// 同时仍走「加密落盘 / 解密载入」的真实存储路径（密文 = base64(明文)）。
+vi.mock('./hooks/useKeyVault', () => ({
+  useKeyVault: () => ({
+    status: 'unlocked' as const,
+    error: null,
+    setup: vi.fn(),
+    unlock: vi.fn(),
+    lock: vi.fn(),
+    codec: {
+      encrypt: (plaintext: string) => Promise.resolve({ iv: 'iv', ct: btoa(plaintext) }),
+      decrypt: (secret: { ct: string }) => Promise.resolve(atob(secret.ct)),
+    },
+  }),
+}))
+
 vi.mock('@nmsci/sdk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@nmsci/sdk')>()
   return {
@@ -108,12 +124,12 @@ describe('App initial state', () => {
     await waitFor(() => {
       const raw = localStorage.getItem('nmsci.flowNodes.v1')
       const saved = JSON.parse(raw ?? '{"nodes":[]}') as {
-        nodes: Array<{ privateKeyHex: string; publicKeyHex: string }>
+        nodes: Array<{ privateKey: { ct: string }; publicKeyHex: string }>
       }
-      expect(saved.nodes).toEqual([expect.objectContaining({
-        privateKeyHex: '0'.repeat(63) + '1',
-        publicKeyHex: '02'.padEnd(66, '1'),
-      })])
+      // 私钥以密文落盘（明文不出现在 raw），pubkey 明文；密文用替身编解码器可解回原私钥。
+      expect(raw).not.toContain('0'.repeat(63) + '1')
+      expect(saved.nodes[0]?.publicKeyHex).toBe('02'.padEnd(66, '1'))
+      expect(atob(saved.nodes[0]!.privateKey.ct)).toBe('0'.repeat(63) + '1')
     })
     // selecting the new node opens its operate panel in the inspector
     expect(await screen.findByRole('button', { name: /register node/i })).toBeTruthy()
@@ -557,10 +573,13 @@ describe('App initial state', () => {
     fireEvent.click(screen.getByRole('button', { name: /import flow node/i }))
 
     await waitFor(() => {
-      const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
-        nodes: Array<{ privateKeyHex: string; publicKeyHex: string }>
+      const raw = localStorage.getItem('nmsci.flowNodes.v1')
+      const saved = JSON.parse(raw ?? '{"nodes":[]}') as {
+        nodes: Array<{ privateKey: { ct: string }; publicKeyHex: string }>
       }
-      expect(saved.nodes[0]?.privateKeyHex).toBe(privateKey)
+      // 导入的私钥同样以密文落盘（明文不出现在 raw），密文可解回原私钥。
+      expect(raw).not.toContain(privateKey)
+      expect(atob(saved.nodes[0]!.privateKey.ct)).toBe(privateKey)
       expect(saved.nodes[0]?.publicKeyHex.length).toBe(66)
     })
   })
