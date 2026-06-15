@@ -78,37 +78,30 @@ describe('App initial state', () => {
     expect(screen.getByLabelText('Data status').textContent).toContain('No data')
   })
 
-  it('generates a local flow node and persists it to localStorage', async () => {
+  it('adds a flow node from the keys toolbar and persists it', async () => {
     render(<App />)
 
-    fireEvent.click(screen.getByRole('button', { name: /generate flow node/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
 
     await waitFor(() => {
-      expect((screen.getByLabelText('Local flow node') as HTMLSelectElement).value)
-        .toBe('02'.padEnd(66, '1'))
+      const raw = localStorage.getItem('nmsci.flowNodes.v1')
+      const saved = JSON.parse(raw ?? '{"nodes":[]}') as {
+        nodes: Array<{ privateKeyHex: string; publicKeyHex: string }>
+      }
+      expect(saved.nodes).toEqual([expect.objectContaining({
+        privateKeyHex: '0'.repeat(63) + '1',
+        publicKeyHex: '02'.padEnd(66, '1'),
+      })])
     })
-    const raw = localStorage.getItem('nmsci.flowNodes.v1')
-    expect(raw).not.toBeNull()
-    const saved = JSON.parse(raw ?? '{"nodes":[]}') as {
-      nodes: Array<{ privateKeyHex: string; publicKeyHex: string }>
-    }
-    expect(saved.nodes).toEqual([expect.objectContaining({
-      privateKeyHex: '0'.repeat(63) + '1',
-      publicKeyHex: '02'.padEnd(66, '1'),
-    })])
+    // selecting the new node opens its operate panel in the inspector
+    expect(await screen.findByRole('button', { name: /register node/i })).toBeTruthy()
   })
 
   it('fills the selected flow node public key into the query field', async () => {
     render(<App />)
 
-    fireEvent.click(screen.getByRole('button', { name: /generate flow node/i }))
-
-    await waitFor(() => {
-      expect((screen.getByLabelText('Local flow node') as HTMLSelectElement).value)
-        .toBe('02'.padEnd(66, '1'))
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: /query this node/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /query this node/i }))
 
     expect((screen.getByLabelText('Flow node id / pubkey') as HTMLTextAreaElement).value)
       .toBe('02'.padEnd(66, '1'))
@@ -126,7 +119,8 @@ describe('App initial state', () => {
     })))
     render(<App />)
 
-    fireEvent.click(screen.getByRole('button', { name: /use latest/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /use latest difficulty/i }))
 
     await waitFor(() => {
       expect((screen.getByLabelText('Register difficulty target') as HTMLInputElement).value)
@@ -353,11 +347,8 @@ describe('App initial state', () => {
     })
     render(<App />)
 
-    fireEvent.click(screen.getByRole('button', { name: /generate flow node/i }))
-    await waitFor(() => {
-      expect((screen.getByLabelText('Local flow node') as HTMLSelectElement).value).toBe(pubkey)
-    })
-    fireEvent.change(screen.getByLabelText('Register difficulty target'), { target: { value: '1d00ffff' } })
+    fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
+    fireEvent.change(await screen.findByLabelText('Register difficulty target'), { target: { value: '1d00ffff' } })
     fireEvent.click(screen.getByRole('button', { name: /register node/i }))
 
     await waitFor(() => {
@@ -376,10 +367,8 @@ describe('App initial state', () => {
   it('renames and deletes a local flow node', async () => {
     render(<App />)
 
-    fireEvent.click(screen.getByRole('button', { name: /generate flow node/i }))
-    await waitFor(() => {
-      expect((screen.getByLabelText('Local flow node') as HTMLSelectElement).value).toBe('02'.padEnd(66, '1'))
-    })
+    fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
+    await screen.findByRole('button', { name: /register node/i })
 
     vi.stubGlobal('prompt', vi.fn(() => 'Renamed node'))
     fireEvent.click(screen.getByRole('button', { name: /^rename$/i }))
