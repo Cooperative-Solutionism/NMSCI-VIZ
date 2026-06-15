@@ -104,7 +104,7 @@ export function QueryPanel({
           className="floating-reopen"
           type="button"
           onClick={() => setPanelCollapsed(false)}
-          aria-label="Open console panel"
+          aria-label="打开控制台面板"
         >
           <Layers size={18} />
         </button>
@@ -114,26 +114,26 @@ export function QueryPanel({
         ref={panelRef}
         style={panelStyle}
         className={`query-panel${panelCollapsed ? ' collapsed' : ''}${panelDragging ? ' dragging' : ''}`}
-        aria-label="Consume chain query"
+        aria-label="消费链查询"
         aria-hidden={panelCollapsed}
       >
         <div className="floating-head" onPointerDown={handlePanelPointerDown}>
           <div className="floating-title">
             <GripVertical className="floating-grip" size={15} aria-hidden />
             <Layers size={15} />
-            <span>Console</span>
+            <span>控制台</span>
           </div>
           <button
             className="floating-collapse"
             type="button"
             onClick={() => setPanelCollapsed(true)}
-            aria-label="Collapse panel"
+            aria-label="收起面板"
           >
             <ChevronLeft size={16} />
           </button>
         </div>
 
-        <div className="floating-tabs" role="tablist" aria-label="Panel sections">
+        <div className="floating-tabs" role="tablist" aria-label="面板分区">
           <button
             role="tab"
             aria-selected={leftTab === 'query'}
@@ -142,7 +142,7 @@ export function QueryPanel({
             onClick={() => setLeftTab('query')}
           >
             <Filter size={15} />
-            Query
+            查询
           </button>
           <button
             role="tab"
@@ -152,7 +152,7 @@ export function QueryPanel({
             onClick={() => setLeftTab('browse')}
           >
             <Database size={15} />
-            Browse
+            浏览
           </button>
           <button
             role="tab"
@@ -162,14 +162,14 @@ export function QueryPanel({
             onClick={() => setLeftTab('keys')}
           >
             <KeyRound size={15} />
-            Keys
+            密钥
           </button>
         </div>
 
         <div className="floating-body">
           {leftTab === 'query' ? (
             <>
-              <Field label="API base">
+              <Field label="API 基址">
                 <input
                   value={apiBase}
                   onChange={(event) => onApiBaseChange(event.currentTarget.value)}
@@ -177,15 +177,15 @@ export function QueryPanel({
                 />
               </Field>
 
-              <Field label="Mode">
-                <div className="segmented" role="group" aria-label="Query mode">
+              <Field label="模式">
+                <div className="segmented" role="group" aria-label="查询模式">
                   <button
                     className={mode === 'start' ? 'active' : ''}
                     type="button"
                     onClick={() => onSetMode('start')}
                   >
                     <LocateFixed size={15} />
-                    Start
+                    起点
                   </button>
                   <button
                     className={mode === 'end' ? 'active' : ''}
@@ -193,7 +193,7 @@ export function QueryPanel({
                     onClick={() => onSetMode('end')}
                   >
                     <CircleDot size={15} />
-                    End
+                    终点
                   </button>
                   <button
                     className={mode === 'node' ? 'active' : ''}
@@ -201,12 +201,12 @@ export function QueryPanel({
                     onClick={() => onSetMode('node')}
                   >
                     <Orbit size={15} />
-                    Node
+                    节点
                   </button>
                 </div>
               </Field>
 
-              <Field label="Flow node id / pubkey">
+              <Field label="流转节点 ID / 公钥">
                 <textarea
                   rows={3}
                   value={nodeId}
@@ -214,10 +214,10 @@ export function QueryPanel({
                   spellCheck={false}
                 />
               </Field>
-              <p className="field-hint">UUID or 66-hex public key (auto-detected)</p>
+              <p className="field-hint">支持 UUID 或 66 位十六进制公钥（自动识别）</p>
 
-              <Field label="Loop status">
-                <div className="segmented compact" role="group" aria-label="Loop status">
+              <Field label="循环状态">
+                <div className="segmented compact" role="group" aria-label="循环状态">
                   {(['all', 'looped', 'open'] as const).map((status) => (
                     <button
                       key={status}
@@ -232,20 +232,20 @@ export function QueryPanel({
               </Field>
 
               <div className="form-grid">
-                <Field label="Currency">
+                <Field label="币种">
                   <select
                     value={currencyFilter}
                     onChange={(event) =>
                       onSetCurrencyFilter(event.currentTarget.value as CurrencyFilter)
                     }
                   >
-                    <option value="all">All</option>
+                    <option value="all">全部</option>
                     <option value="1">CNY</option>
-                    <option value="0">Au ug</option>
+                    <option value="0">Au 微克</option>
                   </select>
-                  <span className="field-hint">Current page view filter</span>
+                  <span className="field-hint">当前页视图过滤</span>
                 </Field>
-                <Field label="Page">
+                <Field label="页码">
                   <input
                     min={0}
                     type="number"
@@ -253,7 +253,7 @@ export function QueryPanel({
                     onChange={(event) => onSetPage(Math.max(0, Number(event.currentTarget.value)))}
                   />
                 </Field>
-                <Field label="Size">
+                <Field label="每页数量">
                   <input
                     min={1}
                     max={200}
@@ -273,28 +273,24 @@ export function QueryPanel({
                   onClick={() => void onRunQuery(0)}
                 >
                   <Search size={16} />
-                  {loading ? 'Loading' : 'Load'}
+                  {loading ? '加载中' : '加载'}
                 </button>
                 {nodeId.trim().length === 0 ? (
                   <span id="load-disabled-reason" className="sr-only">
-                    Enter a flow node UUID to load chain data.
+                    请输入流转节点 UUID 后加载链路数据。
                   </span>
                 ) : null}
               </div>
 
               <div className="request-preview">
-                <span>Request</span>
+                <span>请求</span>
                 <code>{requestUrl}</code>
               </div>
 
-              {error ? (
-                <p className="error-banner">{error}. Current graph was kept unchanged.</p>
-              ) : null}
+              {error ? <p className="error-banner">{error}。当前图谱已保持不变。</p> : null}
               {warning ? <p className="info-banner">{warning}</p> : null}
               {extended ? (
-                <p className="info-banner">
-                  Extended graph view; reload the query to resume pagination.
-                </p>
+                <p className="info-banner">已扩展图谱视图；重新加载查询可恢复分页。</p>
               ) : null}
             </>
           ) : null}
@@ -311,7 +307,7 @@ export function QueryPanel({
 
           {leftTab === 'keys' ? (
             <div className="flow-node-block">
-              <PanelHeader icon={<KeyRound size={16} />} title="Keys" />
+              <PanelHeader icon={<KeyRound size={16} />} title="密钥" />
               <VaultGate
                 status={vaultStatus}
                 error={vaultError}
@@ -327,7 +323,7 @@ export function QueryPanel({
                   onClick={() => onAddFlowNode()}
                 >
                   <Plus size={15} />
-                  Flow node
+                  流转节点
                 </button>
                 <button
                   className="secondary-button"
@@ -336,7 +332,7 @@ export function QueryPanel({
                   onClick={() => onAddConsumeNode()}
                 >
                   <Plus size={15} />
-                  Consume node
+                  消费节点
                 </button>
               </div>
               <div className="action-row">
@@ -347,13 +343,13 @@ export function QueryPanel({
                   onClick={onImportLocalNode}
                 >
                   <Plus size={15} />
-                  Import flow node
+                  导入流转节点
                 </button>
               </div>
               <p className="field-hint">
                 {vaultStatus === 'unlocked'
-                  ? 'Right-click the canvas to add a node, then click a node to register, authorize, or build transactions on it.'
-                  : 'Unlock your key vault to add or import nodes. Private keys are encrypted at rest.'}
+                  ? '可在画布右键添加节点，点击节点后可注册、授权或构建交易。'
+                  : '解锁密钥保险库后可添加或导入节点；私钥会加密存储。'}
               </p>
               {registrationError && showKeyringError ? (
                 <p className="operation-message error">{registrationError}</p>

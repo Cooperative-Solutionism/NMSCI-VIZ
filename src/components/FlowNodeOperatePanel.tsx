@@ -8,8 +8,6 @@ import { PanelHeader } from './PanelHeader'
 
 export type FlowNodeBusyState = 'difficulty' | 'register' | 'authorize' | 'record' | 'mount' | null
 
-// 流转节点操作面板（点击画布上的本地流转节点后显示在右侧检查器）：
-// 密钥信息 + 链上状态 + 注册 + 中心公钥授权 + 钥匙管理。原左栏 FLOW NODES 巨块迁移至此。
 export function FlowNodeOperatePanel({
   busy,
   centralLocked,
@@ -57,63 +55,68 @@ export function FlowNodeOperatePanel({
   registerDifficultyTarget: string
   status: string | null
 }) {
-  const registerDisabled = registerDifficultyTarget.trim().length === 0 || busy !== null || centralLocked
+  const registerDisabled =
+    registerDifficultyTarget.trim().length === 0 || busy !== null || centralLocked
+  const chainState = nodeState
+    ? `${nodeState.registered ? '已注册' : '未注册'}${nodeState.authorized ? ' · 已授权' : ''}${nodeState.locked ? ' · 已锁定' : ''}`
+    : '-'
+
   return (
     <div className="inspector-content">
-      <PanelHeader icon={<KeyRound size={16} />} title="Flow node" />
+      <PanelHeader icon={<KeyRound size={16} />} title="流转节点" />
 
       <div className="node-key-box">
         <DetailRow
-          label="Pubkey"
-          value={(
+          label="公钥"
+          value={
             <span className="copyable-value">
               <code>{node.publicKeyHex}</code>
-              <button type="button" onClick={() => onCopy(node.publicKeyHex, 'Pubkey')}>
-                Copy
+              <button type="button" onClick={() => onCopy(node.publicKeyHex, '公钥')}>
+                复制
               </button>
             </span>
-          )}
-        />
-        <DetailRow
-          label="Register id"
-          value={node.registration?.id ? (
-            <span className="copyable-value">
-              <code>{node.registration.id}</code>
-              <button type="button" onClick={() => onCopy(node.registration?.id ?? '', 'Register id')}>
-                Copy
-              </button>
-            </span>
-          ) : '—'}
-        />
-        <DetailRow label="Secret" value={<code>{maskSecret(node.privateKeyHex)}</code>} />
-        <DetailRow label="Saved" value={formatDateTime(node.createdAt)} />
-        <DetailRow label="Register" value={node.registration?.status ?? '-'} />
-        <DetailRow label="Auth count" value={node.authorizations.length} />
-        <DetailRow
-          label="On-chain"
-          value={
-            nodeState
-              ? `${nodeState.registered ? 'registered' : 'unregistered'}${nodeState.authorized ? ' · authorized' : ''}${nodeState.locked ? ' · locked' : ''}`
-              : '—'
           }
         />
+        <DetailRow
+          label="注册 ID"
+          value={
+            node.registration?.id ? (
+              <span className="copyable-value">
+                <code>{node.registration.id}</code>
+                <button
+                  type="button"
+                  onClick={() => onCopy(node.registration?.id ?? '', '注册 ID')}
+                >
+                  复制
+                </button>
+              </span>
+            ) : (
+              '-'
+            )
+          }
+        />
+        <DetailRow label="私钥" value={<code>{maskSecret(node.privateKeyHex)}</code>} />
+        <DetailRow label="保存时间" value={formatDateTime(node.createdAt)} />
+        <DetailRow label="注册状态" value={formatRegistrationStatus(node.registration?.status)} />
+        <DetailRow label="授权数" value={node.authorizations.length} />
+        <DetailRow label="链上状态" value={chainState} />
         <button className="secondary-button" type="button" onClick={onQuery}>
           <Search size={15} />
-          Query this node
+          查询此节点
         </button>
         <button className="secondary-button" type="button" onClick={onExportPrivateKey}>
-          Export private key
+          导出私钥
         </button>
         <button className="secondary-button" type="button" onClick={onRename}>
-          Rename
+          重命名
         </button>
         <button className="secondary-button danger" type="button" onClick={onDelete}>
-          Delete
+          删除
         </button>
       </div>
 
-      <div className="section-title">Register</div>
-      <Field label="Register difficulty target">
+      <div className="section-title">注册</div>
+      <Field label="注册难度目标">
         <input
           value={registerDifficultyTarget}
           onChange={(event) => onDifficultyChange(event.currentTarget.value)}
@@ -128,12 +131,10 @@ export function FlowNodeOperatePanel({
         onClick={onFetchDifficulty}
       >
         <RefreshCw size={15} />
-        {busy === 'difficulty' ? 'Loading' : 'Use latest difficulty'}
+        {busy === 'difficulty' ? '加载中' : '使用最新难度'}
       </button>
       {centralLocked ? (
-        <p className="operation-message error">
-          Central public key is frozen; registration and authorization are disabled.
-        </p>
+        <p className="operation-message error">中心公钥已冻结，注册和授权已禁用。</p>
       ) : null}
       <button
         className="primary-button"
@@ -144,19 +145,19 @@ export function FlowNodeOperatePanel({
         <BadgeCheck size={16} />
         {busy === 'register'
           ? miningAttempts != null
-            ? `Mining ${miningAttempts.toLocaleString()}`
-            : 'Registering'
-          : 'Register node'}
+            ? `挖矿 ${miningAttempts.toLocaleString()}`
+            : '注册中'
+          : '注册节点'}
       </button>
 
-      <div className="section-title">Authorize central key</div>
-      <Field label="Central pubkey">
+      <div className="section-title">授权中心公钥</div>
+      <Field label="中心公钥">
         <textarea
           rows={3}
           value={centralPubkey}
           onChange={(event) => onCentralPubkeyChange(event.currentTarget.value)}
           spellCheck={false}
-          placeholder="33-byte compressed public key hex"
+          placeholder="33 字节压缩公钥 hex"
         />
       </Field>
       <button
@@ -166,20 +167,20 @@ export function FlowNodeOperatePanel({
         onClick={onAuthorize}
       >
         <ShieldCheck size={16} />
-        {busy === 'authorize' ? 'Authorizing' : 'Authorize central'}
+        {busy === 'authorize' ? '授权中' : '授权中心'}
       </button>
 
       {onCreateRecord || onCreateMount ? (
         <>
-          <div className="section-title">Transaction</div>
+          <div className="section-title">交易</div>
           {onCreateRecord ? (
             <button className="secondary-button" type="button" onClick={onCreateRecord}>
-              Create transaction record
+              创建交易记录
             </button>
           ) : null}
           {onCreateMount ? (
             <button className="secondary-button" type="button" onClick={onCreateMount}>
-              Mount a record
+              挂载已有记录
             </button>
           ) : null}
         </>
@@ -189,10 +190,16 @@ export function FlowNodeOperatePanel({
       {error ? <p className="operation-message error">{error}</p> : null}
       {lastRawBytes ? (
         <div className="raw-preview">
-          <span>Last raw message</span>
+          <span>最近原始消息</span>
           <code>{lastRawBytes}</code>
         </div>
       ) : null}
     </div>
   )
+}
+
+function formatRegistrationStatus(status: string | undefined): string {
+  if (status === 'sent') return '已发送'
+  if (status === 'failed') return '失败'
+  return '-'
 }

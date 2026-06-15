@@ -16,15 +16,15 @@ export function TopBar({
   return (
     <header className="topbar">
       <div>
-        <p className="eyebrow">NMSCI Consumption Network</p>
-        <h1>Network Explorer</h1>
+        <p className="eyebrow">NMSCI 消费网络</p>
+        <h1>网络浏览器</h1>
       </div>
-      <div className="topbar-status" aria-label="Data status">
+      <div className="topbar-status" aria-label="数据状态">
         <span className={`status-dot ${origin}`} />
-        <span>{origin === 'backend' ? 'Backend data' : 'No data'}</span>
+        <span>{origin === 'backend' ? '后端数据' : '暂无数据'}</span>
         <span className="status-divider" />
-        <span>{nodeCount} nodes</span>
-        <span>{edgeCount} edges</span>
+        <span>{nodeCount} 个节点</span>
+        <span>{edgeCount} 条边</span>
       </div>
       <SystemStatusStrip status={systemStatus} />
     </header>

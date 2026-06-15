@@ -165,49 +165,64 @@ describe('chain graph mapping', () => {
     ]
 
     const graph = buildGraphFromConsumeChains(mixed)
-    expect(graph.stats.volumeByCurrency).toEqual(new Map([[1, 12500n], [0, 2_500_000n]]))
-    expect(formatVolumeByCurrency(graph.stats.volumeByCurrency)).toBe('2,500,000 ug Au · 125.00 CNY')
+    expect(graph.stats.volumeByCurrency).toEqual(
+      new Map([
+        [1, 12500n],
+        [0, 2_500_000n],
+      ]),
+    )
+    expect(formatVolumeByCurrency(graph.stats.volumeByCurrency)).toBe(
+      '2,500,000 Au 微克 · 125.00 CNY',
+    )
   })
 
   it('builds backend URLs for node-centered start and end queries', () => {
-    expect(buildConsumeChainUrl('/api', {
-      mode: 'start',
-      nodeId: 'node-1',
-      loopStatus: 'open',
-      page: 2,
-      size: 25,
-    })).toBe('/api/consume-chains?startId=node-1&isLoop=false&page=2&size=25')
+    expect(
+      buildConsumeChainUrl('/api', {
+        mode: 'start',
+        nodeId: 'node-1',
+        loopStatus: 'open',
+        page: 2,
+        size: 25,
+      }),
+    ).toBe('/api/consume-chains?startId=node-1&isLoop=false&page=2&size=25')
 
-    expect(buildConsumeChainUrl('http://localhost:8080/', {
-      mode: 'end',
-      nodeId: 'node 2',
-      loopStatus: 'looped',
-      page: 0,
-      size: 10,
-    })).toBe('http://localhost:8080/consume-chains?endId=node+2&isLoop=true&page=0&size=10')
+    expect(
+      buildConsumeChainUrl('http://localhost:8080/', {
+        mode: 'end',
+        nodeId: 'node 2',
+        loopStatus: 'looped',
+        page: 0,
+        size: 10,
+      }),
+    ).toBe('http://localhost:8080/consume-chains?endId=node+2&isLoop=true&page=0&size=10')
 
-    expect(buildConsumeChainUrl('/api', {
-      mode: 'node',
-      nodeId: 'node-3',
-      loopStatus: 'all',
-      page: 1,
-      size: 100,
-    })).toBe('/api/consume-chains?nodeId=node-3&page=1&size=100')
+    expect(
+      buildConsumeChainUrl('/api', {
+        mode: 'node',
+        nodeId: 'node-3',
+        loopStatus: 'all',
+        page: 1,
+        size: 100,
+      }),
+    ).toBe('/api/consume-chains?nodeId=node-3&page=1&size=100')
 
     const pubkey = `02${'a'.repeat(64)}`
-    expect(buildConsumeChainUrl('/api', {
-      mode: 'start',
-      nodeId: pubkey,
-      loopStatus: 'all',
-      page: 0,
-      size: 50,
-    })).toBe(`/api/consume-chains?startPubkey=${pubkey}&page=0&size=50`)
+    expect(
+      buildConsumeChainUrl('/api', {
+        mode: 'start',
+        nodeId: pubkey,
+        loopStatus: 'all',
+        page: 0,
+        size: 50,
+      }),
+    ).toBe(`/api/consume-chains?startPubkey=${pubkey}&page=0&size=50`)
   })
 
   it('formats operational labels without losing raw ids', () => {
     expect(shortId('abcdef11-1111-4111-8111-111111111111')).toBe('ABCDEF')
     expect(formatAmount(12500, 1)).toBe('125.00 CNY')
-    expect(formatAmount(2500000, 0)).toBe('2,500,000 ug Au')
+    expect(formatAmount(2500000, 0)).toBe('2,500,000 Au 微克')
     expect(chainColor('chain-a')).toBe(chainColor('chain-a'))
     expect(chainColor('chain-a')).not.toBe(chainColor('chain-b'))
   })

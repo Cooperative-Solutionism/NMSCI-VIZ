@@ -1,4 +1,9 @@
-import { ApiClient, listFlowNodes, type FlowNodeListItemDTORaw, type FlowNodeListQuery } from '@nmsci/sdk'
+import {
+  ApiClient,
+  listFlowNodes,
+  type FlowNodeListItemDTORaw,
+  type FlowNodeListQuery,
+} from '@nmsci/sdk'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { errorMessage } from '../lib/errors'
 
@@ -26,30 +31,33 @@ export function useFlowNodeDirectory(apiBase: string) {
   const client = useMemo(() => new ApiClient({ baseUrl: apiBase }), [apiBase])
   const generationRef = useRef(0)
 
-  const load = useCallback(async (query: FlowNodeListQuery) => {
-    const generation = generationRef.current + 1
-    generationRef.current = generation
-    setState((current) => ({ ...current, loading: true, error: null }))
-    try {
-      const res = await listFlowNodes(client, query)
-      if (generation !== generationRef.current) return
-      setState({
-        items: res.data.content,
-        loading: false,
-        error: null,
-        page: res.data.page,
-        hasNext: res.data.hasNext,
-        hasPrevious: res.data.hasPrevious,
-      })
-    } catch (listError) {
-      if (generation !== generationRef.current) return
-      setState((current) => ({
-        ...current,
-        loading: false,
-        error: errorMessage(listError, 'Failed to list flow nodes'),
-      }))
-    }
-  }, [client])
+  const load = useCallback(
+    async (query: FlowNodeListQuery) => {
+      const generation = generationRef.current + 1
+      generationRef.current = generation
+      setState((current) => ({ ...current, loading: true, error: null }))
+      try {
+        const res = await listFlowNodes(client, query)
+        if (generation !== generationRef.current) return
+        setState({
+          items: res.data.content,
+          loading: false,
+          error: null,
+          page: res.data.page,
+          hasNext: res.data.hasNext,
+          hasPrevious: res.data.hasPrevious,
+        })
+      } catch (listError) {
+        if (generation !== generationRef.current) return
+        setState((current) => ({
+          ...current,
+          loading: false,
+          error: errorMessage(listError, '列出流转节点失败'),
+        }))
+      }
+    },
+    [client],
+  )
 
   return { ...state, load }
 }

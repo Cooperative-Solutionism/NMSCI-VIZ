@@ -24,11 +24,9 @@ export function FooterBar({
   return (
     <footer className="footerbar">
       <div>
-        <span className="footer-label">Slice</span>
+        <span className="footer-label">切片</span>
         <span>
-          page {slice.page} / size {slice.size} / {filteredRowCount} visible row
-          {filteredRowCount === 1 ? '' : 's'} / {rowCount} backend row
-          {rowCount === 1 ? '' : 's'}
+          第 {slice.page} 页 / 每页 {slice.size} / 可见 {filteredRowCount} 行 / 后端 {rowCount} 行
         </span>
       </div>
       <div className="pagination">
@@ -36,16 +34,16 @@ export function FooterBar({
           type="button"
           disabled={loading || extended || !slice.hasPrevious}
           onClick={onPreviousPage}
-          aria-label="Previous page"
+          aria-label="上一页"
         >
           <ChevronLeft size={16} />
         </button>
-        <span>{loading ? 'Loading page' : origin === 'backend' ? 'Live slice' : 'No slice'}</span>
+        <span>{loading ? '页面加载中' : origin === 'backend' ? '实时切片' : '无切片'}</span>
         <button
           type="button"
           disabled={loading || extended || origin !== 'backend' || !slice.hasNext}
           onClick={onNextPage}
-          aria-label="Next page"
+          aria-label="下一页"
         >
           <ChevronRight size={16} />
         </button>

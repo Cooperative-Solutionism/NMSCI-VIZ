@@ -40,10 +40,10 @@ export function useNetworkExplorerController(apiBase: string, defaultPageSize: n
 
   const inspectorEmptyMessage =
     query.origin === 'idle'
-      ? 'Run a query to explore the consumption network.'
+      ? '运行查询以探索消费网络。'
       : query.filteredRows.length === 0 && query.rows.length > 0
-        ? `${query.rows.length} row${query.rows.length === 1 ? '' : 's'} hidden by the current-page filter.`
-        : 'No chains matched. Try loop status: All or another mode.'
+        ? `当前页过滤隐藏了 ${query.rows.length} 行。`
+        : '没有匹配的链路。可尝试循环状态“全部”或切换模式。'
 
   return {
     flowRateView,

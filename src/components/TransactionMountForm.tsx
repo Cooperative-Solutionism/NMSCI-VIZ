@@ -3,7 +3,6 @@ import { formatAmount, shortId } from '../lib/chainGraph'
 import type { LocalTxRecord } from '../lib/txRecordStorage'
 import { Field } from './Field'
 
-// 消费记录挂载表单：从已创建记录中选一条挂上链；成功后可一键查看生成的消费链（构建↔可视化闭环）。
 export function TransactionMountForm({
   busy,
   canViewChain,
@@ -32,10 +31,10 @@ export function TransactionMountForm({
 
   return (
     <div className="record-form">
-      <div className="section-title">Mount a record</div>
-      <Field label="Record to mount">
+      <div className="section-title">挂载记录</div>
+      <Field label="待挂载记录">
         <select value={recordId} onChange={(event) => setRecordId(event.currentTarget.value)}>
-          {records.length === 0 ? <option value="">No records — create one first</option> : null}
+          {records.length === 0 ? <option value="">暂无记录，请先创建</option> : null}
           {records.map((record) => (
             <option key={record.id} value={record.id}>
               {shortId(record.id)} · {formatAmount(BigInt(record.amount), record.currencyType)}
@@ -43,7 +42,7 @@ export function TransactionMountForm({
           ))}
         </select>
       </Field>
-      <Field label="Mount difficulty">
+      <Field label="挂载难度">
         <input
           value={difficultyHex}
           onChange={(event) => setDifficultyHex(event.currentTarget.value)}
@@ -56,11 +55,15 @@ export function TransactionMountForm({
         disabled={!ready}
         onClick={() => onMount(recordId, difficultyHex.trim())}
       >
-        {busy ? (miningAttempts != null ? `Mining ${miningAttempts.toLocaleString()}` : 'Submitting') : 'Mount record'}
+        {busy
+          ? miningAttempts != null
+            ? `挖矿 ${miningAttempts.toLocaleString()}`
+            : '提交中'
+          : '提交挂载'}
       </button>
       {canViewChain ? (
         <button className="secondary-button" type="button" onClick={onViewChain}>
-          View consume chain
+          查看消费链
         </button>
       ) : null}
       {status ? <p className="operation-message">{status}</p> : null}

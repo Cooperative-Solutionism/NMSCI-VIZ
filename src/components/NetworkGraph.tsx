@@ -274,7 +274,7 @@ export function NetworkGraph({
         className="graph-canvas"
         role="img"
         tabIndex={0}
-        aria-label={`Consumption chain network graph with ${graph.nodes.length} nodes and ${graph.edges.length} edges`}
+        aria-label={`消费链网络图谱，包含 ${graph.nodes.length} 个节点和 ${graph.edges.length} 条边`}
       />
       {/* eslint-enable jsx-a11y/no-noninteractive-tabindex */}
       {menu ? (
@@ -287,7 +287,7 @@ export function NetworkGraph({
               setMenu(null)
             }}
           >
-            Add flow node
+            添加流转节点
           </button>
           <button
             type="button"
@@ -297,62 +297,63 @@ export function NetworkGraph({
               setMenu(null)
             }}
           >
-            Add consume node
+            添加消费节点
           </button>
         </div>
       ) : null}
-      <div className="sr-only graph-access-list" aria-label="Keyboard graph selection">
-        <h3>Graph nodes</h3>
+      <div className="sr-only graph-access-list" aria-label="键盘图谱选择">
+        <h3>图谱节点</h3>
         {graph.nodes.map((node) => (
           <button key={node.id} type="button" onClick={() => onSelectNode(node)}>
-            Select node {node.id}
+            选择节点 {node.id}
           </button>
         ))}
-        <h3>Graph edges</h3>
+        <h3>图谱边</h3>
         {graph.edges.map((edge) => (
           <button key={edge.id} type="button" onClick={() => onSelectEdge(edge)}>
-            Select {edge.status} edge {edge.id}
+            选择{edge.status === 'looped' ? '成环' : '开放'}边 {edge.id}
           </button>
         ))}
       </div>
-      <div className="graph-tools" aria-label="Graph controls">
+      <div className="graph-tools" aria-label="图谱控制">
         <button
           type="button"
-          aria-label="Zoom in"
-          title="Zoom in"
+          aria-label="放大"
+          title="放大"
           onClick={() => cyRef.current?.zoom(cyRef.current.zoom() + 0.15)}
         >
           <ZoomIn size={16} />
         </button>
         <button
           type="button"
-          aria-label="Zoom out"
-          title="Zoom out"
+          aria-label="缩小"
+          title="缩小"
           onClick={() => cyRef.current?.zoom(cyRef.current.zoom() - 0.15)}
         >
           <ZoomOut size={16} />
         </button>
         <button
           type="button"
-          aria-label="Fit graph"
-          title="Fit graph"
+          aria-label="适配图谱"
+          title="适配图谱"
           onClick={() => cyRef.current?.fit(undefined, 48)}
         >
           <Maximize2 size={16} />
         </button>
-        <button
-          type="button"
-          aria-label="Download PNG"
-          title="Download PNG"
-          onClick={handleDownloadPng}
-        >
+        <button type="button" aria-label="下载 PNG" title="下载 PNG" onClick={handleDownloadPng}>
           <Download size={16} />
         </button>
       </div>
       <div className="legend">
-        <span><i className="legend-line chain" />Color = consume chain</span>
-        <span><i className="legend-line selected" />Selected chain</span>
-        <span>Edge label = amount</span>
+        <span>
+          <i className="legend-line chain" />
+          颜色 = 消费链
+        </span>
+        <span>
+          <i className="legend-line selected" />
+          已选链路
+        </span>
+        <span>边标签 = 金额</span>
       </div>
     </div>
   )
@@ -438,7 +439,8 @@ function positionForNewNode(cy: Core, nodeId: string, edges: ChainGraphEdge[]): 
 
 function findNeighborPosition(cy: Core, nodeId: string, edges: ChainGraphEdge[]): Point | null {
   for (const edge of edges) {
-    const neighborId = edge.source === nodeId ? edge.target : edge.target === nodeId ? edge.source : null
+    const neighborId =
+      edge.source === nodeId ? edge.target : edge.target === nodeId ? edge.source : null
     if (!neighborId) continue
 
     const neighbor = cy.getElementById(neighborId)

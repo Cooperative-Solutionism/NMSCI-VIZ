@@ -34,14 +34,17 @@ export function useReturningFlowRate(
       setStatus('loading')
       setError(null)
       try {
-        const res = await getReturningFlowRateById(client, sourceId ? { targetId, sourceId } : { targetId })
+        const res = await getReturningFlowRateById(
+          client,
+          sourceId ? { targetId, sourceId } : { targetId },
+        )
         if (generation !== generationRef.current) return
         setData(res.data)
         setStatus('loaded')
       } catch (flowError) {
         if (generation !== generationRef.current) return
         setStatus('error')
-        setError(errorMessage(flowError, 'Failed to load return flow rate'))
+        setError(errorMessage(flowError, '加载回流率失败'))
       }
     })
   }, [client, targetId, sourceId])

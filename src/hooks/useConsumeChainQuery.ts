@@ -29,7 +29,9 @@ export function useConsumeChainQuery(apiBase: string, defaultPageSize: number) {
   const [page, setPage] = useState(0)
   const [size, setSize] = useState(defaultPageSize)
   const [rows, setRows] = useState<ConsumeChainResponseDTO[]>([])
-  const [slice, setSlice] = useState<SliceResponseDTO<ConsumeChainResponseDTO>>(makeSlice([], defaultPageSize))
+  const [slice, setSlice] = useState<SliceResponseDTO<ConsumeChainResponseDTO>>(
+    makeSlice([], defaultPageSize),
+  )
   const [selection, setSelection] = useState<Selection | null>(null)
   const [origin, setOrigin] = useState<DataOrigin>('idle')
   const [loading, setLoading] = useState(false)
@@ -98,89 +100,92 @@ export function useConsumeChainQuery(apiBase: string, defaultPageSize: number) {
     return buildConsumeChainUrl(apiBase, { mode, nodeId, loopStatus, page, size })
   }, [apiBase, loopStatus, mode, nodeId, page, size])
 
-  const runQuery = useCallback(async (
-    targetPage: number,
-    override?: { mode: QueryMode; nodeId: string },
-  ) => {
-    const generation = graphRequestGenerationRef.current + 1
-    graphRequestGenerationRef.current = generation
-    const normalizedSize = Math.min(200, Math.max(1, size))
-    const normalizedPage = Math.max(0, targetPage)
-    // 允许调用方一次性指定 mode/nodeId（避免 setState 异步导致 runQuery 读到旧值的竞态）。
-    const effectiveMode = override?.mode ?? mode
-    const effectiveNodeId = (override?.nodeId ?? nodeId).trim()
+  const runQuery = useCallback(
+    async (targetPage: number, override?: { mode: QueryMode; nodeId: string }) => {
+      const generation = graphRequestGenerationRef.current + 1
+      graphRequestGenerationRef.current = generation
+      const normalizedSize = Math.min(200, Math.max(1, size))
+      const normalizedPage = Math.max(0, targetPage)
+      // 允许调用方一次性指定 mode/nodeId（避免 setState 异步导致 runQuery 读到旧值的竞态）。
+      const effectiveMode = override?.mode ?? mode
+      const effectiveNodeId = (override?.nodeId ?? nodeId).trim()
 
-    setLoading(true)
-    setError(null)
-    setWarning(null)
-    setPage(normalizedPage)
-    setSize(normalizedSize)
-    if (override) {
-      setMode(override.mode)
-      setNodeId(override.nodeId)
-    }
-
-    try {
-      const result = await queryConsumeChains(
-        client,
-        consumeChainFilters(effectiveMode, effectiveNodeId, loopStatus),
-        { page: normalizedPage, size: normalizedSize },
-      )
-      if (generation !== graphRequestGenerationRef.current) return
-      const { content, skipped } = normalizeRowsSafely(result.data.content)
-      setRows(content)
-      setSlice({ ...result.data, content })
-      setOrigin('backend')
-      setSelection(null)
-      setExtended(false)
-      setWarning(skipWarning(skipped))
-    } catch (queryError) {
-      if (generation !== graphRequestGenerationRef.current) return
-      setError(errorMessage(queryError, 'Unknown request error'))
-    } finally {
-      if (generation === graphRequestGenerationRef.current) {
-        setLoading(false)
+      setLoading(true)
+      setError(null)
+      setWarning(null)
+      setPage(normalizedPage)
+      setSize(normalizedSize)
+      if (override) {
+        setMode(override.mode)
+        setNodeId(override.nodeId)
       }
-    }
-  }, [client, loopStatus, mode, nodeId, size])
 
-  const extendFromNode = useCallback(async (node: ChainGraphNode, targetMode: QueryMode) => {
-    const generation = graphRequestGenerationRef.current + 1
-    graphRequestGenerationRef.current = generation
-    const normalizedSize = Math.min(200, Math.max(1, size))
-
-    setLoading(true)
-    setExtendLoading(targetMode)
-    setError(null)
-    setMode(targetMode)
-    setNodeId(node.id)
-    setPage(0)
-    setSize(normalizedSize)
-    setSelection({ kind: 'node', id: node.id })
-
-    try {
-      const result = await queryConsumeChains(
-        client,
-        consumeChainFilters(targetMode, node.id, loopStatus),
-        { page: 0, size: normalizedSize },
-      )
-      if (generation !== graphRequestGenerationRef.current) return
-      const { content, skipped } = normalizeRowsSafely(result.data.content)
-      setRows((currentRows) => mergeConsumeChains(currentRows, content))
-      setSlice({ ...result.data, content })
-      setOrigin('backend')
-      setExtended(true)
-      setWarning(skipWarning(skipped))
-    } catch (queryError) {
-      if (generation !== graphRequestGenerationRef.current) return
-      setError(errorMessage(queryError, 'Unknown request error'))
-    } finally {
-      if (generation === graphRequestGenerationRef.current) {
-        setLoading(false)
-        setExtendLoading(null)
+      try {
+        const result = await queryConsumeChains(
+          client,
+          consumeChainFilters(effectiveMode, effectiveNodeId, loopStatus),
+          { page: normalizedPage, size: normalizedSize },
+        )
+        if (generation !== graphRequestGenerationRef.current) return
+        const { content, skipped } = normalizeRowsSafely(result.data.content)
+        setRows(content)
+        setSlice({ ...result.data, content })
+        setOrigin('backend')
+        setSelection(null)
+        setExtended(false)
+        setWarning(skipWarning(skipped))
+      } catch (queryError) {
+        if (generation !== graphRequestGenerationRef.current) return
+        setError(errorMessage(queryError, '未知请求错误'))
+      } finally {
+        if (generation === graphRequestGenerationRef.current) {
+          setLoading(false)
+        }
       }
-    }
-  }, [client, loopStatus, size])
+    },
+    [client, loopStatus, mode, nodeId, size],
+  )
+
+  const extendFromNode = useCallback(
+    async (node: ChainGraphNode, targetMode: QueryMode) => {
+      const generation = graphRequestGenerationRef.current + 1
+      graphRequestGenerationRef.current = generation
+      const normalizedSize = Math.min(200, Math.max(1, size))
+
+      setLoading(true)
+      setExtendLoading(targetMode)
+      setError(null)
+      setMode(targetMode)
+      setNodeId(node.id)
+      setPage(0)
+      setSize(normalizedSize)
+      setSelection({ kind: 'node', id: node.id })
+
+      try {
+        const result = await queryConsumeChains(
+          client,
+          consumeChainFilters(targetMode, node.id, loopStatus),
+          { page: 0, size: normalizedSize },
+        )
+        if (generation !== graphRequestGenerationRef.current) return
+        const { content, skipped } = normalizeRowsSafely(result.data.content)
+        setRows((currentRows) => mergeConsumeChains(currentRows, content))
+        setSlice({ ...result.data, content })
+        setOrigin('backend')
+        setExtended(true)
+        setWarning(skipWarning(skipped))
+      } catch (queryError) {
+        if (generation !== graphRequestGenerationRef.current) return
+        setError(errorMessage(queryError, '未知请求错误'))
+      } finally {
+        if (generation === graphRequestGenerationRef.current) {
+          setLoading(false)
+          setExtendLoading(null)
+        }
+      }
+    },
+    [client, loopStatus, size],
+  )
 
   const selectEdge = useCallback((edge: ChainGraphEdge) => {
     setSelection({ kind: 'edge', id: edge.id })
@@ -259,5 +264,5 @@ function normalizeRowsSafely(rawRows: ConsumeChainResponseDTORaw[]): {
 
 function skipWarning(skipped: number): string | null {
   if (skipped <= 0) return null
-  return `${skipped} chain${skipped === 1 ? '' : 's'} skipped: amount exceeds the precision-safe range (>2^53).`
+  return `已跳过 ${skipped} 条链路：金额超过精度安全范围（>2^53）。`
 }

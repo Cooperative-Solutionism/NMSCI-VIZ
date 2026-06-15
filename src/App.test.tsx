@@ -115,31 +115,41 @@ describe('App initial state', () => {
   })
 
   function openQueryTab() {
-    fireEvent.click(screen.getByRole('tab', { name: /^query$/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /^查询$/ }))
   }
 
   function openBrowseTab() {
-    fireEvent.click(screen.getByRole('tab', { name: /^browse$/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /^浏览$/ }))
   }
 
   function openKeysTab() {
-    fireEvent.click(screen.getByRole('tab', { name: /^keys$/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /^密钥$/ }))
   }
 
   it('starts without demo data or a demo reset action', () => {
     render(<App />)
 
     expect(screen.queryByRole('button', { name: /demo/i })).toBeNull()
-    expect((screen.getByLabelText('Flow node id / pubkey') as HTMLTextAreaElement).value).toBe('')
-    expect(screen.getByText('Run a query to explore the consumption network.')).toBeTruthy()
-    expect(screen.getByLabelText('Data status').textContent).toContain('No data')
+    expect((screen.getByLabelText('流转节点 ID / 公钥') as HTMLTextAreaElement).value).toBe('')
+    expect(screen.getByText('运行查询以探索消费网络。')).toBeTruthy()
+    expect(screen.getByLabelText('数据状态').textContent).toContain('暂无数据')
+  })
+
+  it('renders the main interface in Chinese', () => {
+    render(<App />)
+
+    expect(screen.getByRole('link', { name: '跳转到图谱' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '网络浏览器' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: '查询' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: '浏览' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: '密钥' })).toBeTruthy()
   })
 
   it('adds a flow node from the keys toolbar and persists it', async () => {
     render(<App />)
 
     openKeysTab()
-    fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^流转节点$/ }))
 
     await waitFor(() => {
       const raw = localStorage.getItem('nmsci.flowNodes.v1')
@@ -152,18 +162,18 @@ describe('App initial state', () => {
       expect(atob(saved.nodes[0]!.privateKey.ct)).toBe('0'.repeat(63) + '1')
     })
     // selecting the new node opens its operate panel in the inspector
-    expect(await screen.findByRole('button', { name: /register node/i })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: /注册节点/ })).toBeTruthy()
   })
 
   it('fills the selected flow node public key into the query field', async () => {
     render(<App />)
 
     openKeysTab()
-    fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
-    fireEvent.click(await screen.findByRole('button', { name: /query this node/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^流转节点$/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /查询此节点/ }))
     openQueryTab()
 
-    expect((screen.getByLabelText('Flow node id / pubkey') as HTMLTextAreaElement).value).toBe(
+    expect((screen.getByLabelText('流转节点 ID / 公钥') as HTMLTextAreaElement).value).toBe(
       '02'.padEnd(66, '1'),
     )
   })
@@ -190,18 +200,14 @@ describe('App initial state', () => {
     render(<App />)
 
     openKeysTab()
-    fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
-    fireEvent.click(await screen.findByRole('button', { name: /use latest difficulty/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^流转节点$/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /使用最新难度/ }))
 
     await waitFor(() => {
-      expect((screen.getByLabelText('Register difficulty target') as HTMLInputElement).value).toBe(
-        '20ffffff',
-      )
+      expect((screen.getByLabelText('注册难度目标') as HTMLInputElement).value).toBe('20ffffff')
     })
-    expect((screen.getByLabelText('Central pubkey') as HTMLTextAreaElement).value).toBe(
-      centralPubkey,
-    )
-    expect(screen.queryByText(/Latest block did not include registerDifficultyTarget/i)).toBeNull()
+    expect((screen.getByLabelText('中心公钥') as HTMLTextAreaElement).value).toBe(centralPubkey)
+    expect(screen.queryByText(/最新区块未包含 registerDifficultyTarget/)).toBeNull()
   })
 
   it('loads changed filters from the first page even when the page input is stale', async () => {
@@ -218,11 +224,11 @@ describe('App initial state', () => {
     })
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), {
+    fireEvent.change(screen.getByLabelText('流转节点 ID / 公钥'), {
       target: { value: 'node-1' },
     })
-    fireEvent.change(screen.getByLabelText('Page'), { target: { value: '7' } })
-    fireEvent.click(screen.getByRole('button', { name: /^load$/i }))
+    fireEvent.change(screen.getByLabelText('页码'), { target: { value: '7' } })
+    fireEvent.click(screen.getByRole('button', { name: /^加载$/ }))
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalled()
@@ -245,14 +251,14 @@ describe('App initial state', () => {
     })
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), {
+    fireEvent.change(screen.getByLabelText('流转节点 ID / 公钥'), {
       target: { value: 'node-1' },
     })
-    fireEvent.change(screen.getByLabelText(/Currency/), { target: { value: '1' } })
-    fireEvent.click(screen.getByRole('button', { name: /^load$/i }))
+    fireEvent.change(screen.getByLabelText(/币种/), { target: { value: '1' } })
+    fireEvent.click(screen.getByRole('button', { name: /^加载$/ }))
 
-    await screen.findByText(/Current page view filter/i)
-    expect(screen.getByText(/1 visible row \/ 2 backend rows/i)).toBeTruthy()
+    await screen.findByText(/当前页视图过滤/)
+    expect(screen.getByText(/可见 1 行 \/ 后端 2 行/)).toBeTruthy()
   })
 
   it('does not allow pagination after an extended graph merge', async () => {
@@ -275,17 +281,17 @@ describe('App initial state', () => {
     })
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), {
+    fireEvent.change(screen.getByLabelText('流转节点 ID / 公钥'), {
       target: { value: 'node-1' },
     })
-    fireEvent.click(screen.getByRole('button', { name: /^load$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^加载$/ }))
     fireEvent.click(await screen.findByRole('button', { name: /select node node-a/i }))
-    fireEvent.click(await screen.findByRole('button', { name: /extend start/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /扩展起点/ }))
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /next page/i })).toBeDisabled()
+      expect(screen.getByRole('button', { name: /下一页/ })).toBeDisabled()
     })
-    expect(screen.getByText(/Extended graph view/i)).toBeTruthy()
+    expect(screen.getByText(/已扩展图谱视图/)).toBeTruthy()
   })
 
   it('queries by public key when a 66-hex value is entered', async () => {
@@ -298,8 +304,8 @@ describe('App initial state', () => {
     render(<App />)
 
     const pubkey = `02${'a'.repeat(64)}`
-    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), { target: { value: pubkey } })
-    fireEvent.click(screen.getByRole('button', { name: /^load$/i }))
+    fireEvent.change(screen.getByLabelText('流转节点 ID / 公钥'), { target: { value: pubkey } })
+    fireEvent.click(screen.getByRole('button', { name: /^加载$/ }))
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalled()
@@ -320,19 +326,19 @@ describe('App initial state', () => {
     })
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), {
+    fireEvent.change(screen.getByLabelText('流转节点 ID / 公钥'), {
       target: { value: 'node-1' },
     })
-    fireEvent.click(screen.getByRole('button', { name: /^load$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^加载$/ }))
 
-    expect(await screen.findByText('Loops (1)')).toBeTruthy()
-    const loopRow = screen.getByRole('button', { name: /LOOP-1.*hops/i })
+    expect(await screen.findByText('循环 (1)')).toBeTruthy()
+    const loopRow = screen.getByRole('button', { name: /LOOP-1.*跳/ })
     expect(loopRow).toHaveAttribute('aria-pressed', 'false')
 
     fireEvent.click(loopRow)
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /LOOP-1.*hops/i })).toHaveAttribute(
+      expect(screen.getByRole('button', { name: /LOOP-1.*跳/ })).toHaveAttribute(
         'aria-pressed',
         'true',
       )
@@ -342,7 +348,7 @@ describe('App initial state', () => {
   it('shows onboarding guidance and disables export before any query', () => {
     render(<App />)
 
-    expect(screen.getByText('Explore the consumption network')).toBeTruthy()
+    expect(screen.getByText('探索消费网络')).toBeTruthy()
     expect(screen.getByRole('button', { name: /^csv$/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /^json$/i })).toBeDisabled()
   })
@@ -362,14 +368,14 @@ describe('App initial state', () => {
     })
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText('Flow node id / pubkey'), {
+    fireEvent.change(screen.getByLabelText('流转节点 ID / 公钥'), {
       target: { value: 'node-1' },
     })
-    fireEvent.click(screen.getByRole('button', { name: /^load$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^加载$/ }))
 
-    fireEvent.click(await screen.findByRole('button', { name: /open transaction/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /打开交易/ }))
 
-    expect(await screen.findByText(/Record txid/i)).toBeTruthy()
+    expect(await screen.findByText(/记录 txid/)).toBeTruthy()
     expect(screen.getByText('recordtxid')).toBeTruthy()
   })
 
@@ -404,15 +410,13 @@ describe('App initial state', () => {
     render(<App />)
 
     openBrowseTab()
-    fireEvent.click(screen.getByRole('button', { name: /browse nodes/i }))
-    fireEvent.click(screen.getByRole('button', { name: /^browse$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /浏览节点/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^浏览$/ }))
 
     const row = await screen.findByRole('button', { name: /02DDDDDDDD/i })
     fireEvent.click(row)
 
-    expect((screen.getByLabelText('Flow node id / pubkey') as HTMLTextAreaElement).value).toBe(
-      pubkey,
-    )
+    expect((screen.getByLabelText('流转节点 ID / 公钥') as HTMLTextAreaElement).value).toBe(pubkey)
   })
 
   it('registers a flow node end to end and persists a sent registration', async () => {
@@ -451,11 +455,11 @@ describe('App initial state', () => {
     render(<App />)
 
     openKeysTab()
-    fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
-    fireEvent.change(await screen.findByLabelText('Register difficulty target'), {
+    fireEvent.click(screen.getByRole('button', { name: /^流转节点$/ }))
+    fireEvent.change(await screen.findByLabelText('注册难度目标'), {
       target: { value: '1d00ffff' },
     })
-    fireEvent.click(screen.getByRole('button', { name: /register node/i }))
+    fireEvent.click(screen.getByRole('button', { name: /注册节点/ }))
 
     await waitFor(() => {
       const raw = localStorage.getItem('nmsci.flowNodes.v1')
@@ -466,7 +470,7 @@ describe('App initial state', () => {
       expect(saved.nodes[0]?.registration?.txid).toBe('regtxid')
     })
     await waitFor(() => {
-      expect(screen.getAllByText(/Registered 021111/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/已注册 021111/).length).toBeGreaterThan(0)
     })
   })
 
@@ -474,14 +478,14 @@ describe('App initial state', () => {
     render(<App />)
 
     openKeysTab()
-    fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
-    await screen.findByRole('button', { name: /register node/i })
+    fireEvent.click(screen.getByRole('button', { name: /^流转节点$/ }))
+    await screen.findByRole('button', { name: /注册节点/ })
 
     vi.stubGlobal(
       'prompt',
       vi.fn(() => 'Renamed node'),
     )
-    fireEvent.click(screen.getByRole('button', { name: /^rename$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^重命名$/ }))
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
         nodes: Array<{ label: string }>
@@ -493,7 +497,7 @@ describe('App initial state', () => {
       'confirm',
       vi.fn(() => true),
     )
-    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^删除$/ }))
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
         nodes: unknown[]
@@ -560,20 +564,18 @@ describe('App initial state', () => {
 
     // a consume node (record source) then a flow node (operator) — flow node ends up selected
     openKeysTab()
-    fireEvent.click(screen.getByRole('button', { name: /^consume node$/i }))
-    fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
-    fireEvent.click(await screen.findByRole('button', { name: /create transaction record/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^消费节点$/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^流转节点$/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /创建交易记录/ }))
 
-    fireEvent.change(await screen.findByLabelText('Amount'), { target: { value: '5000' } })
-    fireEvent.change(screen.getByLabelText('Record central pubkey'), {
+    fireEvent.change(await screen.findByLabelText('金额'), { target: { value: '5000' } })
+    fireEvent.change(screen.getByLabelText('记录中心公钥'), {
       target: { value: '02'.padEnd(66, '2') },
     })
     await waitFor(() => {
-      expect((screen.getByLabelText('Transaction difficulty') as HTMLInputElement).value).toBe(
-        '1d00ffff',
-      )
+      expect((screen.getByLabelText('交易难度') as HTMLInputElement).value).toBe('1d00ffff')
     })
-    fireEvent.click(screen.getByRole('button', { name: /^create record$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^创建记录$/ }))
 
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem('nmsci.txRecords.v1') ?? '{"records":[]}') as {
@@ -637,21 +639,19 @@ describe('App initial state', () => {
     render(<App />)
 
     openKeysTab()
-    fireEvent.click(screen.getByRole('button', { name: /^consume node$/i }))
-    fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^消费节点$/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^流转节点$/ }))
 
     // create a record first
-    fireEvent.click(await screen.findByRole('button', { name: /create transaction record/i }))
-    fireEvent.change(await screen.findByLabelText('Amount'), { target: { value: '5000' } })
-    fireEvent.change(screen.getByLabelText('Record central pubkey'), {
+    fireEvent.click(await screen.findByRole('button', { name: /创建交易记录/ }))
+    fireEvent.change(await screen.findByLabelText('金额'), { target: { value: '5000' } })
+    fireEvent.change(screen.getByLabelText('记录中心公钥'), {
       target: { value: '02'.padEnd(66, '2') },
     })
     await waitFor(() => {
-      expect((screen.getByLabelText('Transaction difficulty') as HTMLInputElement).value).toBe(
-        '1d00ffff',
-      )
+      expect((screen.getByLabelText('交易难度') as HTMLInputElement).value).toBe('1d00ffff')
     })
-    fireEvent.click(screen.getByRole('button', { name: /^create record$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^创建记录$/ }))
     await waitFor(() => {
       expect(localStorage.getItem('nmsci.txRecords.v1')).toContain(
         '11111111-1111-4111-8111-1111111111aa',
@@ -659,8 +659,8 @@ describe('App initial state', () => {
     })
 
     // mount it
-    fireEvent.click(screen.getByRole('button', { name: /mount a record/i }))
-    fireEvent.click(await screen.findByRole('button', { name: /^mount record$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /挂载已有记录/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /^提交挂载$/ }))
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some(
@@ -672,7 +672,7 @@ describe('App initial state', () => {
     })
 
     // view the resulting consume chain — queries by pubkey
-    fireEvent.click(await screen.findByRole('button', { name: /view consume chain/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /查看消费链/ }))
     await waitFor(() => {
       const chainCall = fetchMock.mock.calls.find(([input]) =>
         String(input).includes('/consume-chains'),
@@ -693,7 +693,7 @@ describe('App initial state', () => {
     render(<App />)
 
     openKeysTab()
-    fireEvent.click(screen.getByRole('button', { name: /import flow node/i }))
+    fireEvent.click(screen.getByRole('button', { name: /导入流转节点/ }))
 
     await waitFor(() => {
       const raw = localStorage.getItem('nmsci.flowNodes.v1')

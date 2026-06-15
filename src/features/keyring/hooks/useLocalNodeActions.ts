@@ -38,7 +38,7 @@ export function useLocalNodeActions({
   const handleAddFlowNode = useCallback(
     (position?: { x: number; y: number }) => {
       if (vaultStatus !== 'unlocked') {
-        notifyError('Unlock your key vault before adding nodes.')
+        notifyError('添加节点前请先解锁密钥保险库。')
         return
       }
       const keypair = generateKeyPair()
@@ -55,7 +55,7 @@ export function useLocalNodeActions({
       }
       persistLocalFlowNodes((currentNodes) => [node, ...currentNodes])
       selectLocalNode(node.publicKeyHex)
-      notifyStatus('Flow node added.')
+      notifyStatus('流转节点已添加。')
       clearLastRawBytes()
     },
     [
@@ -71,7 +71,7 @@ export function useLocalNodeActions({
   const handleAddConsumeNode = useCallback(
     (position?: { x: number; y: number }) => {
       if (vaultStatus !== 'unlocked') {
-        notifyError('Unlock your key vault before adding nodes.')
+        notifyError('添加节点前请先解锁密钥保险库。')
         return
       }
       const keypair = generateKeyPair()
@@ -87,17 +87,17 @@ export function useLocalNodeActions({
       }
       persistLocalConsumeNodes((currentNodes) => [node, ...currentNodes])
       selectLocalNode(node.publicKeyHex)
-      notifyStatus('Consume node added.')
+      notifyStatus('消费节点已添加。')
     },
     [notifyError, notifyStatus, persistLocalConsumeNodes, selectLocalNode, vaultStatus],
   )
 
   const handleImportLocalNode = useCallback(() => {
     if (vaultStatus !== 'unlocked') {
-      notifyError('Unlock your key vault before importing a node.')
+      notifyError('导入节点前请先解锁密钥保险库。')
       return
     }
-    const privateKeyHex = window.prompt('Paste a private key (hex)')?.trim()
+    const privateKeyHex = window.prompt('粘贴私钥（hex）')?.trim()
     if (!privateKeyHex) return
     try {
       const publicKeyHex = getPublicKeyFromPrivate(privateKeyHex)
@@ -116,15 +116,15 @@ export function useLocalNodeActions({
         ...currentNodes.filter((current) => current.publicKeyHex !== publicKeyHex),
       ])
       selectLocalNode(publicKeyHex)
-      notifyStatus('Flow node imported.')
+      notifyStatus('流转节点已导入。')
     } catch (importError) {
-      notifyError(errorMessage(importError, 'Invalid private key'))
+      notifyError(errorMessage(importError, '私钥无效'))
     }
   }, [notifyError, notifyStatus, persistLocalFlowNodes, selectLocalNode, vaultStatus])
 
   const handleRenameLocalNode = useCallback(() => {
     if (!selectedLocalNode) return
-    const next = window.prompt('Rename flow node', selectedLocalNode.label)
+    const next = window.prompt('重命名流转节点', selectedLocalNode.label)
     if (next == null) return
     const label = (next.trim() || selectedLocalNode.label).slice(0, 64)
     persistLocalFlowNodes((currentNodes) =>
@@ -133,23 +133,23 @@ export function useLocalNodeActions({
         updatedAt: new Date().toISOString(),
       }),
     )
-    notifyStatus('Flow node renamed.')
+    notifyStatus('流转节点已重命名。')
   }, [notifyStatus, persistLocalFlowNodes, selectedLocalNode])
 
   const handleDeleteLocalNode = useCallback(() => {
     if (!selectedLocalNode) return
-    if (!window.confirm('Delete this local flow node? Its private key will be lost.')) return
+    if (!window.confirm('删除此本地流转节点？对应私钥将丢失。')) return
     const removedPubkey = selectedLocalNode.publicKeyHex
     persistLocalFlowNodes((currentNodes) =>
       currentNodes.filter((current) => current.publicKeyHex !== removedPubkey),
     )
     clearSelectedLocalNode()
-    notifyStatus('Flow node deleted.')
+    notifyStatus('流转节点已删除。')
   }, [clearSelectedLocalNode, notifyStatus, persistLocalFlowNodes, selectedLocalNode])
 
   const handleRenameConsumeNode = useCallback(() => {
     if (!selectedLocalConsumeNode) return
-    const next = window.prompt('Rename consume node', selectedLocalConsumeNode.label)
+    const next = window.prompt('重命名消费节点', selectedLocalConsumeNode.label)
     if (next == null) return
     const label = (next.trim() || selectedLocalConsumeNode.label).slice(0, 64)
     persistLocalConsumeNodes((currentNodes) =>
@@ -158,34 +158,34 @@ export function useLocalNodeActions({
         updatedAt: new Date().toISOString(),
       }),
     )
-    notifyStatus('Consume node renamed.')
+    notifyStatus('消费节点已重命名。')
   }, [notifyStatus, persistLocalConsumeNodes, selectedLocalConsumeNode])
 
   const handleDeleteConsumeNode = useCallback(() => {
     if (!selectedLocalConsumeNode) return
-    if (!window.confirm('Delete this consume node? Its private key will be lost.')) return
+    if (!window.confirm('删除此消费节点？对应私钥将丢失。')) return
     const removedPubkey = selectedLocalConsumeNode.publicKeyHex
     persistLocalConsumeNodes((currentNodes) =>
       currentNodes.filter((current) => current.publicKeyHex !== removedPubkey),
     )
     clearSelectedLocalNode()
-    notifyStatus('Consume node deleted.')
+    notifyStatus('消费节点已删除。')
   }, [clearSelectedLocalNode, notifyStatus, persistLocalConsumeNodes, selectedLocalConsumeNode])
 
   const handleQuerySelectedFlowNode = useCallback(() => {
     if (!selectedLocalNode) return
     setMode('node')
     setNodeId(selectedLocalNode.publicKeyHex)
-    notifyStatus('Flow node public key filled into query.')
+    notifyStatus('流转节点公钥已填入查询。')
   }, [notifyStatus, selectedLocalNode, setMode, setNodeId])
 
   const handleCopyText = useCallback(
     async (value: string, label: string) => {
       try {
         await navigator.clipboard.writeText(value)
-        notifyStatus(`${label} copied.`)
+        notifyStatus(`${label}已复制。`)
       } catch (clipboardError) {
-        notifyError(errorMessage(clipboardError, 'Clipboard unavailable'))
+        notifyError(errorMessage(clipboardError, '剪贴板不可用'))
       }
     },
     [notifyError, notifyStatus],
@@ -193,17 +193,15 @@ export function useLocalNodeActions({
 
   const handleExportPrivateKey = useCallback(async () => {
     if (!selectedLocalNode) return
-    const confirmed = window.confirm(
-      'Export private key from localStorage? It is stored in clear text.',
-    )
+    const confirmed = window.confirm('从 localStorage 导出私钥？解锁后私钥会以明文复制。')
     if (!confirmed) return
-    await handleCopyText(selectedLocalNode.privateKeyHex, 'Private key')
+    await handleCopyText(selectedLocalNode.privateKeyHex, '私钥')
   }, [handleCopyText, selectedLocalNode])
 
   const handleExportConsumeKey = useCallback(async () => {
     if (!selectedLocalConsumeNode) return
-    if (!window.confirm('Export private key from localStorage? It is stored in clear text.')) return
-    await handleCopyText(selectedLocalConsumeNode.privateKeyHex, 'Private key')
+    if (!window.confirm('从 localStorage 导出私钥？解锁后私钥会以明文复制。')) return
+    await handleCopyText(selectedLocalConsumeNode.privateKeyHex, '私钥')
   }, [handleCopyText, selectedLocalConsumeNode])
 
   return {

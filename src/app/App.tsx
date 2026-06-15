@@ -76,13 +76,13 @@ function App() {
   const centralLocked = systemStatus.data?.currentCentralPubkeyLocked ?? false
   const politeMessage =
     registration.status ??
-    (query.origin === 'backend' ? `Query complete: ${query.filteredRows.length} visible rows.` : '')
+    (query.origin === 'backend' ? `查询完成：当前可见 ${query.filteredRows.length} 行。` : '')
   const alertMessage = query.error ?? registration.error ?? nodeDetail.nodeDetailError ?? ''
 
   return (
     <main className="app-shell">
       <a className="skip-link" href="#network-graph">
-        Skip to graph
+        跳转到图谱
       </a>
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {politeMessage}

@@ -32,9 +32,9 @@ export function useNetworkExplorerActions({
   const handleCopyCurl = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(toCurl(requestUrl))
-      notifyStatus('Request curl copied.')
+      notifyStatus('请求 curl 已复制。')
     } catch (clipboardError) {
-      notifyError(errorMessage(clipboardError, 'Clipboard unavailable'))
+      notifyError(errorMessage(clipboardError, '剪贴板不可用'))
     }
   }, [notifyError, notifyStatus, requestUrl])
 
@@ -42,7 +42,7 @@ export function useNetworkExplorerActions({
     (pubkey: string) => {
       setMode('node')
       setNodeId(pubkey)
-      notifyStatus('Picked node public key filled into query - click Load.')
+      notifyStatus('已将所选节点公钥填入查询，请点击加载。')
     },
     [notifyStatus, setMode, setNodeId],
   )

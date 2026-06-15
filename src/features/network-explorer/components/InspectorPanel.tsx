@@ -81,24 +81,24 @@ export function InspectorPanel({
   selectedNode: ChainGraphNode | null
 }) {
   return (
-    <aside className="inspector-panel" aria-label="Selection inspector">
+    <aside className="inspector-panel" aria-label="选择详情">
       <LoopsPanel loops={loops} onSelectLoop={onSelectLoop} selectedChainId={selectedChainId} />
 
       <div className="inspector-heading">
         <h2>
           {selectedLocalNode
-            ? 'Flow node'
+            ? '流转节点'
             : selectedLocalConsumeNode
-              ? 'Consume node'
+              ? '消费节点'
               : effectiveSelection?.kind === 'node'
-                ? 'Selected node'
+                ? '已选节点'
                 : effectiveSelection?.kind === 'edge'
-                  ? 'Selected edge'
-                  : 'Selection'}
+                  ? '已选边'
+                  : '选择详情'}
         </h2>
       </div>
 
-      <ErrorBoundary label="Inspector panel failed">
+      <ErrorBoundary label="详情面板加载失败">
         {selectedLocalNode ? (
           <>
             <FlowNodeOperatePanel
@@ -139,7 +139,7 @@ export function InspectorPanel({
             ) : null}
             {registration.recordFormOpen && localTxRecords.length > 0 ? (
               <div className="record-list">
-                <div className="section-title">Created records</div>
+                <div className="section-title">已创建记录</div>
                 {localTxRecords.map((record) => (
                   <div key={record.id} className="detail-row">
                     <span>{shortId(record.id)}</span>

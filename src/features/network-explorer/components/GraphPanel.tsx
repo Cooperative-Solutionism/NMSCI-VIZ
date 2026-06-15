@@ -39,14 +39,9 @@ export function GraphPanel({
   selectedId: string | null
 }) {
   return (
-    <section
-      id="network-graph"
-      className="graph-panel"
-      aria-label="Network visualization"
-      aria-busy={loading}
-    >
+    <section id="network-graph" className="graph-panel" aria-label="网络可视化" aria-busy={loading}>
       <div className="graph-header">
-        <div className="export-bar" role="group" aria-label="Export">
+        <div className="export-bar" role="group" aria-label="导出">
           <button
             className="ghost-button"
             type="button"
@@ -64,46 +59,46 @@ export function GraphPanel({
             JSON
           </button>
           <button className="ghost-button" type="button" onClick={() => void onCopyCurl()}>
-            Copy curl
+            复制 curl
           </button>
         </div>
         {origin === 'idle' ? (
           <div className="graph-welcome">
-            <h2>Explore the consumption network</h2>
+            <h2>探索消费网络</h2>
             <p>
-              Enter a flow node UUID or 66-hex public key, choose a mode (Start / End / Node), and
-              Load. Looped chains are circular trades - open the Loops panel to rank them.
+              输入流转节点 UUID 或 66
+              位十六进制公钥，选择起点、终点或节点模式后加载。成环链路代表循环交易，可在循环面板中排序查看。
             </p>
           </div>
         ) : null}
         <div className="metrics-strip">
           <MetricCard
-            label="Total chains"
+            label="总链路"
             value={graph.stats.totalChains.toString()}
             icon={<GitBranch size={17} />}
           />
           <MetricCard
-            label="Looped"
+            label="成环"
             value={graph.stats.loopedChains.toString()}
             tone="looped"
             icon={<Activity size={17} />}
           />
           <MetricCard
-            label="Open"
+            label="开放"
             value={graph.stats.openChains.toString()}
             tone="open"
             icon={<Network size={17} />}
           />
           <MetricCard
-            label="Volume"
+            label="流量"
             value={formatVolumeByCurrency(graph.stats.volumeByCurrency)}
             icon={<Database size={17} />}
           />
         </div>
       </div>
 
-      <ErrorBoundary label="Network graph failed">
-        <Suspense fallback={<div className="graph-loading">Loading graph...</div>}>
+      <ErrorBoundary label="图谱加载失败">
+        <Suspense fallback={<div className="graph-loading">正在加载图谱...</div>}>
           <NetworkGraph
             graph={canvasGraph}
             selectedId={selectedId}

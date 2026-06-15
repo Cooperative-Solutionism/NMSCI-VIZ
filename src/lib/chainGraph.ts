@@ -105,12 +105,12 @@ export function formatAmount(amount: number | bigint, currencyType: number): str
     return `${whole.toLocaleString()}.${cents.toString().padStart(2, '0')} CNY`
   }
   if (currencyType === 0) {
-    return `${normalizedAmount.toLocaleString()} ug Au`
+    return `${normalizedAmount.toLocaleString()} Au 微克`
   }
   return `${normalizedAmount.toLocaleString()} #${currencyType}`
 }
 
-// 把按币种分桶的金额渲染成单行（"125.00 CNY · 2,500,000 ug Au"）。空桶显示 0。
+// 把按币种分桶的金额渲染成单行（"125.00 CNY · 2,500,000 Au 微克"）。空桶显示 0。
 export function formatVolumeByCurrency(volumeByCurrency: VolumeByCurrency): string {
   if (volumeByCurrency.size === 0) return formatAmount(0n, 1)
   return [...volumeByCurrency.entries()]

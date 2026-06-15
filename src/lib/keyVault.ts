@@ -24,7 +24,7 @@ function getCrypto(): Crypto {
   // 浏览器为 window.crypto；Node 20+ 为全局 webcrypto。两处都暴露在 globalThis.crypto。
   const cryptoObj = globalThis.crypto
   if (!cryptoObj?.subtle) {
-    throw new Error('Web Crypto (crypto.subtle) is unavailable in this environment.')
+    throw new Error('当前环境不可用 Web Crypto（crypto.subtle）。')
   }
   return cryptoObj
 }

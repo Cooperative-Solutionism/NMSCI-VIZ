@@ -39,7 +39,7 @@ export function NodeInspector({
 }) {
   return (
     <div className="inspector-content">
-      <PanelHeader icon={<CircleDot size={16} />} title="Selected node" />
+      <PanelHeader icon={<CircleDot size={16} />} title="已选节点" />
       <div className="node-actions">
         <button
           className="secondary-button"
@@ -47,7 +47,7 @@ export function NodeInspector({
           disabled={disabled}
           onClick={onExtendNode}
         >
-          {extendLoading === 'node' ? 'Loading' : 'Load node'}
+          {extendLoading === 'node' ? '加载中' : '加载节点'}
         </button>
         <button
           className="secondary-button"
@@ -55,7 +55,7 @@ export function NodeInspector({
           disabled={disabled}
           onClick={onExtendStart}
         >
-          {extendLoading === 'start' ? 'Extending' : 'Extend start'}
+          {extendLoading === 'start' ? '扩展中' : '扩展起点'}
         </button>
         <button
           className="secondary-button"
@@ -63,29 +63,37 @@ export function NodeInspector({
           disabled={disabled}
           onClick={onExtendEnd}
         >
-          {extendLoading === 'end' ? 'Extending' : 'Extend end'}
+          {extendLoading === 'end' ? '扩展中' : '扩展终点'}
         </button>
       </div>
-      <DetailRow label="Node" value={<code>{node.id}</code>} />
-      <DetailRow label="Label" value={shortId(node.id)} />
-      <DetailRow label="Touches" value={node.chainCount} />
-      <DetailRow label="Throughput" value={formatVolumeByCurrency(node.volumeByCurrency)} />
-      <div className="section-title">Node state</div>
-      {detailStatus === 'loading' ? <div className="detail-state">Loading node state...</div> : null}
+      <DetailRow label="节点" value={<code>{node.id}</code>} />
+      <DetailRow label="标签" value={shortId(node.id)} />
+      <DetailRow label="关联链数" value={node.chainCount} />
+      <DetailRow label="吞吐量" value={formatVolumeByCurrency(node.volumeByCurrency)} />
+      <div className="section-title">节点状态</div>
+      {detailStatus === 'loading' ? <div className="detail-state">正在加载节点状态...</div> : null}
       {detailStatus === 'error' ? (
-        <div className="detail-state error">{detailError ?? 'Node state request failed.'}</div>
+        <div className="detail-state error">{detailError ?? '节点状态请求失败。'}</div>
       ) : null}
       {state ? (
         <>
-          <DetailRow label="Registered" value={state.registered ? 'Yes' : 'No'} />
-          <DetailRow label="Authorized" value={state.authorized ? 'Yes' : 'No'} />
-          <DetailRow label="Locked" value={state.locked ? 'Yes' : 'No'} />
-          <DetailRow label="Central authorized" value={state.currentCentralPubkeyAuthorized ? 'Yes' : 'No'} />
+          <DetailRow label="已注册" value={state.registered ? '是' : '否'} />
+          <DetailRow label="已授权" value={state.authorized ? '是' : '否'} />
+          <DetailRow label="已锁定" value={state.locked ? '是' : '否'} />
+          <DetailRow
+            label="中心已授权"
+            value={state.currentCentralPubkeyAuthorized ? '是' : '否'}
+          />
         </>
       ) : detailStatus === 'idle' ? (
-        <div className="detail-state">Node state needs the flow node public key (select via a pubkey query).</div>
+        <div className="detail-state">节点状态需要流转节点公钥（请通过公钥查询选择）。</div>
       ) : null}
-      <ReturnFlowCard data={flowRate.data} error={flowRate.error} mode="node" status={flowRate.status} />
+      <ReturnFlowCard
+        data={flowRate.data}
+        error={flowRate.error}
+        mode="node"
+        status={flowRate.status}
+      />
     </div>
   )
 }

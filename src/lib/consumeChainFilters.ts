@@ -2,9 +2,9 @@ import type { ConsumeChainQueryFilters } from '@nmsci/sdk'
 import type { IdentityKind, LoopStatus, QueryMode } from './types'
 
 export function statusLabel(status: LoopStatus): string {
-  if (status === 'looped') return 'Looped'
-  if (status === 'open') return 'Open'
-  return 'All'
+  if (status === 'looped') return '成环'
+  if (status === 'open') return '开放'
+  return '全部'
 }
 
 // 压缩 secp256k1 公钥固定为 33 字节 = 66 个 hex 字符；其余（含 36 位 UUID）按 id 处理。

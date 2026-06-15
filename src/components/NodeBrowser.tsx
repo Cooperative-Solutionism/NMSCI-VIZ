@@ -5,8 +5,6 @@ import { shortHex } from '../lib/format'
 
 const PAGE_SIZE = 10
 
-// 节点发现：按 registered/authorized/locked 过滤浏览节点目录，点选即把公钥填入查询，
-// 解决"打开工具却没有任何可查的 UUID"的冷启动死胡同。
 export function NodeBrowser({
   apiBase,
   onPick,
@@ -21,17 +19,20 @@ export function NodeBrowser({
   const [locked, setLocked] = useState(false)
   const [page, setPage] = useState(0)
 
-  const browse = useCallback((targetPage: number) => {
-    const nextPage = Math.max(0, targetPage)
-    setPage(nextPage)
-    void directory.load({
-      registered: registered || undefined,
-      authorized: authorized || undefined,
-      locked: locked || undefined,
-      page: nextPage,
-      size: PAGE_SIZE,
-    })
-  }, [authorized, directory, locked, registered])
+  const browse = useCallback(
+    (targetPage: number) => {
+      const nextPage = Math.max(0, targetPage)
+      setPage(nextPage)
+      void directory.load({
+        registered: registered || undefined,
+        authorized: authorized || undefined,
+        locked: locked || undefined,
+        page: nextPage,
+        size: PAGE_SIZE,
+      })
+    },
+    [authorized, directory, locked, registered],
+  )
 
   return (
     <section className="node-browser">
@@ -41,14 +42,22 @@ export function NodeBrowser({
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        Browse nodes
+        浏览节点
       </button>
       {open ? (
         <div className="node-browser-body">
-          <div className="filter-chips" role="group" aria-label="Node filters">
-            <ChipToggle label="Registered" active={registered} onToggle={() => setRegistered((v) => !v)} />
-            <ChipToggle label="Authorized" active={authorized} onToggle={() => setAuthorized((v) => !v)} />
-            <ChipToggle label="Locked" active={locked} onToggle={() => setLocked((v) => !v)} />
+          <div className="filter-chips" role="group" aria-label="节点过滤">
+            <ChipToggle
+              label="已注册"
+              active={registered}
+              onToggle={() => setRegistered((v) => !v)}
+            />
+            <ChipToggle
+              label="已授权"
+              active={authorized}
+              onToggle={() => setAuthorized((v) => !v)}
+            />
+            <ChipToggle label="已锁定" active={locked} onToggle={() => setLocked((v) => !v)} />
           </div>
           <button
             className="secondary-button"
@@ -57,19 +66,23 @@ export function NodeBrowser({
             onClick={() => browse(0)}
           >
             <Search size={15} />
-            {directory.loading ? 'Loading' : 'Browse'}
+            {directory.loading ? '加载中' : '浏览'}
           </button>
           {directory.error ? <p className="operation-message error">{directory.error}</p> : null}
           {directory.items.length > 0 ? (
             <ul className="node-browser-list">
               {directory.items.map((item) => (
                 <li key={item.id}>
-                  <button type="button" className="node-browser-row" onClick={() => onPick(item.flowNodePubkey)}>
+                  <button
+                    type="button"
+                    className="node-browser-row"
+                    onClick={() => onPick(item.flowNodePubkey)}
+                  >
                     <span className="node-browser-key">{shortHex(item.flowNodePubkey)}</span>
                     <span className="node-browser-badges">
-                      {item.registered ? <em className="badge reg">reg</em> : null}
-                      {item.authorized ? <em className="badge auth">auth</em> : null}
-                      {item.locked ? <em className="badge lock">lock</em> : null}
+                      {item.registered ? <em className="badge reg">注册</em> : null}
+                      {item.authorized ? <em className="badge auth">授权</em> : null}
+                      {item.locked ? <em className="badge lock">锁定</em> : null}
                     </span>
                   </button>
                 </li>
@@ -78,12 +91,20 @@ export function NodeBrowser({
           ) : null}
           {directory.items.length > 0 ? (
             <div className="node-browser-pager">
-              <button type="button" disabled={!directory.hasPrevious || directory.loading} onClick={() => browse(page - 1)}>
-                Prev
+              <button
+                type="button"
+                disabled={!directory.hasPrevious || directory.loading}
+                onClick={() => browse(page - 1)}
+              >
+                上一页
               </button>
-              <span>page {directory.page}</span>
-              <button type="button" disabled={!directory.hasNext || directory.loading} onClick={() => browse(page + 1)}>
-                Next
+              <span>第 {directory.page} 页</span>
+              <button
+                type="button"
+                disabled={!directory.hasNext || directory.loading}
+                onClick={() => browse(page + 1)}
+              >
+                下一页
               </button>
             </div>
           ) : null}
@@ -103,7 +124,12 @@ function ChipToggle({
   onToggle: () => void
 }) {
   return (
-    <button type="button" className={`chip ${active ? 'active' : ''}`} aria-pressed={active} onClick={onToggle}>
+    <button
+      type="button"
+      className={`chip ${active ? 'active' : ''}`}
+      aria-pressed={active}
+      onClick={onToggle}
+    >
       {label}
     </button>
   )
