@@ -665,8 +665,8 @@ function App() {
           <span className={`status-dot ${origin}`} />
           <span>{origin === 'backend' ? 'Backend data' : 'No data'}</span>
           <span className="status-divider" />
-          <span>{graph.nodes.length} nodes</span>
-          <span>{graph.edges.length} edges</span>
+          <span>{canvasGraph.nodes.length} nodes</span>
+          <span>{canvasGraph.edges.length} edges</span>
         </div>
         <SystemStatusStrip status={systemStatus.data} />
       </header>
@@ -827,6 +827,7 @@ function App() {
         </aside>
 
         <section id="network-graph" className="graph-panel" aria-label="Network visualization" aria-busy={loading}>
+          <div className="graph-header">
           <div className="export-bar" role="group" aria-label="Export">
             <button className="ghost-button" type="button" disabled={graph.edges.length === 0} onClick={handleExportCsv}>
               CSV
@@ -856,6 +857,7 @@ function App() {
               value={formatVolumeByCurrency(graph.stats.volumeByCurrency)}
               icon={<Database size={17} />}
             />
+          </div>
           </div>
 
           <ErrorBoundary label="Network graph failed">
