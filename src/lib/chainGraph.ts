@@ -1,22 +1,30 @@
 import type {
+  CanvasPosition,
   ChainGraph,
   ChainGraphEdge,
   ChainGraphNode,
   ConsumeChainQuery,
-  ConsumeChainResponseDTORaw,
-  EdgeStatus,
+  ConsumeChainResponseDTO,
+  NodeKind,
+  VolumeByCurrency,
 } from './types'
+import { consumeChainParamName, detectIdentityKind } from './consumeChainFilters'
+import { readGraphTokens } from './tokens'
 
-export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTORaw[]): ChainGraph {
+export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTO[]): ChainGraph {
   const nodes = new Map<string, ChainGraphNode>()
   const edges: ChainGraphEdge[] = []
+  const volumeByCurrency: VolumeByCurrency = new Map()
+  let loopedChains = 0
 
   for (const row of rows) {
-    touchNode(nodes, row.consumeChain.start, row.consumeChain.amount)
+    if (row.consumeChain.isLoop) loopedChains += 1
+    addAmount(volumeByCurrency, row.consumeChain.currencyType, row.consumeChain.amount)
 
+    // 节点吞吐量仅由边贡献（链的 start/end 必为首尾边的端点），避免链额+边额对同一节点重复计数。
     for (const edge of row.consumeChainEdges) {
-      touchNode(nodes, edge.source, edge.amount)
-      touchNode(nodes, edge.target, edge.amount)
+      touchNode(nodes, edge.source, edge.amount, edge.currencyType)
+      touchNode(nodes, edge.target, edge.amount, edge.currencyType)
       edges.push({
         id: edge.id,
         source: edge.source,
@@ -33,7 +41,11 @@ export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTORaw[]):
       })
     }
 
-    touchNode(nodes, row.consumeChain.end, row.consumeChain.amount)
+    // 无边的退化链（理论上不出现）仍需让 start/end 入图。
+    if (row.consumeChainEdges.length === 0) {
+      touchNode(nodes, row.consumeChain.start, 0n, row.consumeChain.currencyType)
+      touchNode(nodes, row.consumeChain.end, 0n, row.consumeChain.currencyType)
+    }
   }
 
   return {
@@ -41,24 +53,19 @@ export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTORaw[]):
     edges,
     stats: {
       totalChains: rows.length,
-      loopedChains: rows.filter((row) => row.consumeChain.isLoop).length,
-      openChains: rows.filter((row) => !row.consumeChain.isLoop).length,
-      volume: rows.reduce((sum, row) => sum + row.consumeChain.amount, 0),
-      currencyType: rows[0]?.consumeChain.currencyType ?? 1,
+      loopedChains,
+      openChains: rows.length - loopedChains,
+      volumeByCurrency,
     },
   }
 }
 
-// 展示用：还原 SDK queryConsumeChains 实际请求的 URL（集合根 + id 模式查询参数）。
+// 展示用：还原 SDK queryConsumeChains 实际请求的 URL（集合根 + id/pubkey 模式查询参数）。
 export function buildConsumeChainUrl(baseUrl: string, query: ConsumeChainQuery): string {
   const normalizedBaseUrl = baseUrl.replace(/\/+$/, '')
-  const nodeParamByMode: Record<ConsumeChainQuery['mode'], string> = {
-    start: 'startId',
-    end: 'endId',
-    node: 'nodeId',
-  }
   const params = new URLSearchParams()
-  params.set(nodeParamByMode[query.mode], query.nodeId)
+  const trimmed = query.nodeId.trim()
+  params.set(consumeChainParamName(query.mode, detectIdentityKind(trimmed)), trimmed)
 
   if (query.loopStatus !== 'all') {
     params.set('isLoop', String(query.loopStatus === 'looped'))
@@ -75,10 +82,10 @@ export function shortId(id: string): string {
 }
 
 export function mergeConsumeChains(
-  currentRows: ConsumeChainResponseDTORaw[],
-  nextRows: ConsumeChainResponseDTORaw[],
-): ConsumeChainResponseDTORaw[] {
-  const rowsByChainId = new Map<string, ConsumeChainResponseDTORaw>()
+  currentRows: ConsumeChainResponseDTO[],
+  nextRows: ConsumeChainResponseDTO[],
+): ConsumeChainResponseDTO[] {
+  const rowsByChainId = new Map<string, ConsumeChainResponseDTO>()
   for (const row of currentRows) {
     rowsByChainId.set(row.consumeChain.id, row)
   }
@@ -90,58 +97,97 @@ export function mergeConsumeChains(
   return Array.from(rowsByChainId.values())
 }
 
-export function formatAmount(amount: number, currencyType: number): string {
+export function formatAmount(amount: number | bigint, currencyType: number): string {
+  const normalizedAmount = typeof amount === 'bigint' ? amount : BigInt(Math.trunc(amount))
   if (currencyType === 1) {
-    return `${(amount / 100).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })} CNY`
+    const whole = normalizedAmount / 100n
+    const cents = normalizedAmount % 100n
+    return `${whole.toLocaleString()}.${cents.toString().padStart(2, '0')} CNY`
   }
   if (currencyType === 0) {
-    return `${amount.toLocaleString()} ug Au`
+    return `${normalizedAmount.toLocaleString()} ug Au`
   }
-  return `${amount.toLocaleString()} #${currencyType}`
+  return `${normalizedAmount.toLocaleString()} #${currencyType}`
 }
 
-export function edgeColor(status: EdgeStatus): string {
-  return status === 'looped' ? '#178f69' : '#d88a21'
+// 把按币种分桶的金额渲染成单行（"125.00 CNY · 2,500,000 ug Au"）。空桶显示 0。
+export function formatVolumeByCurrency(volumeByCurrency: VolumeByCurrency): string {
+  if (volumeByCurrency.size === 0) return formatAmount(0n, 1)
+  return [...volumeByCurrency.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([currencyType, amount]) => formatAmount(amount, currencyType))
+    .join(' · ')
 }
 
-const chainPalette = [
-  '#0f766e',
-  '#b45309',
-  '#2563eb',
-  '#be123c',
-  '#6d28d9',
-  '#15803d',
-  '#c2410c',
-  '#0369a1',
-  '#a21caf',
-  '#4d7c0f',
-  '#b91c1c',
-  '#0e7490',
-]
+function addAmount(target: VolumeByCurrency, currencyType: number, amount: bigint): void {
+  target.set(currencyType, (target.get(currencyType) ?? 0n) + amount)
+}
 
 export function chainColor(chainId: string): string {
+  const chainPalette = readGraphTokens().chainPalette
   let hash = 0
   for (let index = 0; index < chainId.length; index += 1) {
     hash = (hash * 31 + chainId.charCodeAt(index)) >>> 0
   }
-  return chainPalette[hash % chainPalette.length]
+  return chainPalette[hash % chainPalette.length] ?? '#0f766e'
 }
 
-function touchNode(nodes: Map<string, ChainGraphNode>, id: string, amount: number): void {
+function touchNode(
+  nodes: Map<string, ChainGraphNode>,
+  id: string,
+  amount: bigint,
+  currencyType: number,
+): void {
   const existing = nodes.get(id)
   if (existing) {
     existing.chainCount += 1
-    existing.volume += amount
+    addAmount(existing.volumeByCurrency, currencyType, amount)
     return
   }
 
+  const volumeByCurrency: VolumeByCurrency = new Map()
+  addAmount(volumeByCurrency, currencyType, amount)
   nodes.set(id, {
     id,
     label: shortId(id),
     chainCount: 1,
-    volume: amount,
+    volumeByCurrency,
+    kind: 'chain',
   })
+}
+
+// 本地密钥节点的最小展示信息（避免 chainGraph 依赖 storage 类型）。
+export interface LocalNodeRef {
+  publicKeyHex: string
+  label: string
+  position?: CanvasPosition
+}
+
+// 把本地密钥节点（流转/消费）叠加到查询得到的链图上，使其直接显示在画布、可在无查询结果时先建后查。
+// 以 pubkey 为 id；与链节点的 UUID id 不会冲突。
+export function mergeLocalNodes(
+  graph: ChainGraph,
+  flowNodes: LocalNodeRef[],
+  consumeNodes: LocalNodeRef[],
+): ChainGraph {
+  const seen = new Set(graph.nodes.map((node) => node.id))
+  const extra: ChainGraphNode[] = []
+  const append = (refs: LocalNodeRef[], kind: NodeKind): void => {
+    for (const ref of refs) {
+      if (seen.has(ref.publicKeyHex)) continue
+      seen.add(ref.publicKeyHex)
+      extra.push({
+        id: ref.publicKeyHex,
+        label: ref.label || shortId(ref.publicKeyHex),
+        chainCount: 0,
+        volumeByCurrency: new Map(),
+        kind,
+        position: ref.position,
+      })
+    }
+  }
+  append(flowNodes, 'local-flow')
+  append(consumeNodes, 'local-consume')
+  if (extra.length === 0) return graph
+  return { ...graph, nodes: [...graph.nodes, ...extra] }
 }

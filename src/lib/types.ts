@@ -6,6 +6,7 @@ export type {
   FlowNodeRegisterMsgRaw,
   CentralPubkeyEmpowerMsgRaw,
   ConsumeChainRaw,
+  ConsumeChainResponseDTO,
   ConsumeChainEdgeRaw,
   ConsumeChainResponseDTORaw,
 } from '@nmsci/sdk'
@@ -14,12 +15,28 @@ export type {
 export type QueryMode = 'start' | 'end' | 'node'
 export type LoopStatus = 'all' | 'looped' | 'open'
 export type EdgeStatus = 'looped' | 'open'
+export type IdentityKind = 'id' | 'pubkey'
+
+// 画布节点来源：来自查询的链节点，或本地密钥（流转/消费）叠加层。
+export type NodeKind = 'chain' | 'local-flow' | 'local-consume'
+
+export interface CanvasPosition {
+  x: number
+  y: number
+}
+
+// 按币种归集的金额（key = currencyType）。混币求和无意义，故所有聚合都按币种分桶。
+export type VolumeByCurrency = Map<number, bigint>
 
 export interface ChainGraphNode {
   id: string
   label: string
   chainCount: number
-  volume: number
+  // 节点吞吐量 = 关联边金额之和，按币种分桶（不再把链额与边额重复计入同一节点）。
+  volumeByCurrency: VolumeByCurrency
+  kind: NodeKind
+  // 本地节点的画布落点（右键添加时记录）；链节点无此字段，由布局算法定位。
+  position?: CanvasPosition
 }
 
 export interface ChainGraphEdge {
@@ -27,22 +44,22 @@ export interface ChainGraphEdge {
   source: string
   target: string
   label: string
-  amount: number
+  amount: bigint
   currencyType: number
   chainId: string
   status: EdgeStatus
   color: string
   relatedTransactionRecord: string
   relatedTransactionMount: string
-  relatedTransactionMountTimestamp: number
+  relatedTransactionMountTimestamp: bigint
 }
 
 export interface ChainGraphStats {
   totalChains: number
   loopedChains: number
   openChains: number
-  volume: number
-  currencyType: number
+  // 总流量按币种分桶（CNY 分 与 Au 微克 不可相加）。
+  volumeByCurrency: VolumeByCurrency
 }
 
 export interface ChainGraph {

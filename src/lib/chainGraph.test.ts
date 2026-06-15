@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest'
+import { normalizeConsumeChainResponseDTO } from '@nmsci/sdk'
 import {
   buildConsumeChainUrl,
   buildGraphFromConsumeChains,
   chainColor,
   formatAmount,
+  formatVolumeByCurrency,
   mergeConsumeChains,
+  mergeLocalNodes,
   shortId,
 } from './chainGraph'
 import type { ConsumeChainResponseDTORaw } from './types'
 
-const chainRows: ConsumeChainResponseDTORaw[] = [
+const rawChainRows: ConsumeChainResponseDTORaw[] = [
   {
     consumeChain: {
       id: 'chain-a',
@@ -73,6 +76,7 @@ const chainRows: ConsumeChainResponseDTORaw[] = [
     ],
   },
 ]
+const chainRows = rawChainRows.map(normalizeConsumeChainResponseDTO)
 
 describe('chain graph mapping', () => {
   it('deduplicates nodes, maps directed edges, and aggregates metrics', () => {
@@ -91,18 +95,78 @@ describe('chain graph mapping', () => {
       target: '22222222-2222-4222-8222-222222222222',
       chainId: 'chain-a',
       status: 'looped',
-      amount: 5000,
+      amount: 5000n,
       color: chainColor('chain-a'),
     })
-    expect(graph.edges[0].color).toBe(graph.edges[1].color)
-    expect(graph.edges[0].color).not.toBe(graph.edges[2].color)
+    expect(graph.edges[0]!.color).toBe(graph.edges[1]!.color)
+    expect(graph.edges[0]!.color).not.toBe(graph.edges[2]!.color)
+
+    // 节点吞吐量只计入关联边金额（不再叠加链额）：node 1111 = a1(5000) + b1(3200)。
+    const startNode = graph.nodes.find((node) => node.id === '11111111-1111-4111-8111-111111111111')
+    expect(startNode?.volumeByCurrency).toEqual(new Map([[1, 8200n]]))
+
     expect(graph.stats).toEqual({
       totalChains: 2,
       loopedChains: 1,
       openChains: 1,
-      volume: 15700,
-      currencyType: 1,
+      volumeByCurrency: new Map([[1, 15700n]]),
     })
+  })
+
+  it('merges local flow/consume nodes onto the chain graph by pubkey', () => {
+    const graph = buildGraphFromConsumeChains(chainRows)
+    const before = graph.nodes.length
+
+    const merged = mergeLocalNodes(
+      graph,
+      [{ publicKeyHex: 'pk-flow', label: 'Flow A', position: { x: 1, y: 2 } }],
+      [{ publicKeyHex: 'pk-consume', label: 'Consume A' }],
+    )
+    expect(merged.nodes.length).toBe(before + 2)
+    const flow = merged.nodes.find((node) => node.id === 'pk-flow')
+    expect(flow?.kind).toBe('local-flow')
+    expect(flow?.position).toEqual({ x: 1, y: 2 })
+    expect(merged.nodes.find((node) => node.id === 'pk-consume')?.kind).toBe('local-consume')
+
+    // 已存在的 id 不重复叠加
+    const dup = mergeLocalNodes(graph, [{ publicKeyHex: graph.nodes[0]!.id, label: 'X' }], [])
+    expect(dup.nodes.length).toBe(before)
+    expect(dup).toBe(graph)
+  })
+
+  it('aggregates volume per currency and never sums across currencies', () => {
+    const mixed = [
+      chainRows[0]!,
+      normalizeConsumeChainResponseDTO({
+        consumeChain: {
+          id: 'chain-au',
+          start: 'node-a',
+          end: 'node-b',
+          amount: 2_500_000,
+          currencyType: 0,
+          isLoop: false,
+          tailMountTimestamp: 1,
+        },
+        consumeChainEdges: [
+          {
+            id: 'edge-au',
+            source: 'node-a',
+            target: 'node-b',
+            amount: 2_500_000,
+            currencyType: 0,
+            chain: 'chain-au',
+            relatedTransactionRecord: 'r',
+            relatedTransactionMount: 'm',
+            relatedTransactionMountTimestamp: 1,
+            isLoop: false,
+          },
+        ],
+      }),
+    ]
+
+    const graph = buildGraphFromConsumeChains(mixed)
+    expect(graph.stats.volumeByCurrency).toEqual(new Map([[1, 12500n], [0, 2_500_000n]]))
+    expect(formatVolumeByCurrency(graph.stats.volumeByCurrency)).toBe('2,500,000 ug Au · 125.00 CNY')
   })
 
   it('builds backend URLs for node-centered start and end queries', () => {
@@ -129,6 +193,15 @@ describe('chain graph mapping', () => {
       page: 1,
       size: 100,
     })).toBe('/api/consume-chains?nodeId=node-3&page=1&size=100')
+
+    const pubkey = `02${'a'.repeat(64)}`
+    expect(buildConsumeChainUrl('/api', {
+      mode: 'start',
+      nodeId: pubkey,
+      loopStatus: 'all',
+      page: 0,
+      size: 50,
+    })).toBe(`/api/consume-chains?startPubkey=${pubkey}&page=0&size=50`)
   })
 
   it('formats operational labels without losing raw ids', () => {
@@ -140,14 +213,14 @@ describe('chain graph mapping', () => {
   })
 
   it('merges extended consume chains by chain id without duplicating existing graph rows', () => {
-    const duplicate = {
-      ...chainRows[0],
+    const duplicate = normalizeConsumeChainResponseDTO({
+      ...rawChainRows[0]!,
       consumeChain: {
-        ...chainRows[0].consumeChain,
+        ...rawChainRows[0]!.consumeChain,
         amount: 999999,
       },
-    }
-    const extra: ConsumeChainResponseDTORaw = {
+    })
+    const extra = normalizeConsumeChainResponseDTO({
       consumeChain: {
         id: 'chain-c',
         start: '44444444-4444-4444-8444-444444444444',
@@ -171,11 +244,11 @@ describe('chain graph mapping', () => {
           isLoop: false,
         },
       ],
-    }
+    })
 
     const merged = mergeConsumeChains(chainRows, [duplicate, extra])
 
     expect(merged.map((row) => row.consumeChain.id)).toEqual(['chain-a', 'chain-b', 'chain-c'])
-    expect(merged[0].consumeChain.amount).toBe(12500)
+    expect(merged[0]!.consumeChain.amount).toBe(12500n)
   })
 })

@@ -1,25 +1,37 @@
-import cytoscape, { type Core, type NodeSingular } from 'cytoscape'
-import { Maximize2, ZoomIn, ZoomOut } from 'lucide-react'
-import { useEffect, useMemo, useRef } from 'react'
+import cytoscape, { type Core, type EdgeSingular, type NodeSingular } from 'cytoscape'
+import { Download, Maximize2, ZoomIn, ZoomOut } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatAmount } from '../lib/chainGraph'
-import type { ChainGraph, ChainGraphEdge, ChainGraphNode } from '../lib/types'
+import { deterministicOffset, type Point } from '../lib/graphLayout'
+import { readGraphTokens } from '../lib/tokens'
+import type { CanvasPosition, ChainGraph, ChainGraphEdge, ChainGraphNode } from '../lib/types'
 
 interface NetworkGraphProps {
   graph: ChainGraph
   selectedId: string | null
   onSelectNode: (node: ChainGraphNode) => void
   onSelectEdge: (edge: ChainGraphEdge) => void
+  onAddFlowNode?: (position: CanvasPosition) => void
+  onAddConsumeNode?: (position: CanvasPosition) => void
 }
 
-interface Point {
+interface ContextMenuState {
   x: number
   y: number
+  position: CanvasPosition
 }
 
-export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: NetworkGraphProps) {
+export function NetworkGraph({
+  graph,
+  selectedId,
+  onSelectNode,
+  onSelectEdge,
+  onAddFlowNode,
+  onAddConsumeNode,
+}: NetworkGraphProps) {
+  const [menu, setMenu] = useState<ContextMenuState | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const cyRef = useRef<Core | null>(null)
-  const initializedRef = useRef(false)
   const nodeMapRef = useRef(new Map<string, ChainGraphNode>())
   const edgeMapRef = useRef(new Map<string, ChainGraphEdge>())
   const onSelectNodeRef = useRef(onSelectNode)
@@ -50,6 +62,7 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
 
   useEffect(() => {
     if (!containerRef.current) return
+    const tokens = readGraphTokens()
 
     const cy = cytoscape({
       container: containerRef.current,
@@ -60,10 +73,10 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
         {
           selector: 'node',
           style: {
-            'background-color': '#f8fafc',
-            'border-color': '#b9c6d3',
+            'background-color': tokens.nodeBackground,
+            'border-color': tokens.nodeBorder,
             'border-width': 1.4,
-            color: '#16202a',
+            color: tokens.nodeText,
             content: 'data(label)',
             'font-family': 'Inter, ui-sans-serif, system-ui',
             'font-size': 11,
@@ -75,17 +88,34 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
           },
         },
         {
+          selector: 'node[kind = "local-flow"]',
+          style: {
+            'background-color': tokens.localFlowBackground,
+            'border-color': tokens.localFlowBorder,
+            'border-width': 3,
+          },
+        },
+        {
+          selector: 'node[kind = "local-consume"]',
+          style: {
+            'background-color': tokens.localConsumeBackground,
+            'border-color': tokens.localConsumeBorder,
+            'border-width': 3,
+            shape: 'round-rectangle',
+          },
+        },
+        {
           selector: 'node:selected',
           style: {
-            'background-color': '#effdfa',
-            'border-color': '#08776c',
+            'background-color': tokens.nodeSelectedBackground,
+            'border-color': tokens.nodeSelectedBorder,
             'border-width': 3,
           },
         },
         {
           selector: 'edge',
           style: {
-            color: '#334155',
+            color: tokens.edgeText,
             'curve-style': 'bezier',
             'font-family': 'Inter, ui-sans-serif, system-ui',
             'font-size': 10,
@@ -96,7 +126,7 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
             'target-arrow-color': 'data(color)',
             'target-arrow-shape': 'triangle',
             'target-distance-from-node': 2,
-            'text-background-color': '#ffffff',
+            'text-background-color': tokens.edgeLabelBackground,
             'text-background-opacity': 0.92,
             'text-background-padding': '3px',
             'text-rotation': 'autorotate',
@@ -109,6 +139,18 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
             opacity: 0.16,
             'text-background-opacity': 0,
             'text-opacity': 0.2,
+          },
+        },
+        {
+          selector: 'edge[status = "open"]',
+          style: {
+            'line-style': 'dashed',
+          },
+        },
+        {
+          selector: 'edge[status = "looped"]',
+          style: {
+            'line-style': 'solid',
           },
         },
         {
@@ -134,19 +176,31 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
     })
 
     cy.on('tap', 'node', (event) => {
-      const node = nodeMapRef.current.get(event.target.id())
+      const node = nodeMapRef.current.get((event.target as NodeSingular).id())
       if (node) onSelectNodeRef.current(node)
     })
     cy.on('tap', 'edge', (event) => {
-      const edge = edgeMapRef.current.get(event.target.id())
+      const edge = edgeMapRef.current.get((event.target as EdgeSingular).id())
       if (edge) onSelectEdgeRef.current(edge)
+    })
+    // 任意点击关闭右键菜单。
+    cy.on('tap', () => setMenu(null))
+    // 右键空白处：在落点弹出"添加节点"菜单（携带 model 坐标供落点定位）。
+    cy.on('cxttap', (event) => {
+      if (event.target !== cy) {
+        setMenu(null)
+        return
+      }
+      const rendered = event.renderedPosition
+      const model = event.position
+      if (!rendered || !model) return
+      setMenu({ x: rendered.x, y: rendered.y, position: { x: model.x, y: model.y } })
     })
 
     cyRef.current = cy
     return () => {
       cy.destroy()
       cyRef.current = null
-      initializedRef.current = false
     }
   }, [])
 
@@ -167,7 +221,6 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
         nodeRepulsion: 9500,
         idealEdgeLength: 132,
       }).run()
-      initializedRef.current = true
     }
   }, [graph.edges, graph.nodes])
 
@@ -188,9 +241,80 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
     if (selectedId) cy.getElementById(selectedId).select()
   }, [selectedChainId, selectedId])
 
+  useEffect(() => {
+    if (!menu) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenu(null)
+    }
+    const onClick = () => setMenu(null)
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('click', onClick)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('click', onClick)
+    }
+  }, [menu])
+
+  const handleDownloadPng = useCallback(() => {
+    const cy = cyRef.current
+    if (!cy) return
+    const uri = cy.png({ full: true, scale: 2, bg: '#ffffff' })
+    const link = document.createElement('a')
+    link.href = uri
+    link.download = 'nmsci-graph.png'
+    link.click()
+  }, [])
+
   return (
-    <div className="graph-shell">
-      <div ref={containerRef} className="graph-canvas" aria-label="Consumption chain network graph" />
+    <div className="graph-shell" onContextMenu={(event) => event.preventDefault()}>
+      {/* 画布需可聚焦以供键盘用户使用；P3 将补 onKeyDown（遍历/缩放/加节点）使其成为真正的交互式 widget。 */}
+      {/* eslint-disable jsx-a11y/no-noninteractive-tabindex */}
+      <div
+        ref={containerRef}
+        className="graph-canvas"
+        role="img"
+        tabIndex={0}
+        aria-label={`Consumption chain network graph with ${graph.nodes.length} nodes and ${graph.edges.length} edges`}
+      />
+      {/* eslint-enable jsx-a11y/no-noninteractive-tabindex */}
+      {menu ? (
+        <div className="graph-context-menu" role="menu" style={{ left: menu.x, top: menu.y }}>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onAddFlowNode?.(menu.position)
+              setMenu(null)
+            }}
+          >
+            Add flow node
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onAddConsumeNode?.(menu.position)
+              setMenu(null)
+            }}
+          >
+            Add consume node
+          </button>
+        </div>
+      ) : null}
+      <div className="sr-only graph-access-list" aria-label="Keyboard graph selection">
+        <h3>Graph nodes</h3>
+        {graph.nodes.map((node) => (
+          <button key={node.id} type="button" onClick={() => onSelectNode(node)}>
+            Select node {node.id}
+          </button>
+        ))}
+        <h3>Graph edges</h3>
+        {graph.edges.map((edge) => (
+          <button key={edge.id} type="button" onClick={() => onSelectEdge(edge)}>
+            Select {edge.status} edge {edge.id}
+          </button>
+        ))}
+      </div>
       <div className="graph-tools" aria-label="Graph controls">
         <button
           type="button"
@@ -216,6 +340,14 @@ export function NetworkGraph({ graph, selectedId, onSelectNode, onSelectEdge }: 
         >
           <Maximize2 size={16} />
         </button>
+        <button
+          type="button"
+          aria-label="Download PNG"
+          title="Download PNG"
+          onClick={handleDownloadPng}
+        >
+          <Download size={16} />
+        </button>
       </div>
       <div className="legend">
         <span><i className="legend-line chain" />Color = consume chain</span>
@@ -238,7 +370,7 @@ function syncNodes(cy: Core, nodes: ChainGraphNode[], edges: ChainGraphEdge[]): 
       existingNode.data({
         ...existingNode.data(),
         label: node.label,
-        volume: node.volume,
+        kind: node.kind,
       })
       continue
     }
@@ -247,10 +379,11 @@ function syncNodes(cy: Core, nodes: ChainGraphNode[], edges: ChainGraphEdge[]): 
       data: {
         id: node.id,
         label: node.label,
-        volume: node.volume,
+        kind: node.kind,
       },
       group: 'nodes',
-      position: positionForNewNode(cy, node.id, edges),
+      // 本地节点用右键落点；链节点沿用邻接定位。
+      position: node.position ?? positionForNewNode(cy, node.id, edges),
     })
   }
 }
@@ -314,17 +447,4 @@ function findNeighborPosition(cy: Core, nodeId: string, edges: ChainGraphEdge[])
     }
   }
   return null
-}
-
-function deterministicOffset(id: string): Point {
-  let hash = 0
-  for (let index = 0; index < id.length; index += 1) {
-    hash = (hash * 33 + id.charCodeAt(index)) >>> 0
-  }
-  const angle = (hash % 360) * (Math.PI / 180)
-  const radius = 126 + (hash % 48)
-  return {
-    x: Math.cos(angle) * radius,
-    y: Math.sin(angle) * radius,
-  }
 }
