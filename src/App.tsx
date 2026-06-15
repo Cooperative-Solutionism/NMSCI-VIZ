@@ -1,12 +1,13 @@
 import {
   Activity,
   ChevronLeft,
-  ChevronRight,
   CircleDot,
   Database,
   Filter,
   GitBranch,
+  GripVertical,
   KeyRound,
+  Layers,
   LocateFixed,
   Network,
   Orbit,
@@ -39,6 +40,7 @@ import {
 import { formatAmount, formatVolumeByCurrency, mergeLocalNodes, shortId } from './lib/chainGraph'
 import { statusLabel } from './lib/consumeChainFilters'
 import { useCanvasSelection } from './hooks/useCanvasSelection'
+import { useDraggable } from './hooks/useDraggable'
 import { useConsumeChainQuery, type CurrencyFilter } from './hooks/useConsumeChainQuery'
 import { useFlowNodeRegistration } from './hooks/useFlowNodeRegistration'
 import { useKeyVault } from './hooks/useKeyVault'
@@ -77,8 +79,14 @@ const NetworkGraph = lazy(() =>
   import('./components/NetworkGraph').then((module) => ({ default: module.NetworkGraph })),
 )
 
+type LeftTab = 'query' | 'browse' | 'keys'
+
 function App() {
   const [apiBase, setApiBase] = useState(defaultApiBase)
+  const [leftTab, setLeftTab] = useState<LeftTab>('query')
+  const [panelCollapsed, setPanelCollapsed] = useState(false)
+  const workspaceRef = useRef<HTMLElement>(null)
+  const panelDrag = useDraggable({ boundsRef: workspaceRef })
   const {
     currencyFilter,
     effectiveSelection,
@@ -109,7 +117,6 @@ function App() {
     setPage,
     setSize,
     size,
-    slice,
     warning,
   } = useConsumeChainQuery(apiBase, defaultPageSize)
   const selection = useCanvasSelection({ selectNode, selectEdge })
@@ -273,14 +280,6 @@ function App() {
     setNodeId(pubkey)
     registration.notifyStatus('Picked node public key filled into query — click Load.')
   }, [registration, setMode, setNodeId])
-  const handlePreviousPage = useCallback(() => {
-    const nextPage = Math.max(0, page - 1)
-    void runQuery(nextPage)
-  }, [page, runQuery])
-
-  const handleNextPage = useCallback(() => {
-    void runQuery(page + 1)
-  }, [page, runQuery])
 
   const handleAddFlowNode = useCallback((position?: { x: number; y: number }) => {
     if (vault.status !== 'unlocked') {
@@ -453,10 +452,77 @@ function App() {
         <SystemStatusStrip status={systemStatus.data} />
       </header>
 
-      <section className="workspace">
-        <aside className="query-panel" aria-label="Consume chain query">
-          <PanelHeader icon={<Filter size={16} />} title="Query" />
+      <section className="workspace" ref={workspaceRef}>
+        {panelCollapsed ? (
+          <button
+            className="floating-reopen"
+            type="button"
+            onClick={() => setPanelCollapsed(false)}
+            aria-label="Open console panel"
+          >
+            <Layers size={18} />
+          </button>
+        ) : null}
 
+        <aside
+          ref={panelDrag.elementRef}
+          style={panelDrag.style}
+          className={`query-panel${panelCollapsed ? ' collapsed' : ''}${panelDrag.dragging ? ' dragging' : ''}`}
+          aria-label="Consume chain query"
+          aria-hidden={panelCollapsed}
+        >
+          <div className="floating-head" onPointerDown={panelDrag.onPointerDown}>
+            <div className="floating-title">
+              <GripVertical className="floating-grip" size={15} aria-hidden />
+              <Layers size={15} />
+              <span>Console</span>
+            </div>
+            <button
+              className="floating-collapse"
+              type="button"
+              onClick={() => setPanelCollapsed(true)}
+              aria-label="Collapse panel"
+            >
+              <ChevronLeft size={16} />
+            </button>
+          </div>
+
+          <div className="floating-tabs" role="tablist" aria-label="Panel sections">
+            <button
+              role="tab"
+              aria-selected={leftTab === 'query'}
+              className={leftTab === 'query' ? 'active' : ''}
+              type="button"
+              onClick={() => setLeftTab('query')}
+            >
+              <Filter size={15} />
+              Query
+            </button>
+            <button
+              role="tab"
+              aria-selected={leftTab === 'browse'}
+              className={leftTab === 'browse' ? 'active' : ''}
+              type="button"
+              onClick={() => setLeftTab('browse')}
+            >
+              <Database size={15} />
+              Browse
+            </button>
+            <button
+              role="tab"
+              aria-selected={leftTab === 'keys'}
+              className={leftTab === 'keys' ? 'active' : ''}
+              type="button"
+              onClick={() => setLeftTab('keys')}
+            >
+              <KeyRound size={15} />
+              Keys
+            </button>
+          </div>
+
+          <div className="floating-body">
+          {leftTab === 'query' ? (
+          <>
           <Field label="API base">
             <input
               value={apiBase}
@@ -573,12 +639,20 @@ function App() {
             <code>{requestUrl}</code>
           </div>
 
-          <NodeBrowser apiBase={apiBase} onPick={handlePickNode} />
-
           {error ? <p className="error-banner">{error}. Current graph was kept unchanged.</p> : null}
           {warning ? <p className="info-banner">{warning}</p> : null}
           {extended ? <p className="info-banner">Extended graph view; reload the query to resume pagination.</p> : null}
+          </>
+          ) : null}
 
+          {leftTab === 'browse' ? (
+          <>
+          <NodeBrowser apiBase={apiBase} onPick={handlePickNode} />
+          </>
+          ) : null}
+
+          {leftTab === 'keys' ? (
+          <>
           <div className="flow-node-block">
             <PanelHeader icon={<KeyRound size={16} />} title="Keys" />
             <VaultGate
@@ -628,7 +702,9 @@ function App() {
               <p className="operation-message error">{registration.error}</p>
             ) : null}
           </div>
-
+          </>
+          ) : null}
+          </div>
         </aside>
 
         <section id="network-graph" className="graph-panel" aria-label="Network visualization" aria-busy={loading}>
@@ -791,26 +867,6 @@ function App() {
           </ErrorBoundary>
         </aside>
       </section>
-
-      <footer className="footerbar">
-        <div>
-          <span className="footer-label">Slice</span>
-          <span>
-            page {slice.page} / size {slice.size} / {filteredRows.length} visible row
-            {filteredRows.length === 1 ? '' : 's'} / {rows.length} backend row
-            {rows.length === 1 ? '' : 's'}
-          </span>
-        </div>
-        <div className="pagination">
-          <button type="button" disabled={loading || extended || !slice.hasPrevious} onClick={handlePreviousPage} aria-label="Previous page">
-            <ChevronLeft size={16} />
-          </button>
-          <span>{loading ? 'Loading page' : origin === 'backend' ? 'Live slice' : 'No slice'}</span>
-          <button type="button" disabled={loading || extended || origin !== 'backend' || !slice.hasNext} onClick={handleNextPage} aria-label="Next page">
-            <ChevronRight size={16} />
-          </button>
-        </div>
-      </footer>
     </main>
   )
 }
