@@ -25,6 +25,10 @@ export default defineConfig([
         tsconfigRootDir: import.meta.dirname,
       },
     },
+    rules: {
+      // 允许解构「剔除字段」的惯用法：const { secret: _omit, ...rest } = obj。
+      '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }],
+    },
   },
   // 测试文件放宽类型感知里对 mock/Response stub 的 no-unsafe-* 噪声（断言层不值得为之加注解），
   // 以及对「返回定值的异步 SDK mock」放宽 require-await（mock 需与真实异步签名一致）。

@@ -13,7 +13,7 @@ import {
   Plus,
   Search,
 } from 'lucide-react'
-import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import {
   ConsumeNodeOperatePanel,
@@ -29,6 +29,7 @@ import {
   SystemStatusStrip,
   TransactionMountForm,
   TransactionRecordForm,
+  VaultGate,
 } from './components'
 import {
   ApiClient,
@@ -39,6 +40,7 @@ import { formatAmount, formatVolumeByCurrency, mergeLocalNodes, shortId } from '
 import { statusLabel } from './lib/consumeChainFilters'
 import { useConsumeChainQuery, type CurrencyFilter } from './hooks/useConsumeChainQuery'
 import { useFlowNodeRegistration } from './hooks/useFlowNodeRegistration'
+import { useKeyVault } from './hooks/useKeyVault'
 import { useNodeDetail } from './hooks/useNodeDetail'
 import { useReturningFlowRate } from './hooks/useReturningFlowRate'
 import { useSystemStatus } from './hooks/useSystemStatus'
@@ -54,12 +56,14 @@ import {
   type LocalTxRecord,
 } from './lib/txRecordStorage'
 import {
+  hasLegacyPlaintextFlowNodes,
   loadLocalFlowNodes,
   patchLocalFlowNode,
   saveLocalFlowNodes,
   type LocalFlowNode,
 } from './lib/flowNodeStorage'
 import {
+  hasLegacyPlaintextConsumeNodes,
   loadLocalConsumeNodes,
   patchLocalConsumeNode,
   saveLocalConsumeNodes,
@@ -137,8 +141,11 @@ function App() {
       : filteredRows.length === 0 && rows.length > 0
         ? `${rows.length} row${rows.length === 1 ? '' : 's'} hidden by the current-page filter.`
         : 'No chains matched. Try loop status: All or another mode.'
-  const [localFlowNodes, setLocalFlowNodes] = useState<LocalFlowNode[]>(() => loadLocalFlowNodes())
-  const [localConsumeNodes, setLocalConsumeNodes] = useState<LocalConsumeNode[]>(() => loadLocalConsumeNodes())
+  // 私钥保险库：流转/消费节点的私钥静态加密落盘，解锁后才解密载入内存（见下方 effect）。
+  const vault = useKeyVault()
+  const [localFlowNodes, setLocalFlowNodes] = useState<LocalFlowNode[]>([])
+  const [localConsumeNodes, setLocalConsumeNodes] = useState<LocalConsumeNode[]>([])
+  // 交易记录不含私钥，无需加密，仍同步载入。
   const [localTxRecords, setLocalTxRecords] = useState<LocalTxRecord[]>(() => loadLocalTxRecords())
   const canvasGraph = useMemo(
     () => mergeLocalNodes(graph, localFlowNodes, localConsumeNodes),
@@ -158,23 +165,28 @@ function App() {
     apiBase,
     selectedLocalNode?.publicKeyHex ?? null,
   )
+  // 持久化即加密：state 同步更新，密文落盘异步进行（仅在保险库解锁时可行，加节点按钮已据此禁用）。
   const persistLocalFlowNodes = useCallback((updater: (currentNodes: LocalFlowNode[]) => LocalFlowNode[]) => {
     setLocalFlowNodes((currentNodes) => {
       const nextNodes = updater(currentNodes)
-      saveLocalFlowNodes(nextNodes)
+      void saveLocalFlowNodes(nextNodes, vault.codec).catch((persistError) => {
+        console.error('Failed to persist encrypted flow-node keyring:', persistError)
+      })
       return nextNodes
     })
-  }, [])
+  }, [vault.codec])
 
   const persistLocalConsumeNodes = useCallback(
     (updater: (currentNodes: LocalConsumeNode[]) => LocalConsumeNode[]) => {
       setLocalConsumeNodes((currentNodes) => {
         const nextNodes = updater(currentNodes)
-        saveLocalConsumeNodes(nextNodes)
+        void saveLocalConsumeNodes(nextNodes, vault.codec).catch((persistError) => {
+          console.error('Failed to persist encrypted consume-node keyring:', persistError)
+        })
         return nextNodes
       })
     },
-    [],
+    [vault.codec],
   )
 
   const persistTxRecords = useCallback(
@@ -191,6 +203,43 @@ function App() {
   const clearSelectedLocalNode = useCallback(() => {
     setSelectedLocalId(null)
   }, [])
+
+  // 显式锁定时清空内存态钥匙串，避免明文私钥滞留内存（锁定动作经此 handler，不在 effect 里同步 setState）。
+  const handleLockVault = useCallback(() => {
+    vault.lock()
+    setLocalFlowNodes([])
+    setLocalConsumeNodes([])
+    setSelectedLocalId(null)
+  }, [vault])
+
+  // 解锁后解密载入钥匙串并迁移旧版明文。
+  const keyringLoadedRef = useRef(false)
+  useEffect(() => {
+    if (vault.status !== 'unlocked') {
+      keyringLoadedRef.current = false
+      return
+    }
+    if (keyringLoadedRef.current) return
+    keyringLoadedRef.current = true
+    let cancelled = false
+    void (async () => {
+      try {
+        const flowNodes = await loadLocalFlowNodes(vault.codec)
+        const consumeNodes = await loadLocalConsumeNodes(vault.codec)
+        if (cancelled) return
+        setLocalFlowNodes(flowNodes)
+        setLocalConsumeNodes(consumeNodes)
+        // 旧版明文遗留：解锁后立即以密文重存完成迁移。
+        if (hasLegacyPlaintextFlowNodes()) await saveLocalFlowNodes(flowNodes, vault.codec)
+        if (hasLegacyPlaintextConsumeNodes()) await saveLocalConsumeNodes(consumeNodes, vault.codec)
+      } catch (loadError) {
+        console.error('Failed to load encrypted keyring:', loadError)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [vault.status, vault.codec])
 
   const reloadRegistrationNodeState = useCallback((pubkey: string) => {
     void reloadLocalNodeState(pubkey)
@@ -238,6 +287,10 @@ function App() {
   }, [page, runQuery])
 
   const handleAddFlowNode = useCallback((position?: { x: number; y: number }) => {
+    if (vault.status !== 'unlocked') {
+      registration.notifyError('Unlock your key vault before adding nodes.')
+      return
+    }
     const keypair = generateKeyPair()
     const now = new Date().toISOString()
     const node: LocalFlowNode = {
@@ -254,9 +307,13 @@ function App() {
     setSelectedLocalId(node.publicKeyHex)
     registration.notifyStatus('Flow node added.')
     registration.clearLastRawBytes()
-  }, [persistLocalFlowNodes, registration])
+  }, [persistLocalFlowNodes, registration, vault.status])
 
   const handleAddConsumeNode = useCallback((position?: { x: number; y: number }) => {
+    if (vault.status !== 'unlocked') {
+      registration.notifyError('Unlock your key vault before adding nodes.')
+      return
+    }
     const keypair = generateKeyPair()
     const now = new Date().toISOString()
     const node: LocalConsumeNode = {
@@ -271,7 +328,7 @@ function App() {
     persistLocalConsumeNodes((currentNodes) => [node, ...currentNodes])
     setSelectedLocalId(node.publicKeyHex)
     registration.notifyStatus('Consume node added.')
-  }, [persistLocalConsumeNodes, registration])
+  }, [persistLocalConsumeNodes, registration, vault.status])
 
   // 画布选择：点本地节点 → 进入对应操作面板；点链节点/边 → 清掉本地选择，走链检查器。
   const handleCanvasSelectNode = useCallback((node: ChainGraphNode) => {
@@ -289,6 +346,10 @@ function App() {
   }, [selectEdge])
 
   const handleImportLocalNode = useCallback(() => {
+    if (vault.status !== 'unlocked') {
+      registration.notifyError('Unlock your key vault before importing a node.')
+      return
+    }
     const privateKeyHex = window.prompt('Paste a private key (hex)')?.trim()
     if (!privateKeyHex) return
     try {
@@ -312,7 +373,7 @@ function App() {
     } catch (importError) {
       registration.notifyError(errorMessage(importError, 'Invalid private key'))
     }
-  }, [persistLocalFlowNodes, registration])
+  }, [persistLocalFlowNodes, registration, vault.status])
 
   const handleRenameLocalNode = useCallback(() => {
     if (!selectedLocalNode) return
@@ -539,25 +600,48 @@ function App() {
 
           <div className="flow-node-block">
             <PanelHeader icon={<KeyRound size={16} />} title="Keys" />
+            <VaultGate
+              status={vault.status}
+              error={vault.error}
+              onSetup={(passphrase) => void vault.setup(passphrase)}
+              onUnlock={(passphrase) => void vault.unlock(passphrase)}
+              onLock={handleLockVault}
+            />
             <div className="action-row two">
-              <button className="secondary-button" type="button" onClick={() => handleAddFlowNode()}>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={vault.status !== 'unlocked'}
+                onClick={() => handleAddFlowNode()}
+              >
                 <Plus size={15} />
                 Flow node
               </button>
-              <button className="secondary-button" type="button" onClick={() => handleAddConsumeNode()}>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={vault.status !== 'unlocked'}
+                onClick={() => handleAddConsumeNode()}
+              >
                 <Plus size={15} />
                 Consume node
               </button>
             </div>
             <div className="action-row">
-              <button className="secondary-button" type="button" onClick={handleImportLocalNode}>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={vault.status !== 'unlocked'}
+                onClick={handleImportLocalNode}
+              >
                 <Plus size={15} />
                 Import flow node
               </button>
             </div>
             <p className="field-hint">
-              Right-click the canvas to add a node, then click a node to register, authorize, or build
-              transactions on it.
+              {vault.status === 'unlocked'
+                ? 'Right-click the canvas to add a node, then click a node to register, authorize, or build transactions on it.'
+                : 'Unlock your key vault to add or import nodes. Private keys are encrypted at rest.'}
             </p>
             {registration.error && !selectedLocalNode && !selectedLocalConsumeNode ? (
               <p className="operation-message error">{registration.error}</p>

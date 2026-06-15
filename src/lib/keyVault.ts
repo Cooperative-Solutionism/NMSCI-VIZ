@@ -14,6 +14,12 @@ export interface EncryptedSecret {
   ct: string
 }
 
+// 加解密一对私钥的编解码器；注入存储层，使存储与具体加密实现解耦（测试可注入假编解码器）。
+export interface SecretCodec {
+  encrypt: (plaintext: string) => Promise<EncryptedSecret>
+  decrypt: (secret: EncryptedSecret) => Promise<string>
+}
+
 function getCrypto(): Crypto {
   // 浏览器为 window.crypto；Node 20+ 为全局 webcrypto。两处都暴露在 globalThis.crypto。
   const cryptoObj = globalThis.crypto

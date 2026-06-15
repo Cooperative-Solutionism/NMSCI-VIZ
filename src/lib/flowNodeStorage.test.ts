@@ -1,10 +1,18 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
+  hasLegacyPlaintextFlowNodes,
   loadLocalFlowNodes,
   patchLocalFlowNode,
   saveLocalFlowNodes,
   type LocalFlowNode,
 } from './flowNodeStorage'
+import type { SecretCodec } from './keyVault'
+
+// 可逆假编解码器（base64 往返），让存储测试无需真实 Web Crypto。
+const fakeCodec: SecretCodec = {
+  encrypt: (plaintext) => Promise.resolve({ iv: 'iv', ct: btoa(plaintext) }),
+  decrypt: (secret) => Promise.resolve(atob(secret.ct)),
+}
 
 const node: LocalFlowNode = {
   id: 'local-node-1',
@@ -21,31 +29,49 @@ describe('flow node local storage', () => {
     localStorage.clear()
   })
 
-  it('stores generated flow nodes in a versioned localStorage document', () => {
-    saveLocalFlowNodes([node])
+  it('encrypts the private key at rest and round-trips through decryption', async () => {
+    await saveLocalFlowNodes([node], fakeCodec)
 
     const raw = localStorage.getItem('nmsci.flowNodes.v1')
     expect(raw).toContain('"version":1')
-    expect(loadLocalFlowNodes()).toEqual([node])
+    expect(raw).toContain('"privateKey"')
+    // 明文私钥绝不落盘。
+    expect(raw).not.toContain(node.privateKeyHex)
+    expect(await loadLocalFlowNodes(fakeCodec)).toEqual([node])
   })
 
-  it('patches matching nodes without duplicating the same local id', () => {
+  it('patches matching nodes without duplicating the same local id', async () => {
     const patchedNodes = patchLocalFlowNode([node], node.id, {
       label: 'NODE02',
       updatedAt: '2026-06-13T00:01:00.000Z',
     })
-    saveLocalFlowNodes(patchedNodes)
+    await saveLocalFlowNodes(patchedNodes, fakeCodec)
 
-    expect(loadLocalFlowNodes()).toEqual([{
+    expect(await loadLocalFlowNodes(fakeCodec)).toEqual([{
       ...node,
       label: 'NODE02',
       updatedAt: '2026-06-13T00:01:00.000Z',
     }])
   })
 
-  it('treats malformed localStorage payloads as empty data', () => {
+  it('treats malformed localStorage payloads as empty data', async () => {
     localStorage.setItem('nmsci.flowNodes.v1', '{broken')
 
-    expect(loadLocalFlowNodes()).toEqual([])
+    expect(await loadLocalFlowNodes(fakeCodec)).toEqual([])
+  })
+
+  it('reads legacy plaintext nodes for migration and flags them', async () => {
+    // 旧版明文文档（privateKeyHex 直存），加载应透传，并被识别为待迁移。
+    localStorage.setItem(
+      'nmsci.flowNodes.v1',
+      JSON.stringify({ version: 1, nodes: [node] }),
+    )
+
+    expect(hasLegacyPlaintextFlowNodes()).toBe(true)
+    expect(await loadLocalFlowNodes(fakeCodec)).toEqual([node])
+
+    // 迁移：以密文重存后不再有明文遗留。
+    await saveLocalFlowNodes([node], fakeCodec)
+    expect(hasLegacyPlaintextFlowNodes()).toBe(false)
   })
 })
