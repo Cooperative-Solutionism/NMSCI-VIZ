@@ -27,6 +27,7 @@ import {
   NodeInspector,
   PanelHeader,
   SystemStatusStrip,
+  TransactionMountForm,
   TransactionRecordForm,
   type TransactionRecordDraft,
 } from './components'
@@ -38,6 +39,7 @@ import {
   getPublicKeyFromPrivate,
   sendCentralPubkeyEmpowerMsg,
   sendFlowNodeRegisterMsg,
+  sendTransactionMountMsg,
   sendTransactionRecordMsg,
 } from '@nmsci/sdk'
 import { formatAmount, formatVolumeByCurrency, mergeLocalNodes, shortId } from './lib/chainGraph'
@@ -53,6 +55,7 @@ import { extractLoops } from './lib/loops'
 import {
   buildEmpowerMessage,
   buildRegisterMessage,
+  buildTransactionMountMessage,
   buildTransactionRecordMessage,
   makeMessageId,
   normalizePubkeyHex,
@@ -153,6 +156,8 @@ function App() {
   const [localConsumeNodes, setLocalConsumeNodes] = useState<LocalConsumeNode[]>(() => loadLocalConsumeNodes())
   const [localTxRecords, setLocalTxRecords] = useState<LocalTxRecord[]>(() => loadLocalTxRecords())
   const [recordFormOpen, setRecordFormOpen] = useState(false)
+  const [mountFormOpen, setMountFormOpen] = useState(false)
+  const [mountedPubkey, setMountedPubkey] = useState<string | null>(null)
   const [txDifficulty, setTxDifficulty] = useState('')
   const canvasGraph = useMemo(
     () => mergeLocalNodes(graph, localFlowNodes, localConsumeNodes),
@@ -450,6 +455,66 @@ function App() {
       setMiningAttempts(null)
     }
   }, [client, localConsumeNodes, persistTxRecords, selectedLocalNode])
+
+  const handleToggleMountForm = useCallback(() => {
+    if (mountFormOpen) {
+      setMountFormOpen(false)
+      return
+    }
+    void (async () => {
+      try {
+        setTxDifficulty((await getDifficulty(client)).data.transaction.nbitsHex)
+      } catch {
+        /* 默认难度拉取失败不阻塞表单 */
+      }
+      setMountFormOpen(true)
+    })()
+  }, [client, mountFormOpen])
+
+  const handleCreateTransactionMount = useCallback(async (recordId: string, difficultyHex: string) => {
+    const record = localTxRecords.find((candidate) => candidate.id === recordId)
+    if (!record) return
+    const consumeNode = localConsumeNodes.find((node) => node.publicKeyHex === record.consumeNodePubkey)
+    const flowNode = localFlowNodes.find((node) => node.publicKeyHex === record.flowNodePubkey)
+    if (!consumeNode || !flowNode) {
+      setFlowNodeError('The consume/flow node for this record is not in your keyring.')
+      return
+    }
+    setFlowNodeBusy('mount')
+    setFlowNodeError(null)
+    setMiningAttempts(0)
+    setMountedPubkey(null)
+    try {
+      const built = await buildTransactionMountMessage(
+        {
+          uuid: makeMessageId(),
+          mountedTransactionRecordId: record.id,
+          difficultyHex: normalizeNBitsHex(difficultyHex, 'Mount difficulty'),
+          consumeNodePubkeyHex: record.consumeNodePubkey,
+          flowNodePubkeyHex: record.flowNodePubkey,
+          centralPubkeyHex: record.centralPubkey,
+          consumePrivateKeyHex: consumeNode.privateKeyHex,
+          flowPrivateKeyHex: flowNode.privateKeyHex,
+        },
+        (attempts) => setMiningAttempts(attempts),
+      )
+      await sendTransactionMountMsg(client, built.bytes)
+      setMountedPubkey(record.flowNodePubkey)
+      setFlowNodeStatus('Transaction mounted. View the consume chain to see it on the graph.')
+    } catch (operationError) {
+      setFlowNodeError(errorMessage(operationError, 'Failed to mount transaction'))
+    } finally {
+      setFlowNodeBusy(null)
+      setMiningAttempts(null)
+    }
+  }, [client, localConsumeNodes, localFlowNodes, localTxRecords])
+
+  const handleViewConsumeChain = useCallback(() => {
+    if (!mountedPubkey) return
+    setSelectedLocalId(null)
+    setMountFormOpen(false)
+    void runQuery(0, { mode: 'node', nodeId: mountedPubkey })
+  }, [mountedPubkey, runQuery])
 
   const handleFetchRegisterDifficulty = useCallback(async () => {
     setFlowNodeBusy('difficulty')
@@ -838,6 +903,7 @@ function App() {
                 onAuthorize={() => void handleAuthorizeCentralPubkey()}
                 onCentralPubkeyChange={setCentralPubkey}
                 onCopy={(value, label) => void handleCopyText(value, label)}
+                onCreateMount={handleToggleMountForm}
                 onCreateRecord={handleToggleRecordForm}
                 onDelete={handleDeleteLocalNode}
                 onDifficultyChange={setRegisterDifficultyTarget}
@@ -871,6 +937,19 @@ function App() {
                     </div>
                   ))}
                 </div>
+              ) : null}
+              {mountFormOpen ? (
+                <TransactionMountForm
+                  busy={flowNodeBusy === 'mount'}
+                  canViewChain={mountedPubkey !== null}
+                  defaultDifficulty={txDifficulty}
+                  error={flowNodeError}
+                  miningAttempts={miningAttempts}
+                  onMount={(recordId, difficultyHex) => void handleCreateTransactionMount(recordId, difficultyHex)}
+                  onViewChain={handleViewConsumeChain}
+                  records={localTxRecords}
+                  status={flowNodeStatus}
+                />
               ) : null}
             </>
           ) : selectedLocalConsumeNode ? (

@@ -22,6 +22,7 @@ export function FlowNodeOperatePanel({
   onAuthorize,
   onCentralPubkeyChange,
   onCopy,
+  onCreateMount,
   onCreateRecord,
   onDelete,
   onDifficultyChange,
@@ -45,6 +46,7 @@ export function FlowNodeOperatePanel({
   onCentralPubkeyChange: (value: string) => void
   onCopy: (value: string, label: string) => void
   onCreateRecord?: () => void
+  onCreateMount?: () => void
   onDelete: () => void
   onDifficultyChange: (value: string) => void
   onExportPrivateKey: () => void
@@ -167,12 +169,19 @@ export function FlowNodeOperatePanel({
         {busy === 'authorize' ? 'Authorizing' : 'Authorize central'}
       </button>
 
-      {onCreateRecord ? (
+      {onCreateRecord || onCreateMount ? (
         <>
           <div className="section-title">Transaction</div>
-          <button className="secondary-button" type="button" onClick={onCreateRecord}>
-            Create transaction record
-          </button>
+          {onCreateRecord ? (
+            <button className="secondary-button" type="button" onClick={onCreateRecord}>
+              Create transaction record
+            </button>
+          ) : null}
+          {onCreateMount ? (
+            <button className="secondary-button" type="button" onClick={onCreateMount}>
+              Mount a record
+            </button>
+          ) : null}
         </>
       ) : null}
 

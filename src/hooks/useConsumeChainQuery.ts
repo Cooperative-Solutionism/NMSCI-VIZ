@@ -96,22 +96,32 @@ export function useConsumeChainQuery(apiBase: string, defaultPageSize: number) {
     return buildConsumeChainUrl(apiBase, { mode, nodeId, loopStatus, page, size })
   }, [apiBase, loopStatus, mode, nodeId, page, size])
 
-  const runQuery = useCallback(async (targetPage: number) => {
+  const runQuery = useCallback(async (
+    targetPage: number,
+    override?: { mode: QueryMode; nodeId: string },
+  ) => {
     const generation = graphRequestGenerationRef.current + 1
     graphRequestGenerationRef.current = generation
     const normalizedSize = Math.min(200, Math.max(1, size))
     const normalizedPage = Math.max(0, targetPage)
+    // 允许调用方一次性指定 mode/nodeId（避免 setState 异步导致 runQuery 读到旧值的竞态）。
+    const effectiveMode = override?.mode ?? mode
+    const effectiveNodeId = (override?.nodeId ?? nodeId).trim()
 
     setLoading(true)
     setError(null)
     setWarning(null)
     setPage(normalizedPage)
     setSize(normalizedSize)
+    if (override) {
+      setMode(override.mode)
+      setNodeId(override.nodeId)
+    }
 
     try {
       const result = await queryConsumeChains(
         client,
-        consumeChainFilters(mode, nodeId.trim(), loopStatus),
+        consumeChainFilters(effectiveMode, effectiveNodeId, loopStatus),
         { page: normalizedPage, size: normalizedSize },
       )
       if (generation !== graphRequestGenerationRef.current) return

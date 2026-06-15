@@ -477,6 +477,74 @@ describe('App initial state', () => {
     expect(recordPost).toBeTruthy()
   })
 
+  it('mounts a created record and views the resulting consume chain by pubkey', async () => {
+    const pubkey = '02'.padEnd(66, '1')
+    const fetchMock = stubFetchByUrl((url, init) => {
+      if (url.pathname === '/metadata/difficulty') {
+        return jsonResponse({
+          code: 200,
+          message: 'ok',
+          data: {
+            register: { nbitsInt: 0, nbitsHex: '1d00ffff', targetDecimal: '0', targetHex: '0' },
+            transaction: { nbitsInt: 0, nbitsHex: '1d00ffff', targetDecimal: '0', targetHex: '0' },
+          },
+        })
+      }
+      if (url.pathname === '/transaction-records' && init?.method === 'POST') {
+        return jsonResponse({ code: 200, message: 'ok', data: { id: '11111111-1111-4111-8111-1111111111aa', txid: 'r' } })
+      }
+      if (url.pathname === '/transaction-mounts' && init?.method === 'POST') {
+        return jsonResponse({ code: 200, message: 'ok', data: { id: '22222222-2222-4222-8222-2222222222bb', txid: 'm' } })
+      }
+      if (url.pathname === `/flow-nodes/${pubkey}`) {
+        return jsonResponse({
+          code: 200,
+          message: 'ok',
+          data: { registered: true, authorized: true, locked: false, currentCentralPubkeyAuthorized: true },
+        })
+      }
+      if (url.pathname === '/consume-chains') {
+        return jsonResponse(sliceResponse([chainRow('chain-x', 1)], { page: 0 }))
+      }
+      throw new Error(`Unexpected URL ${url.href}`)
+    })
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: /^consume node$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^flow node$/i }))
+
+    // create a record first
+    fireEvent.click(await screen.findByRole('button', { name: /create transaction record/i }))
+    fireEvent.change(await screen.findByLabelText('Amount'), { target: { value: '5000' } })
+    fireEvent.change(screen.getByLabelText('Record central pubkey'), { target: { value: '02'.padEnd(66, '2') } })
+    await waitFor(() => {
+      expect((screen.getByLabelText('Transaction difficulty') as HTMLInputElement).value).toBe('1d00ffff')
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^create record$/i }))
+    await waitFor(() => {
+      expect(localStorage.getItem('nmsci.txRecords.v1')).toContain('11111111-1111-4111-8111-1111111111aa')
+    })
+
+    // mount it
+    fireEvent.click(screen.getByRole('button', { name: /mount a record/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /^mount record$/i }))
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(([input, requestInit]) =>
+          String(input).includes('/transaction-mounts') && (requestInit as RequestInit | undefined)?.method === 'POST',
+        ),
+      ).toBe(true)
+    })
+
+    // view the resulting consume chain — queries by pubkey
+    fireEvent.click(await screen.findByRole('button', { name: /view consume chain/i }))
+    await waitFor(() => {
+      const chainCall = fetchMock.mock.calls.find(([input]) => String(input).includes('/consume-chains'))
+      expect(chainCall).toBeTruthy()
+      expect(new URL(String(chainCall![0]), 'http://localhost').searchParams.get('nodePubkey')).toBe(pubkey)
+    })
+  })
+
   it('imports a flow node from a pasted private key', async () => {
     const privateKey = '01'.padStart(64, '0')
     vi.stubGlobal('prompt', vi.fn(() => privateKey))
