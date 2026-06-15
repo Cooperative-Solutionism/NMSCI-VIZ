@@ -84,6 +84,8 @@ type FlowNodeBusyState = 'difficulty' | 'register' | 'authorize' | 'record' | 'm
 
 const defaultApiBase = import.meta.env.VITE_API_BASE ?? '/api'
 const defaultPageSize = 50
+// 协议金额按 int64 序列化，无独立的经济上限常量；以 int64 结构上界做溢出兜底。
+const INT64_MAX = 9223372036854775807n
 const NetworkGraph = lazy(() =>
   import('./components/NetworkGraph').then((module) => ({ default: module.NetworkGraph })),
 )
@@ -158,7 +160,8 @@ function App() {
   const [recordFormOpen, setRecordFormOpen] = useState(false)
   const [mountFormOpen, setMountFormOpen] = useState(false)
   const [mountedPubkey, setMountedPubkey] = useState<string | null>(null)
-  const [txDifficulty, setTxDifficulty] = useState('')
+  // 默认难度从 getDifficulty 拉取；拉取失败时退回此合法 nBits 占位（与表单 placeholder 一致），保证表单仍可用。
+  const [txDifficulty, setTxDifficulty] = useState('1d00ffff')
   const canvasGraph = useMemo(
     () => mergeLocalNodes(graph, localFlowNodes, localConsumeNodes),
     [graph, localFlowNodes, localConsumeNodes],
@@ -191,9 +194,14 @@ function App() {
     downloadText('consume-chains.json', 'application/json', rowsToJson(filteredRows))
   }, [filteredRows])
   const handleCopyCurl = useCallback(async () => {
-    await navigator.clipboard.writeText(toCurl(requestUrl))
-    setFlowNodeError(null)
-    setFlowNodeStatus('Request curl copied.')
+    try {
+      await navigator.clipboard.writeText(toCurl(requestUrl))
+      setFlowNodeError(null)
+      setFlowNodeStatus('Request curl copied.')
+    } catch (clipboardError) {
+      setFlowNodeStatus(null)
+      setFlowNodeError(errorMessage(clipboardError, 'Clipboard unavailable'))
+    }
   }, [requestUrl])
   const handlePickNode = useCallback((pubkey: string) => {
     setMode('node')
@@ -324,7 +332,7 @@ function App() {
     if (!selectedLocalNode) return
     const next = window.prompt('Rename flow node', selectedLocalNode.label)
     if (next == null) return
-    const label = next.trim() || selectedLocalNode.label
+    const label = (next.trim() || selectedLocalNode.label).slice(0, 64)
     persistLocalFlowNodes((currentNodes) =>
       patchLocalFlowNode(currentNodes, selectedLocalNode.id, { label, updatedAt: new Date().toISOString() }),
     )
@@ -345,7 +353,7 @@ function App() {
     if (!selectedLocalConsumeNode) return
     const next = window.prompt('Rename consume node', selectedLocalConsumeNode.label)
     if (next == null) return
-    const label = next.trim() || selectedLocalConsumeNode.label
+    const label = (next.trim() || selectedLocalConsumeNode.label).slice(0, 64)
     persistLocalConsumeNodes((currentNodes) =>
       patchLocalConsumeNode(currentNodes, selectedLocalConsumeNode.id, { label, updatedAt: new Date().toISOString() }),
     )
@@ -371,9 +379,14 @@ function App() {
   }, [selectedLocalNode, setMode, setNodeId])
 
   const handleCopyText = useCallback(async (value: string, label: string) => {
-    await navigator.clipboard.writeText(value)
-    setFlowNodeError(null)
-    setFlowNodeStatus(`${label} copied.`)
+    try {
+      await navigator.clipboard.writeText(value)
+      setFlowNodeError(null)
+      setFlowNodeStatus(`${label} copied.`)
+    } catch (clipboardError) {
+      setFlowNodeStatus(null)
+      setFlowNodeError(errorMessage(clipboardError, 'Clipboard unavailable'))
+    }
   }, [])
 
   const handleExportPrivateKey = useCallback(async () => {
@@ -398,8 +411,9 @@ function App() {
     void (async () => {
       try {
         setTxDifficulty((await getDifficulty(client)).data.transaction.nbitsHex)
-      } catch {
-        /* 默认难度拉取失败不阻塞表单 */
+      } catch (difficultyError) {
+        // 默认难度拉取失败不阻塞表单（退回默认占位）；记录以便排查后端不可用。
+        console.error('Failed to prefetch transaction difficulty:', difficultyError)
       }
       setRecordFormOpen(true)
     })()
@@ -416,12 +430,18 @@ function App() {
     setFlowNodeError(null)
     setMiningAttempts(0)
     try {
+      assertKeypairIntegrity(consumeNode)
+      assertKeypairIntegrity(selectedLocalNode)
+      const amountValue = BigInt(draft.amount)
+      if (amountValue < 1n || amountValue > INT64_MAX) {
+        throw new Error('Amount must be a positive integer within the int64 protocol range.')
+      }
       const messageId = makeMessageId()
       const centralPubkeyHex = normalizePubkeyHex(draft.centralPubkey)
       const built = await buildTransactionRecordMessage(
         {
           uuid: messageId,
-          amount: BigInt(draft.amount),
+          amount: amountValue,
           currencyType: draft.currencyType,
           difficultyHex: normalizeNBitsHex(draft.difficultyHex, 'Transaction difficulty'),
           consumeNodePubkeyHex: consumeNode.publicKeyHex,
@@ -447,6 +467,7 @@ function App() {
         createdAt: new Date().toISOString(),
       }
       persistTxRecords((current) => [record, ...current])
+      setRecordFormOpen(false)
       setFlowNodeStatus(`Transaction record created (${shortId(record.id)}).`)
     } catch (operationError) {
       setFlowNodeError(errorMessage(operationError, 'Failed to create transaction record'))
@@ -464,8 +485,9 @@ function App() {
     void (async () => {
       try {
         setTxDifficulty((await getDifficulty(client)).data.transaction.nbitsHex)
-      } catch {
-        /* 默认难度拉取失败不阻塞表单 */
+      } catch (difficultyError) {
+        // 默认难度拉取失败不阻塞表单（退回默认占位）；记录以便排查后端不可用。
+        console.error('Failed to prefetch transaction difficulty:', difficultyError)
       }
       setMountFormOpen(true)
     })()
@@ -485,6 +507,8 @@ function App() {
     setMiningAttempts(0)
     setMountedPubkey(null)
     try {
+      assertKeypairIntegrity(consumeNode)
+      assertKeypairIntegrity(flowNode)
       const built = await buildTransactionMountMessage(
         {
           uuid: makeMessageId(),
@@ -891,6 +915,7 @@ function App() {
             </h2>
           </div>
 
+          <ErrorBoundary label="Inspector panel failed">
           {selectedLocalNode ? (
             <>
               <FlowNodeOperatePanel
@@ -982,6 +1007,7 @@ function App() {
           ) : (
             <div className="empty-state">{inspectorEmptyMessage}</div>
           )}
+          </ErrorBoundary>
         </aside>
       </section>
 
@@ -1016,6 +1042,14 @@ function downloadText(filename: string, mime: string, content: string): void {
   link.download = filename
   link.click()
   URL.revokeObjectURL(url)
+}
+
+// 校验存储的密钥对未被篡改：私钥派生出的公钥须与存储公钥一致，
+// 否则签名会用错密钥、在后端校验前白挖 PoW。getPublicKeyFromPrivate 为确定性派生。
+function assertKeypairIntegrity(node: { privateKeyHex: string; publicKeyHex: string }): void {
+  if (getPublicKeyFromPrivate(node.privateKeyHex) !== node.publicKeyHex) {
+    throw new Error('Keypair corruption detected: stored private key does not match its public key.')
+  }
 }
 
 export default App

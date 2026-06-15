@@ -47,6 +47,10 @@ vi.mock('@nmsci/sdk', async (importOriginal) => {
       privateKey: '0'.repeat(63) + '1',
       publicKey: '02'.padEnd(66, '1'),
     }),
+    // 与上面固定夹具保持一致：占位私钥派生回占位公钥，让 App 的密钥对完整性校验通过；
+    // 其余私钥走真实派生（不影响导入路径的真实性）。
+    getPublicKeyFromPrivate: (privateKeyHex: string) =>
+      privateKeyHex === '0'.repeat(63) + '1' ? '02'.padEnd(66, '1') : actual.getPublicKeyFromPrivate(privateKeyHex),
     mineNonce: async (
       _prefix: Uint8Array,
       _suffix: Uint8Array,

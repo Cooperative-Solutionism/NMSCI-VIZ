@@ -37,6 +37,10 @@ export default defineConfig([
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/require-await': 'off',
+      // testing-library 的 getByLabelText 返回类型在 eslint 的 projectService 程序里与 tsc -b
+      // 解析不一致，导致对 `as HTMLInputElement` 误报「冗余断言」（删除后 tsc 反而报 .value 不存在）。
+      // 该规则在测试程序里不可靠，测试文件关闭；源码仍保留。
+      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
     },
   },
 ])

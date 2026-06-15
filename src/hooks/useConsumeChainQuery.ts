@@ -54,6 +54,8 @@ export function useConsumeChainQuery(apiBase: string, defaultPageSize: number) {
     setExtended(false)
   }, [])
 
+  // currencyFilter 是「当前页视图过滤」：仅在已取回的 rows 上客户端过滤，不下推后端（/consume-chains 无 currency 参数），
+  // 也不随翻页/extend 自动重置——下一次 runQuery 取回干净数据时才回到全量口径。
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
       const currencyMatches =

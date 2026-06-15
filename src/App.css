@@ -218,6 +218,12 @@
   line-height: 1.2;
 }
 
+.field-error {
+  color: var(--red);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
 .segmented {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
