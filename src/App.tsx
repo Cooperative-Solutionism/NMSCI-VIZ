@@ -1,6 +1,5 @@
 import {
   Activity,
-  BadgeCheck,
   ChevronLeft,
   ChevronRight,
   CircleDot,
@@ -12,17 +11,16 @@ import {
   Network,
   Orbit,
   Plus,
-  RefreshCw,
   Search,
-  ShieldCheck,
 } from 'lucide-react'
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import './App.css'
 import {
-  DetailRow,
+  ConsumeNodeOperatePanel,
   EdgeInspector,
   ErrorBoundary,
   Field,
+  FlowNodeOperatePanel,
   LoopsPanel,
   MetricCard,
   NodeBrowser,
@@ -48,7 +46,6 @@ import { normalizeNBitsHex } from './lib/difficulty'
 import { errorMessage } from './lib/errors'
 import { edgesToCsv, rowsToJson, toCurl } from './lib/exporters'
 import { extractLoops } from './lib/loops'
-import { formatDateTime, maskSecret, shortHex } from './lib/format'
 import {
   buildEmpowerMessage,
   buildRegisterMessage,
@@ -65,9 +62,11 @@ import {
 } from './lib/flowNodeStorage'
 import {
   loadLocalConsumeNodes,
+  patchLocalConsumeNode,
   saveLocalConsumeNodes,
   type LocalConsumeNode,
 } from './lib/consumeNodeStorage'
+import type { ChainGraphEdge, ChainGraphNode } from './lib/types'
 type FlowNodeBusyState = 'difficulty' | 'register' | 'authorize' | null
 
 const defaultApiBase = import.meta.env.VITE_API_BASE ?? '/api'
@@ -146,7 +145,7 @@ function App() {
     () => mergeLocalNodes(graph, localFlowNodes, localConsumeNodes),
     [graph, localFlowNodes, localConsumeNodes],
   )
-  const [selectedLocalPubkey, setSelectedLocalPubkey] = useState(() => localFlowNodes[0]?.publicKeyHex ?? '')
+  const [selectedLocalId, setSelectedLocalId] = useState<string | null>(null)
   const [registerDifficultyTarget, setRegisterDifficultyTarget] = useState('')
   const [centralPubkey, setCentralPubkey] = useState('')
   const [flowNodeBusy, setFlowNodeBusy] = useState<FlowNodeBusyState>(null)
@@ -155,11 +154,14 @@ function App() {
   const [lastFlowNodeRawBytes, setLastFlowNodeRawBytes] = useState('')
   const [miningAttempts, setMiningAttempts] = useState<number | null>(null)
   const client = useMemo(() => new ApiClient({ baseUrl: apiBase }), [apiBase])
-  const selectedLocalNode = useMemo(() => {
-    return localFlowNodes.find((localNode) => localNode.publicKeyHex === selectedLocalPubkey)
-      ?? localFlowNodes[0]
-      ?? null
-  }, [localFlowNodes, selectedLocalPubkey])
+  const selectedLocalNode = useMemo(
+    () => localFlowNodes.find((localNode) => localNode.publicKeyHex === selectedLocalId) ?? null,
+    [localFlowNodes, selectedLocalId],
+  )
+  const selectedLocalConsumeNode = useMemo(
+    () => localConsumeNodes.find((localNode) => localNode.publicKeyHex === selectedLocalId) ?? null,
+    [localConsumeNodes, selectedLocalId],
+  )
   const { nodeState: localNodeState, loadNodeState: reloadLocalNodeState } = useNodeDetail(
     apiBase,
     selectedLocalNode?.publicKeyHex ?? null,
@@ -209,7 +211,7 @@ function App() {
     [],
   )
 
-  const handleAddFlowNodeAt = useCallback((position: { x: number; y: number }) => {
+  const handleAddFlowNode = useCallback((position?: { x: number; y: number }) => {
     const keypair = generateKeyPair()
     const now = new Date().toISOString()
     const node: LocalFlowNode = {
@@ -223,12 +225,13 @@ function App() {
       authorizations: [],
     }
     persistLocalFlowNodes((currentNodes) => [node, ...currentNodes])
-    setSelectedLocalPubkey(node.publicKeyHex)
+    setSelectedLocalId(node.publicKeyHex)
     setFlowNodeError(null)
-    setFlowNodeStatus('Flow node added to canvas.')
+    setFlowNodeStatus('Flow node added.')
+    setLastFlowNodeRawBytes('')
   }, [persistLocalFlowNodes])
 
-  const handleAddConsumeNodeAt = useCallback((position: { x: number; y: number }) => {
+  const handleAddConsumeNode = useCallback((position?: { x: number; y: number }) => {
     const keypair = generateKeyPair()
     const now = new Date().toISOString()
     const node: LocalConsumeNode = {
@@ -241,29 +244,25 @@ function App() {
       position,
     }
     persistLocalConsumeNodes((currentNodes) => [node, ...currentNodes])
+    setSelectedLocalId(node.publicKeyHex)
     setFlowNodeError(null)
-    setFlowNodeStatus('Consume node added to canvas.')
+    setFlowNodeStatus('Consume node added.')
   }, [persistLocalConsumeNodes])
 
-  const handleGenerateFlowNode = useCallback(() => {
-    const keypair = generateKeyPair()
-    const now = new Date().toISOString()
-    const nextNode: LocalFlowNode = {
-      id: makeMessageId(),
-      label: shortId(keypair.publicKey),
-      privateKeyHex: keypair.privateKey,
-      publicKeyHex: keypair.publicKey,
-      createdAt: now,
-      updatedAt: now,
-      authorizations: [],
+  // 画布选择：点本地节点 → 进入对应操作面板；点链节点/边 → 清掉本地选择，走链检查器。
+  const handleCanvasSelectNode = useCallback((node: ChainGraphNode) => {
+    if (node.kind === 'local-flow' || node.kind === 'local-consume') {
+      setSelectedLocalId(node.id)
+      return
     }
+    setSelectedLocalId(null)
+    selectNode(node)
+  }, [selectNode])
 
-    persistLocalFlowNodes((currentNodes) => [nextNode, ...currentNodes])
-    setSelectedLocalPubkey(nextNode.publicKeyHex)
-    setFlowNodeError(null)
-    setFlowNodeStatus('Flow node generated and saved locally.')
-    setLastFlowNodeRawBytes('')
-  }, [persistLocalFlowNodes])
+  const handleCanvasSelectEdge = useCallback((edge: ChainGraphEdge) => {
+    setSelectedLocalId(null)
+    selectEdge(edge)
+  }, [selectEdge])
 
   const handleImportLocalNode = useCallback(() => {
     const privateKeyHex = window.prompt('Paste a private key (hex)')?.trim()
@@ -284,7 +283,7 @@ function App() {
         node,
         ...currentNodes.filter((current) => current.publicKeyHex !== publicKeyHex),
       ])
-      setSelectedLocalPubkey(publicKeyHex)
+      setSelectedLocalId(publicKeyHex)
       setFlowNodeError(null)
       setFlowNodeStatus('Flow node imported.')
     } catch (importError) {
@@ -308,10 +307,31 @@ function App() {
     if (!window.confirm('Delete this local flow node? Its private key will be lost.')) return
     const removedPubkey = selectedLocalNode.publicKeyHex
     persistLocalFlowNodes((currentNodes) => currentNodes.filter((current) => current.publicKeyHex !== removedPubkey))
-    setSelectedLocalPubkey('')
+    setSelectedLocalId(null)
     setFlowNodeError(null)
     setFlowNodeStatus('Flow node deleted.')
   }, [persistLocalFlowNodes, selectedLocalNode])
+
+  const handleRenameConsumeNode = useCallback(() => {
+    if (!selectedLocalConsumeNode) return
+    const next = window.prompt('Rename consume node', selectedLocalConsumeNode.label)
+    if (next == null) return
+    const label = next.trim() || selectedLocalConsumeNode.label
+    persistLocalConsumeNodes((currentNodes) =>
+      patchLocalConsumeNode(currentNodes, selectedLocalConsumeNode.id, { label, updatedAt: new Date().toISOString() }),
+    )
+    setFlowNodeStatus('Consume node renamed.')
+  }, [persistLocalConsumeNodes, selectedLocalConsumeNode])
+
+  const handleDeleteConsumeNode = useCallback(() => {
+    if (!selectedLocalConsumeNode) return
+    if (!window.confirm('Delete this consume node? Its private key will be lost.')) return
+    const removedPubkey = selectedLocalConsumeNode.publicKeyHex
+    persistLocalConsumeNodes((currentNodes) => currentNodes.filter((current) => current.publicKeyHex !== removedPubkey))
+    setSelectedLocalId(null)
+    setFlowNodeError(null)
+    setFlowNodeStatus('Consume node deleted.')
+  }, [persistLocalConsumeNodes, selectedLocalConsumeNode])
 
   const handleQuerySelectedFlowNode = useCallback(() => {
     if (!selectedLocalNode) return
@@ -333,6 +353,12 @@ function App() {
     if (!confirmed) return
     await handleCopyText(selectedLocalNode.privateKeyHex, 'Private key')
   }, [handleCopyText, selectedLocalNode])
+
+  const handleExportConsumeKey = useCallback(async () => {
+    if (!selectedLocalConsumeNode) return
+    if (!window.confirm('Export private key from localStorage? It is stored in clear text.')) return
+    await handleCopyText(selectedLocalConsumeNode.privateKeyHex, 'Private key')
+  }, [handleCopyText, selectedLocalConsumeNode])
 
   const handleFetchRegisterDifficulty = useCallback(async () => {
     setFlowNodeBusy('difficulty')
@@ -616,20 +642,15 @@ function App() {
           {extended ? <p className="info-banner">Extended graph view; reload the query to resume pagination.</p> : null}
 
           <div className="flow-node-block">
-            <PanelHeader icon={<KeyRound size={16} />} title="Flow nodes" />
+            <PanelHeader icon={<KeyRound size={16} />} title="Keys" />
             <div className="action-row two">
-              <button className="secondary-button" type="button" onClick={handleGenerateFlowNode}>
+              <button className="secondary-button" type="button" onClick={() => handleAddFlowNode()}>
                 <Plus size={15} />
-                Generate flow node
+                Flow node
               </button>
-              <button
-                className="secondary-button"
-                type="button"
-                disabled={flowNodeBusy === 'difficulty'}
-                onClick={() => void handleFetchRegisterDifficulty()}
-              >
-                <RefreshCw size={15} />
-                {flowNodeBusy === 'difficulty' ? 'Loading' : 'Use latest'}
+              <button className="secondary-button" type="button" onClick={() => handleAddConsumeNode()}>
+                <Plus size={15} />
+                Consume node
               </button>
             </div>
             <div className="action-row">
@@ -638,147 +659,12 @@ function App() {
                 Import flow node
               </button>
             </div>
-
-            <Field label="Local flow node">
-              <select
-                value={selectedLocalNode?.publicKeyHex ?? ''}
-                disabled={localFlowNodes.length === 0}
-                onChange={(event) => setSelectedLocalPubkey(event.currentTarget.value)}
-              >
-                {localFlowNodes.length === 0 ? <option value="">No local nodes</option> : null}
-                {localFlowNodes.map((localNode) => (
-                  <option key={localNode.id} value={localNode.publicKeyHex}>
-                    {localNode.label} / {shortHex(localNode.publicKeyHex)}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            {selectedLocalNode ? (
-              <div className="node-key-box">
-                <DetailRow
-                  label="Pubkey"
-                  value={(
-                    <span className="copyable-value">
-                      <code>{selectedLocalNode.publicKeyHex}</code>
-                      <button type="button" onClick={() => void handleCopyText(selectedLocalNode.publicKeyHex, 'Pubkey')}>
-                        Copy
-                      </button>
-                    </span>
-                  )}
-                />
-                <DetailRow
-                  label="Register id"
-                  value={selectedLocalNode.registration?.id ? (
-                    <span className="copyable-value">
-                      <code>{selectedLocalNode.registration.id}</code>
-                      <button type="button" onClick={() => void handleCopyText(selectedLocalNode.registration?.id ?? '', 'Register id')}>
-                        Copy
-                      </button>
-                    </span>
-                  ) : '—'}
-                />
-                <DetailRow label="Secret" value={<code>{maskSecret(selectedLocalNode.privateKeyHex)}</code>} />
-                <DetailRow label="Saved" value={formatDateTime(selectedLocalNode.createdAt)} />
-                <DetailRow label="Register" value={selectedLocalNode.registration?.status ?? '-'} />
-                <DetailRow label="Auth count" value={selectedLocalNode.authorizations.length} />
-                <DetailRow
-                  label="On-chain"
-                  value={
-                    localNodeState
-                      ? `${localNodeState.registered ? 'registered' : 'unregistered'}${localNodeState.authorized ? ' · authorized' : ''}${localNodeState.locked ? ' · locked' : ''}`
-                      : '—'
-                  }
-                />
-                <button
-                  className="secondary-button"
-                  type="button"
-                  onClick={handleQuerySelectedFlowNode}
-                >
-                  <Search size={15} />
-                  Query this node
-                </button>
-                <button
-                  className="secondary-button"
-                  type="button"
-                  onClick={() => void handleExportPrivateKey()}
-                >
-                  Export private key
-                </button>
-                <button className="secondary-button" type="button" onClick={handleRenameLocalNode}>
-                  Rename
-                </button>
-                <button className="secondary-button danger" type="button" onClick={handleDeleteLocalNode}>
-                  Delete
-                </button>
-              </div>
-            ) : null}
-
-            <Field label="Register difficulty target">
-              <input
-                value={registerDifficultyTarget}
-                onChange={(event) => setRegisterDifficultyTarget(event.currentTarget.value)}
-                inputMode="text"
-                placeholder="1d00ffff"
-              />
-            </Field>
-            {centralLocked ? (
-              <p className="operation-message error">
-                Central public key is frozen; registration and authorization are disabled.
-              </p>
-            ) : null}
-            <button
-              className="primary-button"
-              type="button"
-              disabled={!selectedLocalNode || registerDifficultyTarget.trim().length === 0 || flowNodeBusy !== null || centralLocked}
-              aria-describedby={!selectedLocalNode || registerDifficultyTarget.trim().length === 0 ? 'register-disabled-reason' : undefined}
-              onClick={() => void handleRegisterFlowNode()}
-            >
-              <BadgeCheck size={16} />
-              {flowNodeBusy === 'register'
-                ? miningAttempts != null
-                  ? `Mining ${miningAttempts.toLocaleString()}`
-                  : 'Registering'
-                : 'Register node'}
-            </button>
-            {!selectedLocalNode || registerDifficultyTarget.trim().length === 0 ? (
-              <span id="register-disabled-reason" className="sr-only">
-                Select a local flow node and enter an nBits hex difficulty.
-              </span>
-            ) : null}
-
-            <Field label="Central pubkey">
-              <textarea
-                rows={3}
-                value={centralPubkey}
-                onChange={(event) => setCentralPubkey(event.currentTarget.value)}
-                spellCheck={false}
-                placeholder="33-byte compressed public key hex"
-              />
-            </Field>
-            <button
-              className="primary-button"
-              type="button"
-              disabled={!selectedLocalNode || centralPubkey.trim().length === 0 || flowNodeBusy !== null || centralLocked}
-              aria-describedby={!selectedLocalNode || centralPubkey.trim().length === 0 ? 'authorize-disabled-reason' : undefined}
-              onClick={() => void handleAuthorizeCentralPubkey()}
-            >
-              <ShieldCheck size={16} />
-              {flowNodeBusy === 'authorize' ? 'Authorizing' : 'Authorize central'}
-            </button>
-            {!selectedLocalNode || centralPubkey.trim().length === 0 ? (
-              <span id="authorize-disabled-reason" className="sr-only">
-                Select a local flow node and enter a central compressed public key.
-              </span>
-            ) : null}
-
-            {flowNodeStatus ? <p className="operation-message">{flowNodeStatus}</p> : null}
-            {flowNodeError ? <p className="operation-message error">{flowNodeError}</p> : null}
-            {lastFlowNodeRawBytes ? (
-              <div className="raw-preview">
-                <span>Last raw message</span>
-                <code>{lastFlowNodeRawBytes}</code>
-              </div>
+            <p className="field-hint">
+              Right-click the canvas to add a node, then click a node to register, authorize, or build
+              transactions on it.
+            </p>
+            {flowNodeError && !selectedLocalNode && !selectedLocalConsumeNode ? (
+              <p className="operation-message error">{flowNodeError}</p>
             ) : null}
           </div>
 
@@ -820,11 +706,11 @@ function App() {
             <Suspense fallback={<div className="graph-loading">Loading graph...</div>}>
               <NetworkGraph
                 graph={canvasGraph}
-                selectedId={effectiveSelection?.id ?? null}
-                onSelectNode={selectNode}
-                onSelectEdge={selectEdge}
-                onAddFlowNode={handleAddFlowNodeAt}
-                onAddConsumeNode={handleAddConsumeNodeAt}
+                selectedId={selectedLocalId ?? effectiveSelection?.id ?? null}
+                onSelectNode={handleCanvasSelectNode}
+                onSelectEdge={handleCanvasSelectEdge}
+                onAddFlowNode={handleAddFlowNode}
+                onAddConsumeNode={handleAddConsumeNode}
               />
             </Suspense>
           </ErrorBoundary>
@@ -835,15 +721,52 @@ function App() {
 
           <div className="inspector-heading">
             <h2>
-              {effectiveSelection?.kind === 'node'
-                ? 'Selected node'
-                : effectiveSelection?.kind === 'edge'
-                  ? 'Selected edge'
-                  : 'Selection'}
+              {selectedLocalNode
+                ? 'Flow node'
+                : selectedLocalConsumeNode
+                  ? 'Consume node'
+                  : effectiveSelection?.kind === 'node'
+                    ? 'Selected node'
+                    : effectiveSelection?.kind === 'edge'
+                      ? 'Selected edge'
+                      : 'Selection'}
             </h2>
           </div>
 
-          {selectedEdge ? (
+          {selectedLocalNode ? (
+            <FlowNodeOperatePanel
+              busy={flowNodeBusy}
+              centralLocked={centralLocked}
+              centralPubkey={centralPubkey}
+              error={flowNodeError}
+              lastRawBytes={lastFlowNodeRawBytes}
+              miningAttempts={miningAttempts}
+              node={selectedLocalNode}
+              nodeState={localNodeState}
+              onAuthorize={() => void handleAuthorizeCentralPubkey()}
+              onCentralPubkeyChange={setCentralPubkey}
+              onCopy={(value, label) => void handleCopyText(value, label)}
+              onDelete={handleDeleteLocalNode}
+              onDifficultyChange={setRegisterDifficultyTarget}
+              onExportPrivateKey={() => void handleExportPrivateKey()}
+              onFetchDifficulty={() => void handleFetchRegisterDifficulty()}
+              onQuery={handleQuerySelectedFlowNode}
+              onRegister={() => void handleRegisterFlowNode()}
+              onRename={handleRenameLocalNode}
+              registerDifficultyTarget={registerDifficultyTarget}
+              status={flowNodeStatus}
+            />
+          ) : selectedLocalConsumeNode ? (
+            <ConsumeNodeOperatePanel
+              error={flowNodeError}
+              node={selectedLocalConsumeNode}
+              onCopy={(value, label) => void handleCopyText(value, label)}
+              onDelete={handleDeleteConsumeNode}
+              onExportPrivateKey={() => void handleExportConsumeKey()}
+              onRename={handleRenameConsumeNode}
+              status={flowNodeStatus}
+            />
+          ) : selectedEdge ? (
             <EdgeInspector apiBase={apiBase} edge={selectedEdge} chain={selectedChain} flowRate={flowRateView} />
           ) : selectedNode ? (
             <NodeInspector
