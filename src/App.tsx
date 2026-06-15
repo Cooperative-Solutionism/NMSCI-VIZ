@@ -38,6 +38,7 @@ import {
 } from '@nmsci/sdk'
 import { formatAmount, formatVolumeByCurrency, mergeLocalNodes, shortId } from './lib/chainGraph'
 import { statusLabel } from './lib/consumeChainFilters'
+import { useCanvasSelection } from './hooks/useCanvasSelection'
 import { useConsumeChainQuery, type CurrencyFilter } from './hooks/useConsumeChainQuery'
 import { useFlowNodeRegistration } from './hooks/useFlowNodeRegistration'
 import { useKeyVault } from './hooks/useKeyVault'
@@ -69,7 +70,6 @@ import {
   saveLocalConsumeNodes,
   type LocalConsumeNode,
 } from './lib/consumeNodeStorage'
-import type { ChainGraphEdge, ChainGraphNode } from './lib/types'
 
 const defaultApiBase = import.meta.env.VITE_API_BASE ?? '/api'
 const defaultPageSize = 50
@@ -112,6 +112,7 @@ function App() {
     slice,
     warning,
   } = useConsumeChainQuery(apiBase, defaultPageSize)
+  const selection = useCanvasSelection({ selectNode, selectEdge })
   const {
     nodeDetailError,
     nodeDetailStatus,
@@ -151,15 +152,14 @@ function App() {
     () => mergeLocalNodes(graph, localFlowNodes, localConsumeNodes),
     [graph, localFlowNodes, localConsumeNodes],
   )
-  const [selectedLocalId, setSelectedLocalId] = useState<string | null>(null)
   const client = useMemo(() => new ApiClient({ baseUrl: apiBase }), [apiBase])
   const selectedLocalNode = useMemo(
-    () => localFlowNodes.find((localNode) => localNode.publicKeyHex === selectedLocalId) ?? null,
-    [localFlowNodes, selectedLocalId],
+    () => localFlowNodes.find((localNode) => localNode.publicKeyHex === selection.selectedLocalId) ?? null,
+    [localFlowNodes, selection.selectedLocalId],
   )
   const selectedLocalConsumeNode = useMemo(
-    () => localConsumeNodes.find((localNode) => localNode.publicKeyHex === selectedLocalId) ?? null,
-    [localConsumeNodes, selectedLocalId],
+    () => localConsumeNodes.find((localNode) => localNode.publicKeyHex === selection.selectedLocalId) ?? null,
+    [localConsumeNodes, selection.selectedLocalId],
   )
   const { nodeState: localNodeState, loadNodeState: reloadLocalNodeState } = useNodeDetail(
     apiBase,
@@ -200,17 +200,13 @@ function App() {
     [],
   )
 
-  const clearSelectedLocalNode = useCallback(() => {
-    setSelectedLocalId(null)
-  }, [])
-
   // 显式锁定时清空内存态钥匙串，避免明文私钥滞留内存（锁定动作经此 handler，不在 effect 里同步 setState）。
   const handleLockVault = useCallback(() => {
     vault.lock()
     setLocalFlowNodes([])
     setLocalConsumeNodes([])
-    setSelectedLocalId(null)
-  }, [vault])
+    selection.clearSelectedLocalNode()
+  }, [selection, vault])
 
   // 解锁后解密载入钥匙串并迁移旧版明文。
   const keyringLoadedRef = useRef(false)
@@ -255,7 +251,7 @@ function App() {
     persistTxRecords,
     reloadLocalNodeState: reloadRegistrationNodeState,
     runQuery,
-    clearSelectedLocalNode,
+    clearSelectedLocalNode: selection.clearSelectedLocalNode,
   })
 
   const handleExportCsv = useCallback(() => {
@@ -304,10 +300,10 @@ function App() {
       authorizations: [],
     }
     persistLocalFlowNodes((currentNodes) => [node, ...currentNodes])
-    setSelectedLocalId(node.publicKeyHex)
+    selection.selectLocalNode(node.publicKeyHex)
     registration.notifyStatus('Flow node added.')
     registration.clearLastRawBytes()
-  }, [persistLocalFlowNodes, registration, vault.status])
+  }, [persistLocalFlowNodes, registration, selection, vault.status])
 
   const handleAddConsumeNode = useCallback((position?: { x: number; y: number }) => {
     if (vault.status !== 'unlocked') {
@@ -326,24 +322,9 @@ function App() {
       position,
     }
     persistLocalConsumeNodes((currentNodes) => [node, ...currentNodes])
-    setSelectedLocalId(node.publicKeyHex)
+    selection.selectLocalNode(node.publicKeyHex)
     registration.notifyStatus('Consume node added.')
-  }, [persistLocalConsumeNodes, registration, vault.status])
-
-  // 画布选择：点本地节点 → 进入对应操作面板；点链节点/边 → 清掉本地选择，走链检查器。
-  const handleCanvasSelectNode = useCallback((node: ChainGraphNode) => {
-    if (node.kind === 'local-flow' || node.kind === 'local-consume') {
-      setSelectedLocalId(node.id)
-      return
-    }
-    setSelectedLocalId(null)
-    selectNode(node)
-  }, [selectNode])
-
-  const handleCanvasSelectEdge = useCallback((edge: ChainGraphEdge) => {
-    setSelectedLocalId(null)
-    selectEdge(edge)
-  }, [selectEdge])
+  }, [persistLocalConsumeNodes, registration, selection, vault.status])
 
   const handleImportLocalNode = useCallback(() => {
     if (vault.status !== 'unlocked') {
@@ -368,12 +349,12 @@ function App() {
         node,
         ...currentNodes.filter((current) => current.publicKeyHex !== publicKeyHex),
       ])
-      setSelectedLocalId(publicKeyHex)
+      selection.selectLocalNode(publicKeyHex)
       registration.notifyStatus('Flow node imported.')
     } catch (importError) {
       registration.notifyError(errorMessage(importError, 'Invalid private key'))
     }
-  }, [persistLocalFlowNodes, registration, vault.status])
+  }, [persistLocalFlowNodes, registration, selection, vault.status])
 
   const handleRenameLocalNode = useCallback(() => {
     if (!selectedLocalNode) return
@@ -391,9 +372,9 @@ function App() {
     if (!window.confirm('Delete this local flow node? Its private key will be lost.')) return
     const removedPubkey = selectedLocalNode.publicKeyHex
     persistLocalFlowNodes((currentNodes) => currentNodes.filter((current) => current.publicKeyHex !== removedPubkey))
-    setSelectedLocalId(null)
+    selection.clearSelectedLocalNode()
     registration.notifyStatus('Flow node deleted.')
-  }, [persistLocalFlowNodes, registration, selectedLocalNode])
+  }, [persistLocalFlowNodes, registration, selectedLocalNode, selection])
 
   const handleRenameConsumeNode = useCallback(() => {
     if (!selectedLocalConsumeNode) return
@@ -411,9 +392,9 @@ function App() {
     if (!window.confirm('Delete this consume node? Its private key will be lost.')) return
     const removedPubkey = selectedLocalConsumeNode.publicKeyHex
     persistLocalConsumeNodes((currentNodes) => currentNodes.filter((current) => current.publicKeyHex !== removedPubkey))
-    setSelectedLocalId(null)
+    selection.clearSelectedLocalNode()
     registration.notifyStatus('Consume node deleted.')
-  }, [persistLocalConsumeNodes, registration, selectedLocalConsumeNode])
+  }, [persistLocalConsumeNodes, registration, selectedLocalConsumeNode, selection])
 
   const handleQuerySelectedFlowNode = useCallback(() => {
     if (!selectedLocalNode) return
@@ -688,9 +669,9 @@ function App() {
             <Suspense fallback={<div className="graph-loading">Loading graph...</div>}>
               <NetworkGraph
                 graph={canvasGraph}
-                selectedId={selectedLocalId ?? effectiveSelection?.id ?? null}
-                onSelectNode={handleCanvasSelectNode}
-                onSelectEdge={handleCanvasSelectEdge}
+                selectedId={selection.selectedLocalId ?? effectiveSelection?.id ?? null}
+                onSelectNode={selection.onCanvasSelectNode}
+                onSelectEdge={selection.onCanvasSelectEdge}
                 onAddFlowNode={handleAddFlowNode}
                 onAddConsumeNode={handleAddConsumeNode}
               />
