@@ -27,16 +27,20 @@ import {
   NodeInspector,
   PanelHeader,
   SystemStatusStrip,
+  TransactionRecordForm,
+  type TransactionRecordDraft,
 } from './components'
 import {
   ApiClient,
   generateKeyPair,
+  getDifficulty,
   getLastBlock,
   getPublicKeyFromPrivate,
   sendCentralPubkeyEmpowerMsg,
   sendFlowNodeRegisterMsg,
+  sendTransactionRecordMsg,
 } from '@nmsci/sdk'
-import { formatVolumeByCurrency, mergeLocalNodes, shortId } from './lib/chainGraph'
+import { formatAmount, formatVolumeByCurrency, mergeLocalNodes, shortId } from './lib/chainGraph'
 import { statusLabel } from './lib/consumeChainFilters'
 import { useConsumeChainQuery, type CurrencyFilter } from './hooks/useConsumeChainQuery'
 import { useNodeDetail } from './hooks/useNodeDetail'
@@ -49,9 +53,15 @@ import { extractLoops } from './lib/loops'
 import {
   buildEmpowerMessage,
   buildRegisterMessage,
+  buildTransactionRecordMessage,
   makeMessageId,
   normalizePubkeyHex,
 } from './lib/messageBuilders'
+import {
+  loadLocalTxRecords,
+  saveLocalTxRecords,
+  type LocalTxRecord,
+} from './lib/txRecordStorage'
 import {
   loadLocalFlowNodes,
   patchLocalFlowNode,
@@ -67,7 +77,7 @@ import {
   type LocalConsumeNode,
 } from './lib/consumeNodeStorage'
 import type { ChainGraphEdge, ChainGraphNode } from './lib/types'
-type FlowNodeBusyState = 'difficulty' | 'register' | 'authorize' | null
+type FlowNodeBusyState = 'difficulty' | 'register' | 'authorize' | 'record' | 'mount' | null
 
 const defaultApiBase = import.meta.env.VITE_API_BASE ?? '/api'
 const defaultPageSize = 50
@@ -141,6 +151,9 @@ function App() {
         : 'No chains matched. Try loop status: All or another mode.'
   const [localFlowNodes, setLocalFlowNodes] = useState<LocalFlowNode[]>(() => loadLocalFlowNodes())
   const [localConsumeNodes, setLocalConsumeNodes] = useState<LocalConsumeNode[]>(() => loadLocalConsumeNodes())
+  const [localTxRecords, setLocalTxRecords] = useState<LocalTxRecord[]>(() => loadLocalTxRecords())
+  const [recordFormOpen, setRecordFormOpen] = useState(false)
+  const [txDifficulty, setTxDifficulty] = useState('')
   const canvasGraph = useMemo(
     () => mergeLocalNodes(graph, localFlowNodes, localConsumeNodes),
     [graph, localFlowNodes, localConsumeNodes],
@@ -206,6 +219,17 @@ function App() {
         const nextNodes = updater(currentNodes)
         saveLocalConsumeNodes(nextNodes)
         return nextNodes
+      })
+    },
+    [],
+  )
+
+  const persistTxRecords = useCallback(
+    (updater: (currentRecords: LocalTxRecord[]) => LocalTxRecord[]) => {
+      setLocalTxRecords((currentRecords) => {
+        const nextRecords = updater(currentRecords)
+        saveLocalTxRecords(nextRecords)
+        return nextRecords
       })
     },
     [],
@@ -359,6 +383,73 @@ function App() {
     if (!window.confirm('Export private key from localStorage? It is stored in clear text.')) return
     await handleCopyText(selectedLocalConsumeNode.privateKeyHex, 'Private key')
   }, [handleCopyText, selectedLocalConsumeNode])
+
+  const handleToggleRecordForm = useCallback(() => {
+    if (recordFormOpen) {
+      setRecordFormOpen(false)
+      return
+    }
+    // 先拉取交易难度作为表单默认值，再开表单（表单挂载时即带上默认难度）。
+    void (async () => {
+      try {
+        setTxDifficulty((await getDifficulty(client)).data.transaction.nbitsHex)
+      } catch {
+        /* 默认难度拉取失败不阻塞表单 */
+      }
+      setRecordFormOpen(true)
+    })()
+  }, [client, recordFormOpen])
+
+  const handleCreateTransactionRecord = useCallback(async (draft: TransactionRecordDraft) => {
+    if (!selectedLocalNode) return
+    const consumeNode = localConsumeNodes.find((node) => node.publicKeyHex === draft.consumeNodePubkey)
+    if (!consumeNode) {
+      setFlowNodeError('Add or pick a consume node first.')
+      return
+    }
+    setFlowNodeBusy('record')
+    setFlowNodeError(null)
+    setMiningAttempts(0)
+    try {
+      const messageId = makeMessageId()
+      const centralPubkeyHex = normalizePubkeyHex(draft.centralPubkey)
+      const built = await buildTransactionRecordMessage(
+        {
+          uuid: messageId,
+          amount: BigInt(draft.amount),
+          currencyType: draft.currencyType,
+          difficultyHex: normalizeNBitsHex(draft.difficultyHex, 'Transaction difficulty'),
+          consumeNodePubkeyHex: consumeNode.publicKeyHex,
+          flowNodePubkeyHex: selectedLocalNode.publicKeyHex,
+          centralPubkeyHex,
+          consumePrivateKeyHex: consumeNode.privateKeyHex,
+          flowPrivateKeyHex: selectedLocalNode.privateKeyHex,
+        },
+        (attempts) => setMiningAttempts(attempts),
+      )
+      const response = (await sendTransactionRecordMsg(client, built.bytes)).data
+      const record: LocalTxRecord = {
+        id: response.id ?? messageId,
+        uuid: messageId,
+        amount: draft.amount,
+        currencyType: draft.currencyType,
+        consumeNodePubkey: consumeNode.publicKeyHex,
+        flowNodePubkey: selectedLocalNode.publicKeyHex,
+        centralPubkey: centralPubkeyHex,
+        txid: response.txid,
+        rawBytesHex: built.rawBytesHex,
+        status: 'sent',
+        createdAt: new Date().toISOString(),
+      }
+      persistTxRecords((current) => [record, ...current])
+      setFlowNodeStatus(`Transaction record created (${shortId(record.id)}).`)
+    } catch (operationError) {
+      setFlowNodeError(errorMessage(operationError, 'Failed to create transaction record'))
+    } finally {
+      setFlowNodeBusy(null)
+      setMiningAttempts(null)
+    }
+  }, [client, localConsumeNodes, persistTxRecords, selectedLocalNode])
 
   const handleFetchRegisterDifficulty = useCallback(async () => {
     setFlowNodeBusy('difficulty')
@@ -734,28 +825,54 @@ function App() {
           </div>
 
           {selectedLocalNode ? (
-            <FlowNodeOperatePanel
-              busy={flowNodeBusy}
-              centralLocked={centralLocked}
-              centralPubkey={centralPubkey}
-              error={flowNodeError}
-              lastRawBytes={lastFlowNodeRawBytes}
-              miningAttempts={miningAttempts}
-              node={selectedLocalNode}
-              nodeState={localNodeState}
-              onAuthorize={() => void handleAuthorizeCentralPubkey()}
-              onCentralPubkeyChange={setCentralPubkey}
-              onCopy={(value, label) => void handleCopyText(value, label)}
-              onDelete={handleDeleteLocalNode}
-              onDifficultyChange={setRegisterDifficultyTarget}
-              onExportPrivateKey={() => void handleExportPrivateKey()}
-              onFetchDifficulty={() => void handleFetchRegisterDifficulty()}
-              onQuery={handleQuerySelectedFlowNode}
-              onRegister={() => void handleRegisterFlowNode()}
-              onRename={handleRenameLocalNode}
-              registerDifficultyTarget={registerDifficultyTarget}
-              status={flowNodeStatus}
-            />
+            <>
+              <FlowNodeOperatePanel
+                busy={flowNodeBusy}
+                centralLocked={centralLocked}
+                centralPubkey={centralPubkey}
+                error={flowNodeError}
+                lastRawBytes={lastFlowNodeRawBytes}
+                miningAttempts={miningAttempts}
+                node={selectedLocalNode}
+                nodeState={localNodeState}
+                onAuthorize={() => void handleAuthorizeCentralPubkey()}
+                onCentralPubkeyChange={setCentralPubkey}
+                onCopy={(value, label) => void handleCopyText(value, label)}
+                onCreateRecord={handleToggleRecordForm}
+                onDelete={handleDeleteLocalNode}
+                onDifficultyChange={setRegisterDifficultyTarget}
+                onExportPrivateKey={() => void handleExportPrivateKey()}
+                onFetchDifficulty={() => void handleFetchRegisterDifficulty()}
+                onQuery={handleQuerySelectedFlowNode}
+                onRegister={() => void handleRegisterFlowNode()}
+                onRename={handleRenameLocalNode}
+                registerDifficultyTarget={registerDifficultyTarget}
+                status={flowNodeStatus}
+              />
+              {recordFormOpen ? (
+                <TransactionRecordForm
+                  busy={flowNodeBusy === 'record'}
+                  consumeNodes={localConsumeNodes}
+                  defaultCentralPubkey={centralPubkey}
+                  defaultDifficulty={txDifficulty}
+                  error={flowNodeError}
+                  miningAttempts={miningAttempts}
+                  onCreate={(draft) => void handleCreateTransactionRecord(draft)}
+                  status={flowNodeStatus}
+                />
+              ) : null}
+              {recordFormOpen && localTxRecords.length > 0 ? (
+                <div className="record-list">
+                  <div className="section-title">Created records</div>
+                  {localTxRecords.map((record) => (
+                    <div key={record.id} className="detail-row">
+                      <span>{shortId(record.id)}</span>
+                      <strong>{formatAmount(BigInt(record.amount), record.currencyType)}</strong>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </>
           ) : selectedLocalConsumeNode ? (
             <ConsumeNodeOperatePanel
               error={flowNodeError}

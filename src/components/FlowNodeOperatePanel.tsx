@@ -6,7 +6,7 @@ import { DetailRow } from './DetailRow'
 import { Field } from './Field'
 import { PanelHeader } from './PanelHeader'
 
-export type FlowNodeBusyState = 'difficulty' | 'register' | 'authorize' | null
+export type FlowNodeBusyState = 'difficulty' | 'register' | 'authorize' | 'record' | 'mount' | null
 
 // 流转节点操作面板（点击画布上的本地流转节点后显示在右侧检查器）：
 // 密钥信息 + 链上状态 + 注册 + 中心公钥授权 + 钥匙管理。原左栏 FLOW NODES 巨块迁移至此。
