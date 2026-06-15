@@ -1,4 +1,4 @@
-import cytoscape, { type Core, type NodeSingular } from 'cytoscape'
+import cytoscape, { type Core, type EdgeSingular, type NodeSingular } from 'cytoscape'
 import { Download, Maximize2, ZoomIn, ZoomOut } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatAmount } from '../lib/chainGraph'
@@ -176,11 +176,11 @@ export function NetworkGraph({
     })
 
     cy.on('tap', 'node', (event) => {
-      const node = nodeMapRef.current.get(event.target.id())
+      const node = nodeMapRef.current.get((event.target as NodeSingular).id())
       if (node) onSelectNodeRef.current(node)
     })
     cy.on('tap', 'edge', (event) => {
-      const edge = edgeMapRef.current.get(event.target.id())
+      const edge = edgeMapRef.current.get((event.target as EdgeSingular).id())
       if (edge) onSelectEdgeRef.current(edge)
     })
     // 任意点击关闭右键菜单。
@@ -267,6 +267,8 @@ export function NetworkGraph({
 
   return (
     <div className="graph-shell" onContextMenu={(event) => event.preventDefault()}>
+      {/* 画布需可聚焦以供键盘用户使用；P3 将补 onKeyDown（遍历/缩放/加节点）使其成为真正的交互式 widget。 */}
+      {/* eslint-disable jsx-a11y/no-noninteractive-tabindex */}
       <div
         ref={containerRef}
         className="graph-canvas"
@@ -274,6 +276,7 @@ export function NetworkGraph({
         tabIndex={0}
         aria-label={`Consumption chain network graph with ${graph.nodes.length} nodes and ${graph.edges.length} edges`}
       />
+      {/* eslint-enable jsx-a11y/no-noninteractive-tabindex */}
       {menu ? (
         <div className="graph-context-menu" role="menu" style={{ left: menu.x, top: menu.y }}>
           <button

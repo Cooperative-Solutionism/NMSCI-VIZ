@@ -32,10 +32,11 @@ export default defineConfig(({ mode }) => {
         provider: 'v8',
         reporter: ['text', 'html', 'lcov'],
         thresholds: {
-          branches: 50,
-          functions: 60,
-          lines: 60,
-          statements: 60,
+          // 防回退底线（贴当前实测水位）；P6 补足组件/钩子测试后再提到 functions 80+。
+          branches: 70,
+          functions: 79,
+          lines: 80,
+          statements: 80,
         },
       },
     },

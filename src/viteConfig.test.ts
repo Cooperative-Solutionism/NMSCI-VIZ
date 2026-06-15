@@ -4,10 +4,10 @@ import configFactory from '../vite.config'
 
 function resolveConfig(): UserConfig {
   if (typeof configFactory === 'function') {
-    return configFactory({ command: 'serve', mode: 'development', isSsrBuild: false, isPreview: false }) as UserConfig
+    return configFactory({ command: 'serve', mode: 'development', isSsrBuild: false, isPreview: false })
   }
 
-  return configFactory as UserConfig
+  return configFactory
 }
 
 describe('Vite React dependency config', () => {

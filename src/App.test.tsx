@@ -564,7 +564,8 @@ describe('App initial state', () => {
 
 function stubFetchByUrl(handler: (url: URL, init?: RequestInit) => Response): ReturnType<typeof vi.fn> {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = new URL(String(input), 'http://localhost')
+    const rawUrl = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+    const url = new URL(rawUrl, 'http://localhost')
     if (url.pathname.startsWith('/api/')) {
       url.pathname = url.pathname.slice('/api'.length)
     }
