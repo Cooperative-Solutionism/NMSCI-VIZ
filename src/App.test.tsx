@@ -106,6 +106,8 @@ vi.mock('@nmsci/sdk', async (importOriginal) => {
   }
 })
 
+const firstPageIndex = 0
+
 function sourceExists(path: string): boolean {
   return existsSync(join(process.cwd(), path))
 }
@@ -277,8 +279,8 @@ describe('App initial state', () => {
       if (url.pathname === '/consume-chains') {
         return jsonResponse(
           sliceResponse([chainRow('chain-cny', 1)], {
-            page: Number(url.searchParams.get('page')),
-            size: Number(url.searchParams.get('size')),
+            pageIndex: Number(url.searchParams.get('page')),
+            sliceSize: Number(url.searchParams.get('size')),
             hasNext: false,
           }),
         )
@@ -305,7 +307,6 @@ describe('App initial state', () => {
       if (url.pathname === '/consume-chains') {
         return jsonResponse(
           sliceResponse([chainRow('chain-cny', 1), chainRow('chain-au', 0)], {
-            page: 0,
             hasNext: true,
           }),
         )
@@ -327,12 +328,11 @@ describe('App initial state', () => {
   it('does not render pagination after an extended graph merge', async () => {
     stubFetchByUrl((url) => {
       if (url.pathname === '/consume-chains' && url.searchParams.get('nodeId') === 'node-1') {
-        return jsonResponse(sliceResponse([chainRow('chain-cny', 1)], { page: 0, hasNext: true }))
+        return jsonResponse(sliceResponse([chainRow('chain-cny', 1)], { hasNext: true }))
       }
       if (url.pathname === '/consume-chains' && url.searchParams.get('startId') === 'node-a') {
         return jsonResponse(
           sliceResponse([chainRow('chain-extra', 1, 'node-a', 'node-c')], {
-            page: 0,
             hasNext: true,
           }),
         )
@@ -358,7 +358,7 @@ describe('App initial state', () => {
   it('queries by public key when a 66-hex value is entered', async () => {
     const fetchMock = stubFetchByUrl((url) => {
       if (url.pathname === '/consume-chains') {
-        return jsonResponse(sliceResponse([chainRow('chain-cny', 1)], { page: 0 }))
+        return jsonResponse(sliceResponse([chainRow('chain-cny', 1)]))
       }
       throw new Error(`Unexpected URL ${url.href}`)
     })
@@ -386,7 +386,7 @@ describe('App initial state', () => {
     stubFetchByUrl((url) => {
       if (url.pathname === '/consume-chains') {
         return jsonResponse(
-          sliceResponse([chainRow('open-1', 1), loopedChainRow('loop-1')], { page: 0 }),
+          sliceResponse([chainRow('open-1', 1), loopedChainRow('loop-1')]),
         )
       }
       throw new Error(`Unexpected URL ${url.href}`)
@@ -445,7 +445,7 @@ describe('App initial state', () => {
   it('opens transaction evidence for a selected edge', async () => {
     stubFetchByUrl((url) => {
       if (url.pathname === '/consume-chains') {
-        return jsonResponse(sliceResponse([chainRow('chain-1', 1)], { page: 0 }))
+        return jsonResponse(sliceResponse([chainRow('chain-1', 1)]))
       }
       if (url.pathname === '/transaction-records/chain-1-record') {
         return jsonResponse(transactionRecord('chain-1-record'))
@@ -486,7 +486,7 @@ describe('App initial state', () => {
                 currentCentralPubkeyAuthorized: false,
               },
             ],
-            page: 0,
+            page: firstPageIndex,
             size: 10,
             numberOfElements: 1,
             hasNext: false,
@@ -721,7 +721,7 @@ describe('App initial state', () => {
         })
       }
       if (url.pathname === '/consume-chains') {
-        return jsonResponse(sliceResponse([chainRow('chain-x', 1)], { page: 0 }))
+        return jsonResponse(sliceResponse([chainRow('chain-x', 1)]))
       }
       throw new Error(`Unexpected URL ${url.href}`)
     })
@@ -853,8 +853,8 @@ function jsonResponse(data: unknown): Response {
 function sliceResponse(
   content: ConsumeChainResponseDTORaw[],
   overrides: Partial<{
-    page: number
-    size: number
+    pageIndex: number
+    sliceSize: number
     numberOfElements: number
     hasNext: boolean
     hasPrevious: boolean
@@ -865,8 +865,8 @@ function sliceResponse(
     message: 'ok',
     data: {
       content,
-      page: overrides.page ?? 0,
-      size: overrides.size ?? 50,
+      page: overrides.pageIndex ?? firstPageIndex,
+      size: overrides.sliceSize ?? 50,
       numberOfElements: overrides.numberOfElements ?? content.length,
       hasNext: overrides.hasNext ?? false,
       hasPrevious: overrides.hasPrevious ?? false,

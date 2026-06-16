@@ -23,6 +23,14 @@ export type Selection = { kind: 'node'; id: string } | { kind: 'edge'; id: strin
 export type DataOrigin = 'idle' | 'backend'
 type RunQueryOverride = { mode: QueryMode; nodeId: string }
 
+const fixedConsumeChainQueryPage = 0
+const fixedConsumeChainQuerySize = dashboardQuerySize
+const initialConsumeChainSlicePage = 0
+const fixedConsumeChainQueryPageRequest = {
+  page: fixedConsumeChainQueryPage,
+  size: fixedConsumeChainQuerySize,
+}
+
 export function useConsumeChainQuery(apiBase: string) {
   const [mode, setMode] = useState<QueryMode>('node')
   const [nodeId, setNodeId] = useState('')
@@ -101,8 +109,6 @@ export function useConsumeChainQuery(apiBase: string) {
       mode,
       nodeId,
       loopStatus,
-      page: 0,
-      size: dashboardQuerySize,
     })
   }, [apiBase, loopStatus, mode, nodeId])
 
@@ -126,7 +132,7 @@ export function useConsumeChainQuery(apiBase: string) {
         const result = await queryConsumeChains(
           client,
           consumeChainFilters(effectiveMode, effectiveNodeId, loopStatus),
-          { page: 0, size: dashboardQuerySize },
+          fixedConsumeChainQueryPageRequest,
         )
         if (generation !== graphRequestGenerationRef.current) return
         const { content, skipped } = normalizeRowsSafely(result.data.content)
@@ -163,7 +169,7 @@ export function useConsumeChainQuery(apiBase: string) {
         const result = await queryConsumeChains(
           client,
           consumeChainFilters(targetMode, node.id, loopStatus),
-          { page: 0, size: dashboardQuerySize },
+          fixedConsumeChainQueryPageRequest,
         )
         if (generation !== graphRequestGenerationRef.current) return
         const { content, skipped } = normalizeRowsSafely(result.data.content)
@@ -207,7 +213,6 @@ export function useConsumeChainQuery(apiBase: string) {
     mode,
     nodeId,
     origin,
-    page: 0,
     requestUrl,
     rows,
     runQuery,
@@ -220,7 +225,6 @@ export function useConsumeChainQuery(apiBase: string) {
     setLoopStatus: changeLoopStatus,
     setMode: changeMode,
     setNodeId: changeNodeId,
-    size: dashboardQuerySize,
     slice,
     warning,
   }
@@ -232,7 +236,7 @@ function makeSlice(
 ): SliceResponseDTO<ConsumeChainResponseDTO> {
   return {
     content: rows,
-    page: 0,
+    page: initialConsumeChainSlicePage,
     size: sliceSize,
     numberOfElements: rows.length,
     hasNext: false,

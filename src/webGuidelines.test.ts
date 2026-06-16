@@ -126,6 +126,15 @@ describe('web interface guideline regressions', () => {
     const forbiddenDefaultSizeName = 'default' + 'PageSize'
     const forbiddenTargetPageName = 'target' + 'Page'
     const forbiddenNumericQueryCall = new RegExp('run' + 'Query\\(\\s*\\d')
+    const forbiddenPageProperty = 'page' + ':'
+    const forbiddenSizeProperty = 'size' + ':'
+    const types = read('src/lib/types.ts')
+    const chainGraph = read('src/lib/chainGraph.ts')
+    const consumeQuery = read('src/hooks/useConsumeChainQuery.ts')
+    const queryTypeBody =
+      /export interface ConsumeChainQuery\s*\{([\s\S]*?)\n\}/.exec(types)?.[1] ?? ''
+    const hookReturnBody =
+      /return\s*\{[\s\S]*?currencyFilter,[\s\S]*?warning,\s*\n\s*\}/.exec(consumeQuery)?.[0] ?? ''
     const files = [
       'src/hooks/useConsumeChainQuery.ts',
       'src/features/network-explorer/hooks/useNetworkExplorerController.ts',
@@ -141,6 +150,13 @@ describe('web interface guideline regressions', () => {
       expect(text, file).not.toContain(forbiddenTargetPageName)
       expect(text, file).not.toMatch(forbiddenNumericQueryCall)
     }
+
+    expect(queryTypeBody).not.toContain(forbiddenPageProperty)
+    expect(queryTypeBody).not.toContain(forbiddenSizeProperty)
+    expect(chainGraph).not.toContain('query' + '.page')
+    expect(chainGraph).not.toContain('query' + '.size')
+    expect(hookReturnBody).not.toContain(forbiddenPageProperty)
+    expect(hookReturnBody).not.toContain(forbiddenSizeProperty)
   })
 
   it('exposes async status and errors through live regions', () => {

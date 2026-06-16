@@ -182,30 +182,24 @@ describe('chain graph mapping', () => {
         mode: 'start',
         nodeId: 'node-1',
         loopStatus: 'open',
-        page: 2,
-        size: 25,
       }),
-    ).toBe('/api/consume-chains?startId=node-1&isLoop=false&page=2&size=25')
+    ).toBe('/api/consume-chains?startId=node-1&isLoop=false&page=0&size=200')
 
     expect(
       buildConsumeChainUrl('http://localhost:8080/', {
         mode: 'end',
         nodeId: 'node 2',
         loopStatus: 'looped',
-        page: 0,
-        size: 10,
       }),
-    ).toBe('http://localhost:8080/consume-chains?endId=node+2&isLoop=true&page=0&size=10')
+    ).toBe('http://localhost:8080/consume-chains?endId=node+2&isLoop=true&page=0&size=200')
 
     expect(
       buildConsumeChainUrl('/api', {
         mode: 'node',
         nodeId: 'node-3',
         loopStatus: 'all',
-        page: 1,
-        size: 100,
       }),
-    ).toBe('/api/consume-chains?nodeId=node-3&page=1&size=100')
+    ).toBe('/api/consume-chains?nodeId=node-3&page=0&size=200')
 
     const pubkey = `02${'a'.repeat(64)}`
     expect(
@@ -213,10 +207,8 @@ describe('chain graph mapping', () => {
         mode: 'start',
         nodeId: pubkey,
         loopStatus: 'all',
-        page: 0,
-        size: 50,
       }),
-    ).toBe(`/api/consume-chains?startPubkey=${pubkey}&page=0&size=50`)
+    ).toBe(`/api/consume-chains?startPubkey=${pubkey}&page=0&size=200`)
   })
 
   it('formats operational labels without losing raw ids', () => {

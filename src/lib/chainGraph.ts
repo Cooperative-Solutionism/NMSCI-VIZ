@@ -11,6 +11,9 @@ import type {
 import { consumeChainParamName, detectIdentityKind } from './consumeChainFilters'
 import { readGraphTokens } from './tokens'
 
+const consumeChainUrlPage = 0
+const consumeChainUrlSize = 200
+
 export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTO[]): ChainGraph {
   const nodes = new Map<string, ChainGraphNode>()
   const edges: ChainGraphEdge[] = []
@@ -71,8 +74,8 @@ export function buildConsumeChainUrl(baseUrl: string, query: ConsumeChainQuery):
     params.set('isLoop', String(query.loopStatus === 'looped'))
   }
 
-  params.set('page', String(query.page))
-  params.set('size', String(query.size))
+  params.set('page', String(consumeChainUrlPage))
+  params.set('size', String(consumeChainUrlSize))
 
   return `${normalizedBaseUrl}/consume-chains?${params.toString()}`
 }

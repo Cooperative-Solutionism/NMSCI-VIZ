@@ -237,7 +237,7 @@ export function QueryPanel({
             ) : null}
             {extended ? (
               <p className="info-banner" aria-live="polite">
-                已扩展图谱视图；重新加载查询可恢复分页。
+                已扩展图谱视图；重新加载查询可恢复干净的后端结果。
               </p>
             ) : null}
           </>
