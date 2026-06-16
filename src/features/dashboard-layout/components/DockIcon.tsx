@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from 'react'
+import { useEffect, useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { useDraggable } from '../../../shared/hooks/useDraggable'
 import type { DashboardPoint } from '../dashboardLayout'
@@ -26,6 +26,10 @@ function arrowKeyDelta(key: string): DashboardPoint | null {
   }
 }
 
+function samePosition(left: DashboardPoint, right: DashboardPoint) {
+  return left.x === right.x && left.y === right.y
+}
+
 export function DockIcon({
   label,
   icon: Icon,
@@ -33,10 +37,25 @@ export function DockIcon({
   onOpen,
   onPositionChange,
 }: DockIconProps) {
+  const lastPositionRef = useRef(position)
+  const pointerCleanupRef = useRef<(() => void) | null>(null)
+  const suppressNextClickRef = useRef(false)
+  const handlePositionChange = (next: DashboardPoint) => {
+    if (samePosition(lastPositionRef.current, next)) return
+
+    lastPositionRef.current = next
+    onPositionChange(next)
+  }
   const { elementRef, nudgeBy, onPointerDown, style } = useDraggable<HTMLButtonElement>({
     initialPosition: position,
-    onDragEnd: onPositionChange,
+    onDragEnd: handlePositionChange,
   })
+
+  useEffect(() => {
+    lastPositionRef.current = position
+  }, [position])
+
+  useEffect(() => () => pointerCleanupRef.current?.(), [])
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     const delta = arrowKeyDelta(event.key)
@@ -44,6 +63,47 @@ export function DockIcon({
 
     event.preventDefault()
     nudgeBy(delta)
+  }
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return
+
+    pointerCleanupRef.current?.()
+    const start = { x: event.clientX, y: event.clientY }
+    let moved = false
+
+    const handleMove = (move: PointerEvent) => {
+      if (moved) return
+      if (move.clientX === start.x && move.clientY === start.y) return
+
+      moved = true
+      suppressNextClickRef.current = true
+    }
+    const teardown = () => {
+      window.removeEventListener('pointermove', handleMove)
+      window.removeEventListener('pointerup', teardown)
+      pointerCleanupRef.current = null
+
+      if (moved) {
+        window.setTimeout(() => {
+          suppressNextClickRef.current = false
+        }, 0)
+      }
+    }
+
+    window.addEventListener('pointermove', handleMove)
+    window.addEventListener('pointerup', teardown)
+    pointerCleanupRef.current = teardown
+    onPointerDown(event)
+  }
+
+  const handleClick = () => {
+    if (suppressNextClickRef.current) {
+      suppressNextClickRef.current = false
+      return
+    }
+
+    onOpen()
   }
 
   return (
@@ -56,9 +116,9 @@ export function DockIcon({
       aria-expanded="false"
       title={label}
       data-drag-handle
-      onClick={onOpen}
+      onClick={handleClick}
       onKeyDown={handleKeyDown}
-      onPointerDown={onPointerDown}
+      onPointerDown={handlePointerDown}
     >
       <Icon size={18} aria-hidden="true" />
     </button>

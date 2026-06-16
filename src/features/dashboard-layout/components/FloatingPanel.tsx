@@ -1,5 +1,5 @@
 import { ChevronLeft, GripVertical } from 'lucide-react'
-import type { KeyboardEvent, ReactNode, Ref } from 'react'
+import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { useDraggable } from '../../../shared/hooks/useDraggable'
 import type { DashboardPoint } from '../dashboardLayout'
 
@@ -33,13 +33,25 @@ export function FloatingPanel({
   onCollapse,
   onPositionChange,
 }: FloatingPanelProps) {
-  const { elementRef, nudgeBy, onPointerDown, style } = useDraggable<HTMLDivElement>({
-    initialPosition: position,
-    onDragEnd: onPositionChange,
-  })
-  const panelRef = elementRef as unknown as Ref<HTMLElement>
+  const titleId = useId()
+  const lastPositionRef = useRef(position)
+  const handlePositionChange = (next: DashboardPoint) => {
+    const current = lastPositionRef.current
+    if (current.x === next.x && current.y === next.y) return
 
-  const handleHeaderKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    lastPositionRef.current = next
+    onPositionChange(next)
+  }
+  const { elementRef, nudgeBy, onPointerDown, style } = useDraggable<HTMLElement>({
+    initialPosition: position,
+    onDragEnd: handlePositionChange,
+  })
+
+  useEffect(() => {
+    lastPositionRef.current = position
+  }, [position])
+
+  const handleMoveKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     const delta = arrowKeyDelta(event.key)
     if (!delta) return
 
@@ -49,23 +61,24 @@ export function FloatingPanel({
 
   return (
     <section
-      ref={panelRef}
+      ref={elementRef}
       className="floating-panel"
       style={style}
       role="dialog"
-      aria-label={title}
-      onPointerDown={onPointerDown}
+      aria-labelledby={titleId}
     >
-      <div
-        className="floating-panel__header"
-        data-drag-handle
-        role="button"
-        tabIndex={0}
-        aria-label={`移动${title}面板`}
-        onKeyDown={handleHeaderKeyDown}
-      >
-        <GripVertical size={18} aria-hidden="true" />
-        <h2>{title}</h2>
+      <div className="floating-panel__header">
+        <button
+          type="button"
+          className="icon-button"
+          data-drag-handle
+          aria-label={`移动${title}面板`}
+          onKeyDown={handleMoveKeyDown}
+          onPointerDown={onPointerDown}
+        >
+          <GripVertical size={18} aria-hidden="true" />
+        </button>
+        <h2 id={titleId}>{title}</h2>
         <button
           type="button"
           className="icon-button"

@@ -7,6 +7,64 @@ import { FloatingPanel } from './FloatingPanel'
 afterEach(cleanup)
 
 describe('DockIcon', () => {
+  it('opens exactly once for a normal click without persisting an unchanged position', () => {
+    const onOpen = vi.fn()
+    const onPositionChange = vi.fn()
+
+    render(
+      <DockIcon
+        label="查询"
+        icon={Search}
+        position={{ x: 24, y: 32 }}
+        onOpen={onOpen}
+        onPositionChange={onPositionChange}
+      />,
+    )
+
+    const button = screen.getByRole('button', { name: '打开查询面板' })
+
+    fireEvent.pointerDown(button, {
+      button: 0,
+      clientX: 24,
+      clientY: 32,
+    })
+    fireEvent.pointerUp(window)
+    fireEvent.click(button)
+
+    expect(onOpen).toHaveBeenCalledTimes(1)
+    expect(onPositionChange).not.toHaveBeenCalled()
+  })
+
+  it('moves by pointer drag without opening the panel', () => {
+    const onOpen = vi.fn()
+    const onPositionChange = vi.fn()
+
+    render(
+      <DockIcon
+        label="查询"
+        icon={Search}
+        position={{ x: 24, y: 32 }}
+        onOpen={onOpen}
+        onPositionChange={onPositionChange}
+      />,
+    )
+
+    const button = screen.getByRole('button', { name: '打开查询面板' })
+
+    fireEvent.pointerDown(button, {
+      button: 0,
+      clientX: 100,
+      clientY: 200,
+    })
+    fireEvent.pointerMove(window, { clientX: 118, clientY: 225 })
+    fireEvent.pointerUp(window)
+    fireEvent.click(button)
+
+    expect(onPositionChange).toHaveBeenCalledTimes(1)
+    expect(onPositionChange).toHaveBeenCalledWith({ x: 42, y: 57 })
+    expect(onOpen).not.toHaveBeenCalled()
+  })
+
   it('renders a draggable collapsed button with Chinese labels and opens on click', () => {
     const onOpen = vi.fn()
 
@@ -56,6 +114,58 @@ describe('DockIcon', () => {
 })
 
 describe('FloatingPanel', () => {
+  it('does not drag or report position when clicking collapse', () => {
+    const onCollapse = vi.fn()
+    const onPositionChange = vi.fn()
+
+    render(
+      <FloatingPanel
+        title="查询"
+        position={{ x: 72, y: 16 }}
+        onCollapse={onCollapse}
+        onPositionChange={onPositionChange}
+      >
+        <p>查询条件</p>
+      </FloatingPanel>,
+    )
+
+    const collapseButton = screen.getByRole('button', { name: '折叠查询面板' })
+
+    fireEvent.pointerDown(collapseButton, {
+      button: 0,
+      clientX: 100,
+      clientY: 200,
+    })
+    fireEvent.pointerUp(window)
+    fireEvent.click(collapseButton)
+
+    expect(onCollapse).toHaveBeenCalledTimes(1)
+    expect(onPositionChange).not.toHaveBeenCalled()
+  })
+
+  it('ignores non-arrow keys on a real move handle button', () => {
+    const onPositionChange = vi.fn()
+
+    render(
+      <FloatingPanel
+        title="查询"
+        position={{ x: 72, y: 16 }}
+        onCollapse={vi.fn()}
+        onPositionChange={onPositionChange}
+      >
+        <p>查询条件</p>
+      </FloatingPanel>,
+    )
+
+    const moveHandle = screen.getByRole('button', { name: '移动查询面板' })
+
+    expect(moveHandle.tagName).toBe('BUTTON')
+
+    fireEvent.keyDown(moveHandle, { key: 'Escape' })
+
+    expect(onPositionChange).not.toHaveBeenCalled()
+  })
+
   it('renders a dialog by Chinese title and body children', () => {
     render(
       <FloatingPanel
