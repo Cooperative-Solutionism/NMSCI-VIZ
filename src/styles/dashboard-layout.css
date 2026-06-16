@@ -87,7 +87,13 @@
   border-bottom: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.72);
   padding: 7px 8px;
+  cursor: grab;
+  touch-action: none;
   user-select: none;
+}
+
+.floating-panel__header:active {
+  cursor: grabbing;
 }
 
 .floating-panel__header h2 {

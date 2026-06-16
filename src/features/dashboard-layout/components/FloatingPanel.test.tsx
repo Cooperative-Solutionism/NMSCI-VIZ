@@ -274,7 +274,13 @@ describe('FloatingPanel', () => {
       </FloatingPanel>,
     )
 
-    fireEvent.pointerDown(screen.getByRole('button', { name: moveQueryName }), {
+    const header = screen
+      .getByRole('heading', { name: queryLabel })
+      .closest('.floating-panel__header')
+
+    expect(header).not.toBeNull()
+
+    fireEvent.pointerDown(header as HTMLElement, {
       button: 0,
       clientX: 100,
       clientY: 200,

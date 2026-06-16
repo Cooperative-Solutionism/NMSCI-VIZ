@@ -82,14 +82,13 @@ export function FloatingPanel({
       aria-labelledby={titleId}
       tabIndex={-1}
     >
-      <div className="floating-panel__header">
+      <div className="floating-panel__header" onPointerDown={onPointerDown}>
         <button
           type="button"
           className="icon-button"
           data-drag-handle
           aria-label={`移动${title}面板`}
           onKeyDown={handleMoveKeyDown}
-          onPointerDown={onPointerDown}
         >
           <GripVertical size={18} aria-hidden="true" />
         </button>
