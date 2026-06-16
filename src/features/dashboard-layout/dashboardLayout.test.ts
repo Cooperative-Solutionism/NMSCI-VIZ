@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   DASHBOARD_LAYOUT_STORAGE_KEY,
   dashboardPanelIds,
+  defaultDashboardLayout,
   loadDashboardLayout,
   normalizeDashboardLayout,
   saveDashboardLayout,
@@ -44,6 +45,14 @@ describe('dashboard layout state', () => {
 
     expect(layout.query.dockPosition).toEqual({ x: 16, y: 16 })
     expect(layout.system.dockPosition).toEqual({ x: 16, y: 296 })
+  })
+
+  it('exports the default layout with expected query defaults', () => {
+    expect(defaultDashboardLayout.query).toEqual({
+      collapsed: true,
+      dockPosition: { x: 16, y: 16 },
+      panelPosition: { x: 72, y: 16 },
+    })
   })
 
   it('repairs malformed or missing saved layout data from defaults', () => {
@@ -115,9 +124,36 @@ describe('dashboard layout state', () => {
     } as Storage
 
     expect(loadDashboardLayout(fakeStorage())).toEqual(defaults)
-    expect(loadDashboardLayout(fakeStorage({ [DASHBOARD_LAYOUT_STORAGE_KEY]: '' }))).toEqual(defaults)
-    expect(loadDashboardLayout(fakeStorage({ [DASHBOARD_LAYOUT_STORAGE_KEY]: '{broken' }))).toEqual(defaults)
+    expect(loadDashboardLayout(fakeStorage({ [DASHBOARD_LAYOUT_STORAGE_KEY]: '' }))).toEqual(
+      defaults,
+    )
+    expect(loadDashboardLayout(fakeStorage({ [DASHBOARD_LAYOUT_STORAGE_KEY]: '{broken' }))).toEqual(
+      defaults,
+    )
     expect(loadDashboardLayout(throwingStorage)).toEqual(defaults)
+  })
+
+  it('returns the default layout when default storage resolution throws', () => {
+    const localStorageGetter = vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new Error('localStorage unavailable')
+    })
+
+    try {
+      expect(loadDashboardLayout()).toEqual(defaultDashboardLayout)
+    } finally {
+      localStorageGetter.mockRestore()
+    }
+  })
+
+  it('returns the default layout when provided storage access fails', () => {
+    const throwingStorage = {
+      ...fakeStorage(),
+      getItem: () => {
+        throw new Error('storage unavailable')
+      },
+    } as Storage
+
+    expect(loadDashboardLayout(throwingStorage)).toEqual(defaultDashboardLayout)
   })
 
   it('writes normalized JSON to the dashboard layout storage key', () => {
@@ -141,6 +177,19 @@ describe('dashboard layout state', () => {
     const raw = storage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY)
     expect(raw).toBe(JSON.stringify(normalizeDashboardLayout(dirtyLayout)))
     expect(JSON.parse(raw ?? '{}')).toEqual(normalizeDashboardLayout(dirtyLayout))
+  })
+
+  it('does not throw when dashboard layout storage write fails', () => {
+    const throwingStorage = {
+      ...fakeStorage(),
+      setItem: () => {
+        throw new Error('storage quota exceeded')
+      },
+    } as Storage
+
+    expect(() =>
+      saveDashboardLayout(normalizeDashboardLayout(undefined), throwingStorage),
+    ).not.toThrow()
   })
 
   it('patches a panel layout without mutating the previous state', () => {

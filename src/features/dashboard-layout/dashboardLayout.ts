@@ -15,9 +15,16 @@ export type DashboardLayoutState = Record<DashboardPanelId, DashboardPanelLayout
 
 export const DASHBOARD_LAYOUT_STORAGE_KEY = 'nmsci.dashboard.layout.v1'
 
-export const dashboardPanelIds: DashboardPanelId[] = ['query', 'details', 'loops', 'metrics', 'export', 'system']
+export const dashboardPanelIds: DashboardPanelId[] = [
+  'query',
+  'details',
+  'loops',
+  'metrics',
+  'export',
+  'system',
+]
 
-const defaultDashboardLayout: DashboardLayoutState = {
+export const defaultDashboardLayout: DashboardLayoutState = {
   query: {
     collapsed: true,
     dockPosition: { x: 16, y: 16 },
@@ -66,14 +73,20 @@ function clampCoordinate(value: number, max: number): number {
   return Math.min(Math.max(value, 0), Math.max(max, 0))
 }
 
-function clampPoint(point: DashboardPoint, bounds: { width: number; height: number }, reservedSize: number): DashboardPoint {
+function clampPoint(
+  point: DashboardPoint,
+  bounds: { width: number; height: number },
+  reservedSize: number,
+): DashboardPoint {
   return {
     x: clampCoordinate(point.x, bounds.width - reservedSize),
     y: clampCoordinate(point.y, bounds.height - reservedSize),
   }
 }
 
-function shouldClamp(bounds: { width: number; height: number } | undefined): bounds is { width: number; height: number } {
+function shouldClamp(
+  bounds: { width: number; height: number } | undefined,
+): bounds is { width: number; height: number } {
   return Boolean(bounds && Number.isFinite(bounds.width) && Number.isFinite(bounds.height))
 }
 
@@ -88,8 +101,11 @@ export const normalizeDashboardLayout = (
     const savedPanel = source[panelId]
     const savedLayout = isRecord(savedPanel) ? savedPanel : {}
     const normalizedPanel = {
-      collapsed: typeof savedLayout.collapsed === 'boolean' ? savedLayout.collapsed : defaults.collapsed,
-      dockPosition: isPoint(savedLayout.dockPosition) ? clonePoint(savedLayout.dockPosition) : clonePoint(defaults.dockPosition),
+      collapsed:
+        typeof savedLayout.collapsed === 'boolean' ? savedLayout.collapsed : defaults.collapsed,
+      dockPosition: isPoint(savedLayout.dockPosition)
+        ? clonePoint(savedLayout.dockPosition)
+        : clonePoint(defaults.dockPosition),
       panelPosition: isPoint(savedLayout.panelPosition)
         ? clonePoint(savedLayout.panelPosition)
         : clonePoint(defaults.panelPosition),
@@ -107,20 +123,26 @@ export const normalizeDashboardLayout = (
   }, {} as DashboardLayoutState)
 }
 
-export const loadDashboardLayout = (storage = window.localStorage): DashboardLayoutState => {
+export const loadDashboardLayout = (storage?: Storage): DashboardLayoutState => {
   try {
-    const rawLayout = storage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY)
+    const targetStorage = storage ?? window.localStorage
+    const rawLayout = targetStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY)
     return normalizeDashboardLayout(rawLayout ? JSON.parse(rawLayout) : undefined)
   } catch {
     return normalizeDashboardLayout(undefined)
   }
 }
 
-export const saveDashboardLayout = (
-  layout: DashboardLayoutState,
-  storage = window.localStorage,
-): void => {
-  storage.setItem(DASHBOARD_LAYOUT_STORAGE_KEY, JSON.stringify(normalizeDashboardLayout(layout)))
+export const saveDashboardLayout = (layout: DashboardLayoutState, storage?: Storage): void => {
+  try {
+    const targetStorage = storage ?? window.localStorage
+    targetStorage.setItem(
+      DASHBOARD_LAYOUT_STORAGE_KEY,
+      JSON.stringify(normalizeDashboardLayout(layout)),
+    )
+  } catch {
+    return
+  }
 }
 
 export const updatePanelLayout = (
