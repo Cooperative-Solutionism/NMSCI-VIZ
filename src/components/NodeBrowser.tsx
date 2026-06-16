@@ -59,14 +59,18 @@ export function NodeBrowser({
             <ChipToggle
               label="已注册"
               active={registered}
-              onToggle={() => setRegistered((v) => !v)}
+              onToggle={() => setRegistered((value) => !value)}
             />
             <ChipToggle
               label="已授权"
               active={authorized}
-              onToggle={() => setAuthorized((v) => !v)}
+              onToggle={() => setAuthorized((value) => !value)}
             />
-            <ChipToggle label="已锁定" active={locked} onToggle={() => setLocked((v) => !v)} />
+            <ChipToggle
+              label="已锁定"
+              active={locked}
+              onToggle={() => setLocked((value) => !value)}
+            />
           </div>
           <button
             className="secondary-button"
@@ -113,7 +117,7 @@ export function NodeBrowser({
               >
                 上一页
               </button>
-              <span>第 {directory.page} 页</span>
+              <span>第 {directory.page + 1} 页</span>
               <button
                 type="button"
                 disabled={!directory.hasNext || directory.loading}

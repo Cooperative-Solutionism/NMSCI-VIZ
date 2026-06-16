@@ -1,10 +1,12 @@
-import { BadgeCheck, KeyRound, RefreshCw, Search, ShieldCheck } from 'lucide-react'
 import type { FlowNodeStateResponseDTO } from '@nmsci/sdk'
-import { formatDateTime, formatInteger, maskSecret } from '../lib/format'
+import { KeyRound } from 'lucide-react'
 import type { LocalFlowNode } from '../lib/flowNodeStorage'
-import { DetailRow } from './DetailRow'
-import { Field } from './Field'
 import { PanelHeader } from './PanelHeader'
+import { FlowNodeAuthorizationControls } from './flow-node-operate/FlowNodeAuthorizationControls'
+import { FlowNodeKeyDetails } from './flow-node-operate/FlowNodeKeyDetails'
+import { FlowNodeRegistrationControls } from './flow-node-operate/FlowNodeRegistrationControls'
+import { FlowNodeTransactionControls } from './flow-node-operate/FlowNodeTransactionControls'
+import { OperationFeedback } from './flow-node-operate/OperationFeedback'
 
 export type FlowNodeBusyState = 'difficulty' | 'register' | 'authorize' | 'record' | 'mount' | null
 
@@ -55,169 +57,36 @@ export function FlowNodeOperatePanel({
   registerDifficultyTarget: string
   status: string | null
 }) {
-  const registerDisabled =
-    registerDifficultyTarget.trim().length === 0 || busy !== null || centralLocked
-  const chainState = nodeState
-    ? `${nodeState.registered ? '已注册' : '未注册'}${nodeState.authorized ? ' · 已授权' : ''}${nodeState.locked ? ' · 已锁定' : ''}`
-    : '-'
-
   return (
     <div className="inspector-content">
       <PanelHeader icon={<KeyRound size={16} />} title="流转节点" />
-
-      <div className="node-key-box">
-        <DetailRow
-          label="公钥"
-          value={
-            <span className="copyable-value">
-              <code translate="no">{node.publicKeyHex}</code>
-              <button type="button" onClick={() => onCopy(node.publicKeyHex, '公钥')}>
-                复制
-              </button>
-            </span>
-          }
-        />
-        <DetailRow
-          label="注册 ID"
-          value={
-            node.registration?.id ? (
-              <span className="copyable-value">
-                <code translate="no">{node.registration.id}</code>
-                <button
-                  type="button"
-                  onClick={() => onCopy(node.registration?.id ?? '', '注册 ID')}
-                >
-                  复制
-                </button>
-              </span>
-            ) : (
-              '-'
-            )
-          }
-        />
-        <DetailRow
-          label="私钥"
-          value={<code translate="no">{maskSecret(node.privateKeyHex)}</code>}
-        />
-        <DetailRow label="保存时间" value={formatDateTime(node.createdAt)} />
-        <DetailRow label="注册状态" value={formatRegistrationStatus(node.registration?.status)} />
-        <DetailRow label="授权数" value={node.authorizations.length} />
-        <DetailRow label="链上状态" value={chainState} />
-        <button className="secondary-button" type="button" onClick={onQuery}>
-          <Search size={15} />
-          查询此节点
-        </button>
-        <button className="secondary-button" type="button" onClick={onExportPrivateKey}>
-          导出私钥
-        </button>
-        <button className="secondary-button" type="button" onClick={onRename}>
-          重命名
-        </button>
-        <button className="secondary-button danger" type="button" onClick={onDelete}>
-          删除
-        </button>
-      </div>
-
-      <div className="section-title">注册</div>
-      <Field label="注册难度目标">
-        <input
-          name="registerDifficultyTarget"
-          autoComplete="off"
-          value={registerDifficultyTarget}
-          onChange={(event) => onDifficultyChange(event.currentTarget.value)}
-          inputMode="text"
-          spellCheck={false}
-          placeholder="例如 1d00ffff…"
-        />
-      </Field>
-      <button
-        className="secondary-button"
-        type="button"
-        disabled={busy === 'difficulty'}
-        onClick={onFetchDifficulty}
-      >
-        <RefreshCw size={15} />
-        {busy === 'difficulty' ? '加载中…' : '使用最新难度'}
-      </button>
-      {centralLocked ? (
-        <p className="operation-message error" role="alert">
-          中心公钥已冻结，注册和授权已禁用。
-        </p>
-      ) : null}
-      <button
-        className="primary-button"
-        type="button"
-        disabled={registerDisabled}
-        onClick={onRegister}
-      >
-        <BadgeCheck size={16} />
-        {busy === 'register'
-          ? miningAttempts != null
-            ? `挖矿 ${formatInteger(miningAttempts)}…`
-            : '注册中…'
-          : '注册节点'}
-      </button>
-
-      <div className="section-title">授权中心公钥</div>
-      <Field label="中心公钥">
-        <textarea
-          name="authorizationCentralPubkey"
-          autoComplete="off"
-          rows={3}
-          value={centralPubkey}
-          onChange={(event) => onCentralPubkeyChange(event.currentTarget.value)}
-          spellCheck={false}
-          placeholder="例如 02 后接 64 位 hex…"
-        />
-      </Field>
-      <button
-        className="primary-button"
-        type="button"
-        disabled={centralPubkey.trim().length === 0 || busy !== null || centralLocked}
-        onClick={onAuthorize}
-      >
-        <ShieldCheck size={16} />
-        {busy === 'authorize' ? '授权中…' : '授权中心'}
-      </button>
-
-      {onCreateRecord || onCreateMount ? (
-        <>
-          <div className="section-title">交易</div>
-          {onCreateRecord ? (
-            <button className="secondary-button" type="button" onClick={onCreateRecord}>
-              创建交易记录
-            </button>
-          ) : null}
-          {onCreateMount ? (
-            <button className="secondary-button" type="button" onClick={onCreateMount}>
-              挂载已有记录
-            </button>
-          ) : null}
-        </>
-      ) : null}
-
-      {status ? (
-        <p className="operation-message" aria-live="polite">
-          {status}
-        </p>
-      ) : null}
-      {error ? (
-        <p className="operation-message error" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {lastRawBytes ? (
-        <div className="raw-preview">
-          <span>最近原始消息</span>
-          <code translate="no">{lastRawBytes}</code>
-        </div>
-      ) : null}
+      <FlowNodeKeyDetails
+        node={node}
+        nodeState={nodeState}
+        onCopy={onCopy}
+        onDelete={onDelete}
+        onExportPrivateKey={onExportPrivateKey}
+        onQuery={onQuery}
+        onRename={onRename}
+      />
+      <FlowNodeRegistrationControls
+        busy={busy}
+        centralLocked={centralLocked}
+        miningAttempts={miningAttempts}
+        onDifficultyChange={onDifficultyChange}
+        onFetchDifficulty={onFetchDifficulty}
+        onRegister={onRegister}
+        registerDifficultyTarget={registerDifficultyTarget}
+      />
+      <FlowNodeAuthorizationControls
+        busy={busy}
+        centralLocked={centralLocked}
+        centralPubkey={centralPubkey}
+        onAuthorize={onAuthorize}
+        onCentralPubkeyChange={onCentralPubkeyChange}
+      />
+      <FlowNodeTransactionControls onCreateMount={onCreateMount} onCreateRecord={onCreateRecord} />
+      <OperationFeedback error={error} lastRawBytes={lastRawBytes} status={status} />
     </div>
   )
-}
-
-function formatRegistrationStatus(status: string | undefined): string {
-  if (status === 'sent') return '已发送'
-  if (status === 'failed') return '失败'
-  return '-'
 }

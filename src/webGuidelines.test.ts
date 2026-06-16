@@ -24,21 +24,41 @@ function collectTsxFiles(dir = join(root, 'src')): string[] {
   })
 }
 
+function collectCssFiles(dir = join(root, 'src')): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) return collectCssFiles(path)
+    if (!entry.isFile() || !entry.name.endsWith('.css')) return []
+    return relative(root, path).replaceAll('\\', '/')
+  })
+}
+
+function readCssBundle(): string {
+  return collectCssFiles()
+    .map((file) => read(file))
+    .join('\n')
+}
+
 describe('web interface guideline regressions', () => {
   const uiTsx = collectTsxFiles()
 
   it('keeps non-auth form controls named with autocomplete disabled', () => {
-    const queryPanel = read('src/features/network-explorer/components/QueryPanel.tsx')
+    const queryForm = read(
+      'src/features/network-explorer/components/query-panel/QueryFormContent.tsx',
+    )
     const recordForm = read('src/components/TransactionRecordForm.tsx')
     const mountForm = read('src/components/TransactionMountForm.tsx')
-    const flowPanel = read('src/components/FlowNodeOperatePanel.tsx')
+    const flowPanel = [
+      read('src/components/flow-node-operate/FlowNodeRegistrationControls.tsx'),
+      read('src/components/flow-node-operate/FlowNodeAuthorizationControls.tsx'),
+    ].join('\n')
     const vaultGate = read('src/components/VaultGate.tsx')
 
     for (const name of ['apiBase', 'nodeId', 'currencyFilter']) {
-      expect(queryPanel).toContain(`name="${name}"`)
+      expect(queryForm).toContain(`name="${name}"`)
     }
-    expect(queryPanel).not.toContain('name="page"')
-    expect(queryPanel).not.toContain('name="size"')
+    expect(queryForm).not.toContain('name="page"')
+    expect(queryForm).not.toContain('name="size"')
     for (const name of [
       'consumeNodePubkey',
       'amount',
@@ -63,8 +83,8 @@ describe('web interface guideline regressions', () => {
     expect(text).not.toMatch(/(['"`])[^'"`\n]*\.\.\.[^'"`\n]*\1/)
     expect(text).not.toMatch(/>[^<\n]*\.\.\.[^<\n]*</)
     expect(text).not.toContain('toLocaleString()')
-    expect(text).toContain('加载中…')
-    expect(text).toContain('正在加载交易…')
+    expect(text).toContain('\u52a0\u8f7d\u4e2d\u2026')
+    expect(text).toContain('\u6b63\u5728\u52a0\u8f7d\u4ea4\u6613\u2026')
   })
 
   it('marks UI identifiers as non-translatable code tokens', () => {
@@ -82,7 +102,7 @@ describe('web interface guideline regressions', () => {
 
     expect(networkGraph).toContain('onKeyDown={handleCanvasKeyDown}')
     expect(networkGraph).not.toContain('role="menu"')
-    expect(queryPanel).toContain("useUrlStateParam<LeftTab>('panel'")
+    expect(queryPanel).toMatch(/useUrlStateParam<QueryPanelTab>\(\s*'panel'/)
     expect(queryPanel).not.toContain("useUrlBooleanParam('panelCollapsed'")
     expect(queryPanel).not.toContain('onKeyDown={handlePanelKeyDown}')
     expect(queryPanel).not.toContain('useDraggable')
@@ -110,7 +130,7 @@ describe('web interface guideline regressions', () => {
 
   it('uses the floating dashboard shell instead of fixed page chrome', () => {
     const app = read('src/app/App.tsx')
-    const appCss = read('src/App.css')
+    const appCss = readCssBundle()
 
     expect(app).toContain('DashboardWorkspace')
     expect(app).not.toContain('TopBar')
@@ -138,7 +158,7 @@ describe('web interface guideline regressions', () => {
   })
 
   it('keeps query panel content scrollable inside the fixed shell', () => {
-    const appCss = read('src/App.css')
+    const appCss = readCssBundle()
     const contentRule = cssRule(appCss, '.query-panel-content')
     const bodyRule = cssRule(appCss, '.query-panel-content .floating-body')
 
@@ -217,6 +237,7 @@ describe('web interface guideline regressions', () => {
 
     for (const file of [
       'src/features/network-explorer/components/QueryPanel.tsx',
+      'src/features/network-explorer/components/query-panel/QueryFormContent.tsx',
       'src/features/network-explorer/hooks/useNetworkExplorerController.ts',
       'src/App.test.tsx',
     ]) {
@@ -227,7 +248,7 @@ describe('web interface guideline regressions', () => {
   })
 
   it('keeps retired page-control CSS selectors removed', () => {
-    const appCss = read('src/App.css')
+    const appCss = readCssBundle()
     const footerSelector = '.footer' + 'bar'
     const pagerSelector = '.pagina' + 'tion'
 
@@ -241,7 +262,8 @@ describe('web interface guideline regressions', () => {
       'src/components/TransactionEvidence.tsx',
       'src/components/NodeBrowser.tsx',
       'src/components/VaultGate.tsx',
-      'src/features/network-explorer/components/QueryPanel.tsx',
+      'src/features/network-explorer/components/query-panel/QueryFormContent.tsx',
+      'src/features/network-explorer/components/query-panel/KeyringPanelContent.tsx',
     ]) {
       const text = read(file)
       expect(text).toMatch(/aria-live="polite"|role="status"|role="alert"/)

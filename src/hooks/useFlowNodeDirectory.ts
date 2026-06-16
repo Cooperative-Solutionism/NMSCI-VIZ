@@ -25,7 +25,7 @@ const EMPTY: DirectoryState = {
   hasPrevious: false,
 }
 
-// 流转节点目录（GET /flow-nodes，API.md §5）。让分析师无需预先持有 UUID 即可发现节点。
+// 流转节点目录（GET /flow-nodes，API.md §5），让分析师无需预先持有 UUID 即可发现节点。
 export function useFlowNodeDirectory(apiBase: string) {
   const [state, setState] = useState<DirectoryState>(EMPTY)
   const client = useMemo(() => new ApiClient({ baseUrl: apiBase }), [apiBase])

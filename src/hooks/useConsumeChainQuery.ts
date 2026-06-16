@@ -1,4 +1,4 @@
-import { ApiClient, normalizeConsumeChainResponseDTO, queryConsumeChains } from '@nmsci/sdk'
+import { ApiClient, queryConsumeChains } from '@nmsci/sdk'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { dashboardQueryPage, dashboardQuerySize } from '../app/config'
 import {
@@ -12,15 +12,24 @@ import type {
   ChainGraphEdge,
   ChainGraphNode,
   ConsumeChainResponseDTO,
-  ConsumeChainResponseDTORaw,
   LoopStatus,
   QueryMode,
 } from '../lib/types'
+import {
+  filterConsumeChainRows,
+  findSelectedChain,
+  findSelectedEdge,
+  findSelectedNode,
+  normalizeRowsSafely,
+  resolveEffectiveSelection,
+  skipWarning,
+  type CurrencyFilter,
+  type DataOrigin,
+  type RunQueryOverride,
+  type Selection,
+} from './consume-chain-query/queryState'
 
-export type CurrencyFilter = 'all' | '1' | '0'
-export type Selection = { kind: 'node'; id: string } | { kind: 'edge'; id: string }
-export type DataOrigin = 'idle' | 'backend'
-type RunQueryOverride = { mode: QueryMode; nodeId: string }
+export type { CurrencyFilter, DataOrigin, Selection }
 
 const fixedConsumeChainQueryPageRequest = {
   page: dashboardQueryPage,
@@ -43,7 +52,6 @@ export function useConsumeChainQuery(apiBase: string) {
   const client = useMemo(() => new ApiClient({ baseUrl: apiBase }), [apiBase])
   const graphRequestGenerationRef = useRef(0)
 
-  // 改任一查询参数都视为退出「扩展态」：合并视图随之失效，下一次 Load/翻页取回干净数据。
   const changeMode = useCallback((next: QueryMode) => {
     setMode(next)
     setExtended(false)
@@ -57,46 +65,27 @@ export function useConsumeChainQuery(apiBase: string) {
     setExtended(false)
   }, [])
 
-  // currencyFilter 是「已加载结果视图过滤」：仅在已取回的 rows 上客户端过滤，不下推后端（/consume-chains 无 currency 参数）。
-  // 下一次 runQuery 取回干净数据时才回到全量口径。
-  const filteredRows = useMemo(() => {
-    return rows.filter((row) => {
-      const currencyMatches =
-        currencyFilter === 'all' || row.consumeChain.currencyType === Number(currencyFilter)
-      const loopMatches =
-        loopStatus === 'all' || row.consumeChain.isLoop === (loopStatus === 'looped')
-      return currencyMatches && loopMatches
-    })
-  }, [currencyFilter, loopStatus, rows])
-
+  const filteredRows = useMemo(
+    () => filterConsumeChainRows(rows, currencyFilter, loopStatus),
+    [currencyFilter, loopStatus, rows],
+  )
   const graph = useMemo(() => buildGraphFromConsumeChains(filteredRows), [filteredRows])
-  const effectiveSelection = useMemo<Selection | null>(() => {
-    if (selection?.kind === 'edge' && graph.edges.some((edge) => edge.id === selection.id)) {
-      return selection
-    }
-    if (selection?.kind === 'node' && graph.nodes.some((node) => node.id === selection.id)) {
-      return selection
-    }
-    if (graph.edges[0]) return { kind: 'edge', id: graph.edges[0].id }
-    if (graph.nodes[0]) return { kind: 'node', id: graph.nodes[0].id }
-    return null
-  }, [graph.edges, graph.nodes, selection])
-
-  const selectedEdge = useMemo(() => {
-    if (effectiveSelection?.kind !== 'edge') return null
-    return graph.edges.find((edge) => edge.id === effectiveSelection.id) ?? null
-  }, [effectiveSelection, graph.edges])
-
-  const selectedNode = useMemo(() => {
-    if (effectiveSelection?.kind !== 'node') return null
-    return graph.nodes.find((node) => node.id === effectiveSelection.id) ?? null
-  }, [effectiveSelection, graph.nodes])
-
-  const selectedChain = useMemo(() => {
-    if (!selectedEdge) return null
-    return filteredRows.find((row) => row.consumeChain.id === selectedEdge.chainId) ?? null
-  }, [filteredRows, selectedEdge])
-
+  const effectiveSelection = useMemo<Selection | null>(
+    () => resolveEffectiveSelection(graph, selection),
+    [graph, selection],
+  )
+  const selectedEdge = useMemo(
+    () => findSelectedEdge(graph.edges, effectiveSelection),
+    [effectiveSelection, graph.edges],
+  )
+  const selectedNode = useMemo(
+    () => findSelectedNode(graph.nodes, effectiveSelection),
+    [effectiveSelection, graph.nodes],
+  )
+  const selectedChain = useMemo(
+    () => findSelectedChain(filteredRows, selectedEdge),
+    [filteredRows, selectedEdge],
+  )
   const requestUrl = useMemo(() => {
     return buildConsumeChainUrl(apiBase, {
       mode,
@@ -109,7 +98,6 @@ export function useConsumeChainQuery(apiBase: string) {
     async (queryOverride?: RunQueryOverride) => {
       const generation = graphRequestGenerationRef.current + 1
       graphRequestGenerationRef.current = generation
-      // 允许调用方一次性指定 mode/nodeId（避免 setState 异步导致 runQuery 读到旧值的竞态）。
       const effectiveMode = queryOverride?.mode ?? mode
       const effectiveNodeId = (queryOverride?.nodeId ?? nodeId).trim()
 
@@ -218,27 +206,4 @@ export function useConsumeChainQuery(apiBase: string) {
     setNodeId: changeNodeId,
     warning,
   }
-}
-
-// 逐行归一化：单条链含超过 2^53 的金额时 SDK 的 toSafeBigInt 会抛错，
-// 这里跳过该行并计数，避免一条超大额链让整页查询失败（仅是临时前端兜底，根因需 SDK 侧字符串传输 int64）。
-function normalizeRowsSafely(rawRows: ConsumeChainResponseDTORaw[]): {
-  content: ConsumeChainResponseDTO[]
-  skipped: number
-} {
-  const content: ConsumeChainResponseDTO[] = []
-  let skipped = 0
-  for (const raw of rawRows) {
-    try {
-      content.push(normalizeConsumeChainResponseDTO(raw))
-    } catch {
-      skipped += 1
-    }
-  }
-  return { content, skipped }
-}
-
-function skipWarning(skipped: number): string | null {
-  if (skipped <= 0) return null
-  return `已跳过 ${skipped} 条链路：金额超过精度安全范围（>2^53）。`
 }

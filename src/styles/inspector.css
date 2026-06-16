@@ -1,0 +1,114 @@
+.inspector-heading {
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  padding: 15px 16px;
+}
+
+.inspector-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+}
+
+.status-pill {
+  align-self: flex-start;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 850;
+  padding: 4px 10px;
+  text-transform: uppercase;
+}
+
+.status-pill.looped {
+  background: var(--teal-soft);
+  color: var(--green);
+}
+
+.status-pill.open {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.node-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.detail-state {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 13px;
+  padding: 10px;
+}
+
+.detail-state.error {
+  border-color: rgba(173, 62, 50, 0.32);
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.section-title {
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  padding-top: 14px;
+  text-transform: uppercase;
+}
+
+.detail-row {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.detail-row > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.detail-row > strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 720;
+  overflow-wrap: anywhere;
+}
+
+.empty-state {
+  margin: 18px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  padding: 18px;
+}
+
+.error-boundary {
+  display: grid;
+  place-content: center;
+  gap: 10px;
+  min-height: 220px;
+  border: 1px solid rgba(173, 62, 50, 0.32);
+  background: var(--red-soft);
+  color: var(--red);
+  padding: 20px;
+  text-align: center;
+}
+
+.error-boundary button {
+  justify-self: center;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-weight: 800;
+  padding: 8px 10px;
+}

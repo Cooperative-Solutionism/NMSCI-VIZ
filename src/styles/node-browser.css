@@ -1,0 +1,121 @@
+.node-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.node-browser-toggle {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0;
+}
+
+.node-browser-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  padding: 3px 10px;
+}
+
+.chip.active {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.node-browser-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.node-browser-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 5px 8px;
+}
+
+.node-browser-row:hover {
+  border-color: var(--teal);
+}
+
+.node-browser-badges {
+  display: flex;
+  gap: 4px;
+}
+
+.badge {
+  border-radius: 4px;
+  font-size: 10px;
+  font-style: normal;
+  padding: 1px 5px;
+}
+
+.badge.reg {
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.badge.auth {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.badge.lock {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.node-browser-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.node-browser-pager button {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 3px 10px;
+}
+
+.node-browser-pager button:disabled {
+  opacity: 0.5;
+}
+
+/* 系统状态条 */
