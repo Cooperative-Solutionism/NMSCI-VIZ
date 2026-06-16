@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -19,6 +20,10 @@ type UseDraggableOptions = {
   onDragEnd?: (position: Point) => void
 }
 
+function positionFromInitial(initialX: number | undefined, initialY: number | undefined) {
+  return initialX === undefined || initialY === undefined ? null : { x: initialX, y: initialY }
+}
+
 export function useDraggable({
   boundsRef,
   margin = 8,
@@ -27,20 +32,39 @@ export function useDraggable({
 }: UseDraggableOptions = {}) {
   const initialX = initialPosition?.x
   const initialY = initialPosition?.y
+  const initialPoint = positionFromInitial(initialX, initialY)
   const elementRef = useRef<HTMLElement | null>(null)
-  const positionRef = useRef<Point | null>(initialPosition)
+  const positionRef = useRef<Point | null>(initialPoint)
+  const onDragEndRef = useRef(onDragEnd)
   const cleanupRef = useRef<(() => void) | null>(null)
-  const [position, setPosition] = useState<Point | null>(initialPosition)
+  const [positionState, setPositionState] = useState(() => ({
+    initialX,
+    initialY,
+    position: initialPoint,
+  }))
   const [dragging, setDragging] = useState(false)
+  const initialPositionChanged =
+    positionState.initialX !== initialX || positionState.initialY !== initialY
+  const position = initialPositionChanged ? initialPoint : positionState.position
+
+  if (initialPositionChanged) {
+    setPositionState({ initialX, initialY, position: initialPoint })
+  }
 
   useEffect(() => () => cleanupRef.current?.(), [])
 
-  useEffect(() => {
-    const next =
-      initialX === undefined || initialY === undefined ? null : { x: initialX, y: initialY }
+  useLayoutEffect(() => {
+    positionRef.current = position
+  }, [position])
+
+  useLayoutEffect(() => {
+    onDragEndRef.current = onDragEnd
+  })
+
+  const setCurrentPosition = useCallback((next: Point) => {
     positionRef.current = next
-    setPosition(next)
-  }, [initialX, initialY])
+    setPositionState((current) => ({ ...current, position: next }))
+  }, [])
 
   const clampPosition = useCallback(
     (element: HTMLElement, next: Point): Point => {
@@ -70,20 +94,23 @@ export function useDraggable({
       const clamped = clampPosition(element, next)
       element.style.left = `${clamped.x}px`
       element.style.top = `${clamped.y}px`
-      positionRef.current = clamped
-      setPosition(clamped)
+      setCurrentPosition(clamped)
       return clamped
     },
-    [clampPosition],
+    [clampPosition, setCurrentPosition],
   )
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
       if (event.button !== 0) return
-      const isDedicatedHandle = event.currentTarget.hasAttribute('data-drag-handle')
+      const target = event.target as HTMLElement
+      const handle = target.closest('[data-drag-handle]')
+      const isDedicatedHandle =
+        event.currentTarget.hasAttribute('data-drag-handle') ||
+        (handle !== null && event.currentTarget.contains(handle))
       if (
         !isDedicatedHandle &&
-        (event.target as HTMLElement).closest('button, a, input, textarea, select, [data-no-drag]')
+        target.closest('button, a, input, textarea, select, [data-no-drag]')
       )
         return
       const el = elementRef.current
@@ -109,10 +136,9 @@ export function useDraggable({
       }
       const handleUp = () => {
         teardown()
-        positionRef.current = last
-        setPosition(last)
+        setCurrentPosition(last)
         setDragging(false)
-        onDragEnd?.(last)
+        onDragEndRef.current?.(last)
       }
 
       window.addEventListener('pointermove', handleMove)
@@ -121,7 +147,7 @@ export function useDraggable({
       setDragging(true)
       event.preventDefault()
     },
-    [clampPosition, currentPosition, onDragEnd],
+    [clampPosition, currentPosition, setCurrentPosition],
   )
 
   const nudgeBy = useCallback(
@@ -130,9 +156,9 @@ export function useDraggable({
       if (!el) return
       const current = currentPosition(el)
       const next = setElementPosition(el, { x: current.x + delta.x, y: current.y + delta.y })
-      onDragEnd?.(next)
+      onDragEndRef.current?.(next)
     },
-    [currentPosition, onDragEnd, setElementPosition],
+    [currentPosition, setElementPosition],
   )
 
   const style: CSSProperties | undefined = position
