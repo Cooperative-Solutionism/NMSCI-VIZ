@@ -1,4 +1,6 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import type {
@@ -104,6 +106,14 @@ vi.mock('@nmsci/sdk', async (importOriginal) => {
   }
 })
 
+function sourceExists(path: string): boolean {
+  return existsSync(join(process.cwd(), path))
+}
+
+function readSource(path: string): string {
+  return readFileSync(join(process.cwd(), path), 'utf8')
+}
+
 describe('App initial state', () => {
   afterEach(() => {
     cleanup()
@@ -144,6 +154,47 @@ describe('App initial state', () => {
     expect(screen.getByRole('tab', { name: '查询' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: '浏览' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: '密钥' })).toBeTruthy()
+  })
+
+  it('splits graph chrome into reusable panel content components', () => {
+    const graphPanel = readSource('src/features/network-explorer/components/GraphPanel.tsx')
+    expect(graphPanel).not.toContain('graph-welcome')
+    expect(graphPanel).not.toContain('metrics-strip')
+    expect(graphPanel).not.toContain('export-bar')
+    expect(graphPanel).not.toContain('探索消费网络')
+
+    expect(sourceExists('src/features/network-explorer/components/MetricsPanelContent.tsx')).toBe(
+      true,
+    )
+    expect(sourceExists('src/features/network-explorer/components/ExportPanelContent.tsx')).toBe(
+      true,
+    )
+    expect(sourceExists('src/features/network-explorer/components/SystemPanelContent.tsx')).toBe(
+      true,
+    )
+
+    const metricsPanel = sourceExists(
+      'src/features/network-explorer/components/MetricsPanelContent.tsx',
+    )
+      ? readSource('src/features/network-explorer/components/MetricsPanelContent.tsx')
+      : ''
+    const exportPanel = sourceExists(
+      'src/features/network-explorer/components/ExportPanelContent.tsx',
+    )
+      ? readSource('src/features/network-explorer/components/ExportPanelContent.tsx')
+      : ''
+    const systemPanel = sourceExists(
+      'src/features/network-explorer/components/SystemPanelContent.tsx',
+    )
+      ? readSource('src/features/network-explorer/components/SystemPanelContent.tsx')
+      : ''
+
+    expect(metricsPanel).toContain('MetricCard')
+    expect(metricsPanel).toContain('formatVolumeByCurrency')
+    expect(exportPanel).toContain('graphEdgeCount === 0')
+    expect(exportPanel).toContain('filteredRowCount === 0')
+    expect(exportPanel).toContain('void onCopyCurl()')
+    expect(systemPanel).toContain('SystemStatusStrip')
   })
 
   it('adds a flow node from the keys toolbar and persists it', async () => {
@@ -316,7 +367,13 @@ describe('App initial state', () => {
     expect(request.searchParams.get('nodeId')).toBeNull()
   })
 
-  it('lists looped chains and highlights one when selected from the loops panel', async () => {
+  it('lists looped chains outside the inspector and highlights one when selected', async () => {
+    const inspectorPanel = readSource('src/features/network-explorer/components/InspectorPanel.tsx')
+    const app = readSource('src/app/App.tsx')
+    expect(inspectorPanel).not.toContain('LoopsPanel')
+    expect(inspectorPanel).toContain('inspector-panel-content')
+    expect(app).toContain('LoopsPanel')
+
     stubFetchByUrl((url) => {
       if (url.pathname === '/consume-chains') {
         return jsonResponse(
@@ -346,12 +403,34 @@ describe('App initial state', () => {
     })
   })
 
-  it('shows onboarding guidance and disables export before any query', () => {
+  it('does not show the old graph welcome card and disables export before any query', () => {
     render(<App />)
 
-    expect(screen.getByText('探索消费网络')).toBeTruthy()
+    const graph = screen.getByRole('region', { name: '网络可视化' })
+    expect(within(graph).queryByText('探索消费网络')).toBeNull()
+    expect(graph.querySelector('.graph-panel-body')).toHaveStyle({
+      display: 'grid',
+      gridRow: '1 / -1',
+      minHeight: '0',
+    })
     expect(screen.getByRole('button', { name: /^csv$/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /^json$/i })).toBeDisabled()
+  })
+
+  it('keeps query tabs usable without the draggable query shell', () => {
+    render(<App />)
+
+    expect(screen.queryByRole('button', { name: /拖动控制台面板/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /打开控制台面板/ })).toBeNull()
+
+    openBrowseTab()
+    expect(screen.getByRole('button', { name: /浏览节点/ })).toBeTruthy()
+
+    openKeysTab()
+    expect(screen.getByRole('button', { name: /^流转节点$/ })).toBeTruthy()
+
+    openQueryTab()
+    expect(screen.getByLabelText('流转节点 ID / 公钥')).toBeTruthy()
   })
 
   it('opens transaction evidence for a selected edge', async () => {

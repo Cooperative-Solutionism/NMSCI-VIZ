@@ -3,7 +3,6 @@ import {
   EdgeInspector,
   ErrorBoundary,
   FlowNodeOperatePanel,
-  LoopsPanel,
   NodeInspector,
   TransactionMountForm,
   TransactionRecordForm,
@@ -36,13 +35,10 @@ export function InspectorPanel({
   localConsumeNodes,
   localNodeState,
   localTxRecords,
-  loops,
   nodeDetail,
   nodeActions,
-  onSelectLoop,
   registration,
   selectedChain,
-  selectedChainId,
   selectedEdge,
   selectedLocalConsumeNode,
   selectedLocalNode,
@@ -59,7 +55,6 @@ export function InspectorPanel({
   localConsumeNodes: LocalConsumeNode[]
   localNodeState: NodeDetail['nodeState']
   localTxRecords: LocalTxRecord[]
-  loops: ReturnType<typeof import('../../../lib/loops').extractLoops>
   nodeDetail: NodeDetail
   nodeActions: {
     handleCopyText: (value: string, label: string) => Promise<void>
@@ -71,19 +66,15 @@ export function InspectorPanel({
     handleRenameConsumeNode: () => void
     handleRenameLocalNode: () => void
   }
-  onSelectLoop: (chainId: string) => void
   registration: RegistrationController
   selectedChain: ConsumeChainResponseDTO | null
-  selectedChainId: string | null
   selectedEdge: ChainGraphEdge | null
   selectedLocalConsumeNode: LocalConsumeNode | null
   selectedLocalNode: LocalFlowNode | null
   selectedNode: ChainGraphNode | null
 }) {
   return (
-    <aside className="inspector-panel" aria-label="选择详情">
-      <LoopsPanel loops={loops} onSelectLoop={onSelectLoop} selectedChainId={selectedChainId} />
-
+    <div className="inspector-panel-content" aria-label="选择详情">
       <div className="inspector-heading">
         <h2>
           {selectedLocalNode
@@ -198,6 +189,6 @@ export function InspectorPanel({
           <div className="empty-state">{inspectorEmptyMessage}</div>
         )}
       </ErrorBoundary>
-    </aside>
+    </div>
   )
 }

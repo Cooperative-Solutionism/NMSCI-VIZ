@@ -76,9 +76,29 @@ describe('web interface guideline regressions', () => {
     expect(networkGraph).toContain('onKeyDown={handleCanvasKeyDown}')
     expect(networkGraph).not.toContain('role="menu"')
     expect(queryPanel).toContain("useUrlStateParam<LeftTab>('panel'")
-    expect(queryPanel).toContain("useUrlBooleanParam('panelCollapsed'")
-    expect(queryPanel).toContain('onKeyDown={handlePanelKeyDown}')
+    expect(queryPanel).not.toContain("useUrlBooleanParam('panelCollapsed'")
+    expect(queryPanel).not.toContain('onKeyDown={handlePanelKeyDown}')
+    expect(queryPanel).not.toContain('useDraggable')
+    expect(queryPanel).toContain('className="query-panel-content"')
     expect(nodeBrowser).toContain("useUrlBooleanParam('nodeBrowserOpen'")
+  })
+
+  it('keeps floating panel content split from fixed shells', () => {
+    const graphPanel = read('src/features/network-explorer/components/GraphPanel.tsx')
+    const inspectorPanel = read('src/features/network-explorer/components/InspectorPanel.tsx')
+    const queryPanel = read('src/features/network-explorer/components/QueryPanel.tsx')
+    const app = read('src/app/App.tsx')
+
+    expect(graphPanel).not.toContain('graph-welcome')
+    expect(graphPanel).not.toContain('metrics-strip')
+    expect(graphPanel).not.toContain('export-bar')
+    expect(queryPanel).not.toContain('floating-head')
+    expect(queryPanel).not.toContain('floating-reopen')
+    expect(inspectorPanel).not.toContain('LoopsPanel')
+    expect(inspectorPanel).toContain('className="inspector-panel-content"')
+    expect(app).toContain('MetricsPanelContent')
+    expect(app).toContain('ExportPanelContent')
+    expect(app).toContain('LoopsPanel')
   })
 
   it('exposes async status and errors through live regions', () => {
