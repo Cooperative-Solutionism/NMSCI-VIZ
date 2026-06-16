@@ -24,7 +24,7 @@ function positionFromInitial(initialX: number | undefined, initialY: number | un
   return initialX === undefined || initialY === undefined ? null : { x: initialX, y: initialY }
 }
 
-export function useDraggable({
+export function useDraggable<T extends HTMLElement = HTMLElement>({
   boundsRef,
   margin = 8,
   initialPosition = null,
@@ -33,7 +33,7 @@ export function useDraggable({
   const initialX = initialPosition?.x
   const initialY = initialPosition?.y
   const initialPoint = positionFromInitial(initialX, initialY)
-  const elementRef = useRef<HTMLElement | null>(null)
+  const elementRef = useRef<T | null>(null)
   const positionRef = useRef<Point | null>(initialPoint)
   const onDragEndRef = useRef(onDragEnd)
   const cleanupRef = useRef<(() => void) | null>(null)

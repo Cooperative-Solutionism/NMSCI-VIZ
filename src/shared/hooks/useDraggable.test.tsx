@@ -12,7 +12,7 @@ function DragProbe({
   initialPosition?: Point | null
   onDragEnd?: (position: Point) => void
 }) {
-  const { dragging, elementRef, nudgeBy, onPointerDown, style } = useDraggable({
+  const { dragging, elementRef, nudgeBy, onPointerDown, style } = useDraggable<HTMLDivElement>({
     initialPosition,
     onDragEnd,
   })
@@ -43,7 +43,7 @@ function BoundedDragProbe({
   onDragEnd?: (position: Point) => void
 }) {
   const boundsRef = useRef<HTMLDivElement>(null)
-  const { elementRef, nudgeBy, onPointerDown, style } = useDraggable({
+  const { elementRef, nudgeBy, onPointerDown, style } = useDraggable<HTMLDivElement>({
     boundsRef,
     initialPosition,
     onDragEnd,
