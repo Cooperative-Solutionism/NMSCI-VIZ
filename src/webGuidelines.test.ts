@@ -8,6 +8,11 @@ function read(path: string): string {
   return readFileSync(join(root, path), 'utf8')
 }
 
+function cssRule(css: string, selector: string): string {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`, 'm').exec(css)?.[1] ?? ''
+}
+
 function collectTsxFiles(dir = join(root, 'src')): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name)
@@ -99,6 +104,20 @@ describe('web interface guideline regressions', () => {
     expect(app).toContain('MetricsPanelContent')
     expect(app).toContain('ExportPanelContent')
     expect(app).toContain('LoopsPanel')
+  })
+
+  it('keeps query panel content scrollable inside the fixed shell', () => {
+    const appCss = read('src/App.css')
+    const contentRule = cssRule(appCss, '.query-panel-content')
+    const bodyRule = cssRule(appCss, '.query-panel-content .floating-body')
+
+    expect(contentRule).toContain('display: flex;')
+    expect(contentRule).toContain('flex-direction: column;')
+    expect(contentRule).toContain('min-height: 0;')
+    expect(contentRule).toContain('max-height: 100%;')
+    expect(bodyRule).toContain('flex: 1 1 auto;')
+    expect(bodyRule).toContain('min-height: 0;')
+    expect(bodyRule).toContain('overflow: auto;')
   })
 
   it('exposes async status and errors through live regions', () => {

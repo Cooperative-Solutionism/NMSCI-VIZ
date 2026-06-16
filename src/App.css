@@ -142,6 +142,13 @@
   overflow: hidden;
 }
 
+.query-panel-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 100%;
+}
+
 .query-panel.collapsed {
   display: none;
 }
@@ -259,6 +266,12 @@
   flex-direction: column;
   gap: 16px;
   padding: 16px 16px 18px;
+  overflow: auto;
+}
+
+.query-panel-content .floating-body {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
 }
 
