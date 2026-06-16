@@ -50,12 +50,7 @@ function BoundedDragProbe({
   })
   return (
     <div ref={boundsRef} data-testid="drag-bounds">
-      <div
-        ref={elementRef}
-        style={style}
-        onPointerDown={onPointerDown}
-        data-testid="drag-target"
-      >
+      <div ref={elementRef} style={style} onPointerDown={onPointerDown} data-testid="drag-target">
         <button type="button" onClick={() => nudgeBy({ x: 100, y: 100 })}>
           nudge beyond bounds
         </button>

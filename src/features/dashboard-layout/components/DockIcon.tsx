@@ -1,4 +1,9 @@
-import { useEffect, useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { useDraggable } from '../../../shared/hooks/useDraggable'
 import type { DashboardPoint } from '../dashboardLayout'
@@ -30,13 +35,7 @@ function samePosition(left: DashboardPoint, right: DashboardPoint) {
   return left.x === right.x && left.y === right.y
 }
 
-export function DockIcon({
-  label,
-  icon: Icon,
-  position,
-  onOpen,
-  onPositionChange,
-}: DockIconProps) {
+export function DockIcon({ label, icon: Icon, position, onOpen, onPositionChange }: DockIconProps) {
   const lastPositionRef = useRef(position)
   const pointerCleanupRef = useRef<(() => void) | null>(null)
   const suppressNextClickRef = useRef(false)
