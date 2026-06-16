@@ -74,10 +74,10 @@ export function DashboardWorkspace({ graph, panels }: DashboardWorkspaceProps) {
             key={panel.id}
             label={panel.label}
             icon={panel.icon}
-            position={panelLayout.dockPosition}
+            position={panelLayout.panelPosition}
             boundsRef={workspaceRef}
             onOpen={() => openPanel(panel.id)}
-            onPositionChange={(dockPosition) => updateLayout(panel.id, { dockPosition })}
+            onPositionChange={(panelPosition) => updateLayout(panel.id, { panelPosition })}
           />
         ) : (
           <FloatingPanel
