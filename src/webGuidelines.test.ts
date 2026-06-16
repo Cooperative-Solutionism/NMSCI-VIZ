@@ -196,6 +196,21 @@ describe('web interface guideline regressions', () => {
     expect(consumeQuery).not.toContain(forbiddenDtoName)
   })
 
+  it('uses shared fixed pagination constants for consume-chain requests and previews', () => {
+    const config = read('src/app/config.ts')
+    const chainGraph = read('src/lib/chainGraph.ts')
+    const consumeQuery = read('src/hooks/useConsumeChainQuery.ts')
+
+    expect(config).toContain('dashboardQueryPage')
+    expect(config).toContain('dashboardQuerySize')
+    expect(chainGraph).toContain('dashboardQueryPage')
+    expect(chainGraph).toContain('dashboardQuerySize')
+    expect(consumeQuery).toContain('dashboardQueryPage')
+    expect(consumeQuery).toContain('dashboardQuerySize')
+    expect(chainGraph).not.toContain('const consumeChainUrlPage')
+    expect(chainGraph).not.toContain('const consumeChainUrlSize')
+  })
+
   it('keeps loaded-result filter wording free of page labels', () => {
     const forbiddenCurrentPageLabel = '当前' + '页'
     const forbiddenCnPageControlsLabel = '分' + '页'

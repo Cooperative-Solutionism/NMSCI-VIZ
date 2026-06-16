@@ -1,6 +1,6 @@
 import { ApiClient, normalizeConsumeChainResponseDTO, queryConsumeChains } from '@nmsci/sdk'
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { dashboardQuerySize } from '../app/config'
+import { dashboardQueryPage, dashboardQuerySize } from '../app/config'
 import {
   buildConsumeChainUrl,
   buildGraphFromConsumeChains,
@@ -22,11 +22,9 @@ export type Selection = { kind: 'node'; id: string } | { kind: 'edge'; id: strin
 export type DataOrigin = 'idle' | 'backend'
 type RunQueryOverride = { mode: QueryMode; nodeId: string }
 
-const fixedConsumeChainQueryPage = 0
-const fixedConsumeChainQuerySize = dashboardQuerySize
 const fixedConsumeChainQueryPageRequest = {
-  page: fixedConsumeChainQueryPage,
-  size: fixedConsumeChainQuerySize,
+  page: dashboardQueryPage,
+  size: dashboardQuerySize,
 }
 
 export function useConsumeChainQuery(apiBase: string) {

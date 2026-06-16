@@ -12,9 +12,12 @@ type DockIconProps = {
   label: string
   icon: LucideIcon
   position: DashboardPoint
+  boundsRef?: { current: HTMLElement | null }
   onOpen: () => void
   onPositionChange: (position: DashboardPoint) => void
 }
+
+const dragIntentThreshold = 4
 
 function arrowKeyDelta(key: string): DashboardPoint | null {
   switch (key) {
@@ -35,7 +38,14 @@ function samePosition(left: DashboardPoint, right: DashboardPoint) {
   return left.x === right.x && left.y === right.y
 }
 
-export function DockIcon({ label, icon: Icon, position, onOpen, onPositionChange }: DockIconProps) {
+export function DockIcon({
+  label,
+  icon: Icon,
+  position,
+  boundsRef,
+  onOpen,
+  onPositionChange,
+}: DockIconProps) {
   const lastPositionRef = useRef(position)
   const pointerCleanupRef = useRef<(() => void) | null>(null)
   const suppressNextClickRef = useRef(false)
@@ -46,6 +56,7 @@ export function DockIcon({ label, icon: Icon, position, onOpen, onPositionChange
     onPositionChange(next)
   }
   const { elementRef, nudgeBy, onPointerDown, style } = useDraggable<HTMLButtonElement>({
+    boundsRef,
     initialPosition: position,
     onDragEnd: handlePositionChange,
   })
@@ -73,7 +84,9 @@ export function DockIcon({ label, icon: Icon, position, onOpen, onPositionChange
 
     const handleMove = (move: PointerEvent) => {
       if (moved) return
-      if (move.clientX === start.x && move.clientY === start.y) return
+      const deltaX = move.clientX - start.x
+      const deltaY = move.clientY - start.y
+      if (Math.hypot(deltaX, deltaY) < dragIntentThreshold) return
 
       moved = true
       suppressNextClickRef.current = true

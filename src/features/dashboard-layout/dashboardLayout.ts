@@ -13,6 +13,11 @@ export type DashboardPanelLayout = {
 
 export type DashboardLayoutState = Record<DashboardPanelId, DashboardPanelLayout>
 
+export type DashboardBounds = {
+  width: number
+  height: number
+}
+
 export const DASHBOARD_LAYOUT_STORAGE_KEY = 'nmsci.dashboard.layout.v1'
 
 export const dashboardPanelIds: DashboardPanelId[] = [
@@ -73,26 +78,23 @@ function clampCoordinate(value: number, max: number): number {
   return Math.min(Math.max(value, 0), Math.max(max, 0))
 }
 
-function clampPoint(
-  point: DashboardPoint,
-  bounds: { width: number; height: number },
-  reservedSize: number,
-): DashboardPoint {
+const dockReservedSize = { width: 48, height: 48 }
+const panelReservedSize = { width: 280, height: 48 }
+
+function clampPoint(point: DashboardPoint, bounds: DashboardBounds, reservedSize: DashboardBounds) {
   return {
-    x: clampCoordinate(point.x, bounds.width - reservedSize),
-    y: clampCoordinate(point.y, bounds.height - reservedSize),
+    x: clampCoordinate(point.x, bounds.width - reservedSize.width),
+    y: clampCoordinate(point.y, bounds.height - reservedSize.height),
   }
 }
 
-function shouldClamp(
-  bounds: { width: number; height: number } | undefined,
-): bounds is { width: number; height: number } {
+function shouldClamp(bounds: DashboardBounds | undefined): bounds is DashboardBounds {
   return Boolean(bounds && Number.isFinite(bounds.width) && Number.isFinite(bounds.height))
 }
 
 export const normalizeDashboardLayout = (
   input: unknown,
-  bounds?: { width: number; height: number },
+  bounds?: DashboardBounds,
 ): DashboardLayoutState => {
   const source = isRecord(input) ? input : {}
 
@@ -114,8 +116,8 @@ export const normalizeDashboardLayout = (
     layout[panelId] = shouldClamp(bounds)
       ? {
           ...normalizedPanel,
-          dockPosition: clampPoint(normalizedPanel.dockPosition, bounds, 48),
-          panelPosition: clampPoint(normalizedPanel.panelPosition, bounds, 0),
+          dockPosition: clampPoint(normalizedPanel.dockPosition, bounds, dockReservedSize),
+          panelPosition: clampPoint(normalizedPanel.panelPosition, bounds, panelReservedSize),
         }
       : normalizedPanel
 
@@ -123,22 +125,29 @@ export const normalizeDashboardLayout = (
   }, {} as DashboardLayoutState)
 }
 
-export const loadDashboardLayout = (storage?: Storage): DashboardLayoutState => {
+export const loadDashboardLayout = (
+  storage?: Storage,
+  bounds?: DashboardBounds,
+): DashboardLayoutState => {
   try {
     const targetStorage = storage ?? window.localStorage
     const rawLayout = targetStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY)
-    return normalizeDashboardLayout(rawLayout ? JSON.parse(rawLayout) : undefined)
+    return normalizeDashboardLayout(rawLayout ? JSON.parse(rawLayout) : undefined, bounds)
   } catch {
-    return normalizeDashboardLayout(undefined)
+    return normalizeDashboardLayout(undefined, bounds)
   }
 }
 
-export const saveDashboardLayout = (layout: DashboardLayoutState, storage?: Storage): void => {
+export const saveDashboardLayout = (
+  layout: DashboardLayoutState,
+  storage?: Storage,
+  bounds?: DashboardBounds,
+): void => {
   try {
     const targetStorage = storage ?? window.localStorage
     targetStorage.setItem(
       DASHBOARD_LAYOUT_STORAGE_KEY,
-      JSON.stringify(normalizeDashboardLayout(layout)),
+      JSON.stringify(normalizeDashboardLayout(layout, bounds)),
     )
   } catch {
     return
@@ -149,11 +158,15 @@ export const updatePanelLayout = (
   layout: DashboardLayoutState,
   panelId: DashboardPanelId,
   patch: Partial<DashboardPanelLayout>,
+  bounds?: DashboardBounds,
 ): DashboardLayoutState =>
-  normalizeDashboardLayout({
-    ...layout,
-    [panelId]: {
-      ...layout[panelId],
-      ...patch,
+  normalizeDashboardLayout(
+    {
+      ...layout,
+      [panelId]: {
+        ...layout[panelId],
+        ...patch,
+      },
     },
-  })
+    bounds,
+  )

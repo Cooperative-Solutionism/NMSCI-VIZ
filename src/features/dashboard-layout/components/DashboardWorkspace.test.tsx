@@ -1,36 +1,60 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { DASHBOARD_LAYOUT_STORAGE_KEY, defaultDashboardLayout } from '../dashboardLayout'
 import { dashboardPanelIcons, type DashboardPanelConfig } from '../panelRegistry'
 import { DashboardWorkspace } from './DashboardWorkspace'
+
+const queryLabel = '\u67e5\u8be2'
+const detailsLabel = '\u8be6\u60c5'
+const graphText = '\u4ea4\u6613\u56fe\u8c31'
+const queryContent = '\u67e5\u8be2\u6761\u4ef6'
+const detailsContent = '\u8282\u70b9\u8be6\u60c5'
+const openQueryName = /\u6253\u5f00\u67e5\u8be2\u9762\u677f/
+const openDetailsName = /\u6253\u5f00\u8be6\u60c5\u9762\u677f/
+const collapseQueryName = /\u6298\u53e0\u67e5\u8be2\u9762\u677f/
+const moveQueryName = /\u79fb\u52a8\u67e5\u8be2\u9762\u677f/
 
 function panels(): DashboardPanelConfig[] {
   return [
     {
       id: 'query',
-      label: '查询',
+      label: queryLabel,
       icon: dashboardPanelIcons.query,
-      content: <p>查询条件</p>,
+      content: <p>{queryContent}</p>,
     },
     {
       id: 'details',
-      label: '详情',
+      label: detailsLabel,
       icon: dashboardPanelIcons.details,
-      content: <p>节点详情</p>,
+      content: <p>{detailsContent}</p>,
     },
   ]
 }
 
 function renderWorkspace() {
-  return render(<DashboardWorkspace graph={<div>交易图谱</div>} panels={panels()} />)
+  return render(<DashboardWorkspace graph={<div>{graphText}</div>} panels={panels()} />)
 }
 
 function storedLayout() {
   return JSON.parse(window.localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY) ?? '{}')
 }
 
+function mockDimension(
+  element: HTMLElement,
+  property: 'clientWidth' | 'clientHeight' | 'offsetWidth' | 'offsetHeight',
+  value: number,
+) {
+  Object.defineProperty(element, property, { configurable: true, value })
+}
+
+function mockWindowSize(width: number, height: number) {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: width })
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: height })
+}
+
 beforeEach(() => {
   window.localStorage.clear()
+  mockWindowSize(1024, 768)
 })
 
 afterEach(cleanup)
@@ -40,31 +64,41 @@ describe('DashboardWorkspace', () => {
     renderWorkspace()
 
     expect(screen.getByRole('main')).toHaveClass('dashboard-workspace')
-    expect(screen.getByText('交易图谱').parentElement).toHaveClass('dashboard-graph')
-    expect(screen.getByRole('button', { name: '打开查询面板' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '打开详情面板' })).toBeInTheDocument()
+    expect(screen.getByText(graphText).parentElement).toHaveClass('dashboard-graph')
+    expect(screen.getByRole('button', { name: openQueryName })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: openDetailsName })).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('opens a docked query panel and persists the expanded layout', () => {
     renderWorkspace()
 
-    fireEvent.click(screen.getByRole('button', { name: '打开查询面板' }))
+    fireEvent.click(screen.getByRole('button', { name: openQueryName }))
 
-    expect(screen.queryByRole('button', { name: '打开查询面板' })).not.toBeInTheDocument()
-    expect(screen.getByRole('dialog', { name: '查询' })).toBeInTheDocument()
-    expect(screen.getByText('查询条件')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: openQueryName })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: queryLabel })).toBeInTheDocument()
+    expect(screen.getByText(queryContent)).toBeInTheDocument()
     expect(storedLayout().query.collapsed).toBe(false)
+  })
+
+  it('moves focus to the opened panel after activating a dock entry', () => {
+    renderWorkspace()
+
+    const queryDock = screen.getByRole('button', { name: openQueryName })
+    queryDock.focus()
+    fireEvent.click(queryDock)
+
+    expect(screen.getByRole('dialog', { name: queryLabel })).toHaveFocus()
   })
 
   it('collapses an expanded query panel and persists the collapsed layout', () => {
     renderWorkspace()
-    fireEvent.click(screen.getByRole('button', { name: '打开查询面板' }))
+    fireEvent.click(screen.getByRole('button', { name: openQueryName }))
 
-    fireEvent.click(screen.getByRole('button', { name: '折叠查询面板' }))
+    fireEvent.click(screen.getByRole('button', { name: collapseQueryName }))
 
-    expect(screen.getByRole('button', { name: '打开查询面板' })).toBeInTheDocument()
-    expect(screen.queryByRole('dialog', { name: '查询' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: openQueryName })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: queryLabel })).not.toBeInTheDocument()
     expect(storedLayout().query.collapsed).toBe(true)
   })
 
@@ -82,14 +116,35 @@ describe('DashboardWorkspace', () => {
 
     renderWorkspace()
 
-    expect(screen.getByRole('dialog', { name: '查询' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '打开查询面板' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: queryLabel })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: openQueryName })).not.toBeInTheDocument()
+  })
+
+  it('clamps saved panel positions to the viewport on first render', () => {
+    mockWindowSize(320, 240)
+    window.localStorage.setItem(
+      DASHBOARD_LAYOUT_STORAGE_KEY,
+      JSON.stringify({
+        ...defaultDashboardLayout,
+        details: {
+          ...defaultDashboardLayout.details,
+          collapsed: false,
+        },
+      }),
+    )
+
+    renderWorkspace()
+
+    expect(screen.getByRole('dialog', { name: detailsLabel })).toHaveStyle({
+      left: '40px',
+      top: '80px',
+    })
   })
 
   it('persists dockPosition changes from arrow nudging a dock icon', () => {
     renderWorkspace()
 
-    fireEvent.keyDown(screen.getByRole('button', { name: '打开查询面板' }), {
+    fireEvent.keyDown(screen.getByRole('button', { name: openQueryName }), {
       key: 'ArrowRight',
     })
 
@@ -99,7 +154,7 @@ describe('DashboardWorkspace', () => {
 
   it('persists dockPosition changes from dragging a dock icon', () => {
     renderWorkspace()
-    const queryDock = screen.getByRole('button', { name: '打开查询面板' })
+    const queryDock = screen.getByRole('button', { name: openQueryName })
 
     fireEvent.pointerDown(queryDock, { button: 0, clientX: 100, clientY: 200 })
     fireEvent.pointerMove(window, { clientX: 118, clientY: 225 })
@@ -109,11 +164,29 @@ describe('DashboardWorkspace', () => {
     expect(storedLayout().query.collapsed).toBe(true)
   })
 
+  it('clamps dock drags to workspace bounds before saving', () => {
+    renderWorkspace()
+    const workspace = screen.getByRole('main')
+    const queryDock = screen.getByRole('button', { name: openQueryName })
+
+    mockDimension(workspace, 'clientWidth', 100)
+    mockDimension(workspace, 'clientHeight', 90)
+    mockDimension(queryDock, 'offsetWidth', 44)
+    mockDimension(queryDock, 'offsetHeight', 44)
+
+    fireEvent.pointerDown(queryDock, { button: 0, clientX: 0, clientY: 0 })
+    fireEvent.pointerMove(window, { clientX: 1000, clientY: 1000 })
+    fireEvent.pointerUp(window)
+
+    expect(storedLayout().query.dockPosition).toEqual({ x: 48, y: 38 })
+    expect(storedLayout().query.collapsed).toBe(true)
+  })
+
   it('persists panelPosition changes from arrow nudging a floating panel handle', () => {
     renderWorkspace()
-    fireEvent.click(screen.getByRole('button', { name: '打开查询面板' }))
+    fireEvent.click(screen.getByRole('button', { name: openQueryName }))
 
-    fireEvent.keyDown(screen.getByRole('button', { name: '移动查询面板' }), {
+    fireEvent.keyDown(screen.getByRole('button', { name: moveQueryName }), {
       key: 'ArrowDown',
     })
 

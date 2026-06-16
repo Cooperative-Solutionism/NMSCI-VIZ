@@ -70,6 +70,7 @@ export function useDraggable<T extends HTMLElement = HTMLElement>({
     (element: HTMLElement, next: Point): Point => {
       const bounds = boundsRef?.current
       if (!bounds) return next
+      if (bounds.clientWidth <= 0 || bounds.clientHeight <= 0) return next
       const maxX = Math.max(margin, bounds.clientWidth - element.offsetWidth - margin)
       const maxY = Math.max(margin, bounds.clientHeight - element.offsetHeight - margin)
       return {

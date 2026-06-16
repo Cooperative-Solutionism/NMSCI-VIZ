@@ -111,7 +111,14 @@ describe('dashboard layout state', () => {
     )
 
     expect(layout.query.dockPosition).toEqual({ x: 52, y: 22 })
-    expect(layout.query.panelPosition).toEqual({ x: 0, y: 70 })
+    expect(layout.query.panelPosition).toEqual({ x: 0, y: 22 })
+  })
+
+  it('keeps default right-side panels visible on narrow viewports', () => {
+    const layout = normalizeDashboardLayout(undefined, { width: 320, height: 240 })
+
+    expect(layout.details.panelPosition).toEqual({ x: 40, y: 80 })
+    expect(layout.loops.panelPosition).toEqual({ x: 40, y: 192 })
   })
 
   it('falls back to defaults for empty, invalid, or unreadable storage', () => {

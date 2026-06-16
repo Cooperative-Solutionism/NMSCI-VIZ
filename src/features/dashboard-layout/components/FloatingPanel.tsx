@@ -7,7 +7,10 @@ type FloatingPanelProps = {
   title: string
   position: DashboardPoint
   children: ReactNode
+  boundsRef?: { current: HTMLElement | null }
+  focusOnMount?: boolean
   onCollapse: () => void
+  onFocusMount?: () => void
   onPositionChange: (position: DashboardPoint) => void
 }
 
@@ -30,7 +33,10 @@ export function FloatingPanel({
   title,
   position,
   children,
+  boundsRef,
+  focusOnMount = false,
   onCollapse,
+  onFocusMount,
   onPositionChange,
 }: FloatingPanelProps) {
   const titleId = useId()
@@ -43,9 +49,17 @@ export function FloatingPanel({
     onPositionChange(next)
   }
   const { elementRef, nudgeBy, onPointerDown, style } = useDraggable<HTMLElement>({
+    boundsRef,
     initialPosition: position,
     onDragEnd: handlePositionChange,
   })
+
+  useEffect(() => {
+    if (!focusOnMount) return
+
+    elementRef.current?.focus({ preventScroll: true })
+    onFocusMount?.()
+  }, [elementRef, focusOnMount, onFocusMount])
 
   useEffect(() => {
     lastPositionRef.current = position
@@ -66,6 +80,7 @@ export function FloatingPanel({
       style={style}
       role="dialog"
       aria-labelledby={titleId}
+      tabIndex={-1}
     >
       <div className="floating-panel__header">
         <button
