@@ -269,7 +269,6 @@ describe('App initial state', () => {
 
     expect(container.querySelector('[name="page"]')).toBeNull()
     expect(container.querySelector('[name="size"]')).toBeNull()
-    expect(container.querySelector('.footerbar')).toBeNull()
     expect(screen.queryByRole('button', { name: /上一页/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /下一页/ })).toBeNull()
   })
@@ -302,7 +301,7 @@ describe('App initial state', () => {
     expect(request.searchParams.get('size')).toBe('200')
   })
 
-  it('labels currency as a current-page filter and reports visible row counts', async () => {
+  it('labels currency as a loaded-result filter and reports visible row counts', async () => {
     stubFetchByUrl((url) => {
       if (url.pathname === '/consume-chains') {
         return jsonResponse(
@@ -321,11 +320,11 @@ describe('App initial state', () => {
     fireEvent.change(screen.getByLabelText(/币种/), { target: { value: '1' } })
     fireEvent.click(screen.getByRole('button', { name: /^加载$/ }))
 
-    await screen.findByText(/当前页视图过滤/)
+    await screen.findByText(/已加载结果视图过滤/)
     expect(screen.getByText(/查询完成：当前可见 1 行/)).toBeTruthy()
   })
 
-  it('does not render pagination after an extended graph merge', async () => {
+  it('does not render page controls after an extended graph merge', async () => {
     stubFetchByUrl((url) => {
       if (url.pathname === '/consume-chains' && url.searchParams.get('nodeId') === 'node-1') {
         return jsonResponse(sliceResponse([chainRow('chain-cny', 1)], { hasNext: true }))
@@ -804,7 +803,7 @@ function stubFetchByUrl(
     const rawUrl = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
     const url = new URL(rawUrl, 'http://localhost')
     if (url.pathname.startsWith('/api/')) {
-      url.pathname = url.pathname.slice('/api'.length)
+      url.pathname = url.pathname.substring('/api'.length)
     }
     // App 挂载即拉取系统状态；统一给个默认（未冻结）响应。
     if (url.pathname === '/system/status') {

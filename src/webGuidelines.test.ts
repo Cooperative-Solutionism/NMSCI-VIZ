@@ -122,12 +122,16 @@ describe('web interface guideline regressions', () => {
     expect(bodyRule).toContain('overflow: auto;')
   })
 
-  it('keeps pagination arguments out of consume-chain query APIs', () => {
+  it('keeps page arguments out of consume-chain query APIs', () => {
     const forbiddenDefaultSizeName = 'default' + 'PageSize'
     const forbiddenTargetPageName = 'target' + 'Page'
     const forbiddenNumericQueryCall = new RegExp('run' + 'Query\\(\\s*\\d')
     const forbiddenPageProperty = 'page' + ':'
     const forbiddenSizeProperty = 'size' + ':'
+    const forbiddenSetStateName = 'set' + 'Slice'
+    const forbiddenFactoryName = 'make' + 'Slice'
+    const forbiddenDtoName = 'Slice' + 'ResponseDTO'
+    const forbiddenReturnEntry = 'sli' + 'ce,'
     const types = read('src/lib/types.ts')
     const chainGraph = read('src/lib/chainGraph.ts')
     const consumeQuery = read('src/hooks/useConsumeChainQuery.ts')
@@ -157,6 +161,34 @@ describe('web interface guideline regressions', () => {
     expect(chainGraph).not.toContain('query' + '.size')
     expect(hookReturnBody).not.toContain(forbiddenPageProperty)
     expect(hookReturnBody).not.toContain(forbiddenSizeProperty)
+    expect(hookReturnBody).not.toContain(forbiddenReturnEntry)
+    expect(consumeQuery).not.toContain(forbiddenSetStateName)
+    expect(consumeQuery).not.toContain(forbiddenFactoryName)
+    expect(consumeQuery).not.toContain(forbiddenDtoName)
+  })
+
+  it('keeps loaded-result filter wording free of page labels', () => {
+    const forbiddenCurrentPageLabel = '当前' + '页'
+    const forbiddenCnPageControlsLabel = '分' + '页'
+
+    for (const file of [
+      'src/features/network-explorer/components/QueryPanel.tsx',
+      'src/features/network-explorer/hooks/useNetworkExplorerController.ts',
+      'src/App.test.tsx',
+    ]) {
+      const text = read(file)
+      expect(text, file).not.toContain(forbiddenCurrentPageLabel)
+      expect(text, file).not.toContain(forbiddenCnPageControlsLabel)
+    }
+  })
+
+  it('keeps retired page-control CSS selectors removed', () => {
+    const appCss = read('src/App.css')
+    const footerSelector = '.footer' + 'bar'
+    const pagerSelector = '.pagina' + 'tion'
+
+    expect(appCss).not.toContain(footerSelector)
+    expect(appCss).not.toContain(pagerSelector)
   })
 
   it('exposes async status and errors through live regions', () => {

@@ -42,7 +42,7 @@ export function useNetworkExplorerController(apiBase: string) {
     query.origin === 'idle'
       ? '运行查询以探索消费网络。'
       : query.filteredRows.length === 0 && query.rows.length > 0
-        ? `当前页过滤隐藏了 ${query.rows.length} 行。`
+        ? `筛选条件隐藏了 ${query.rows.length} 行。`
         : '没有匹配的链路。可尝试循环状态“全部”或切换模式。'
 
   return {

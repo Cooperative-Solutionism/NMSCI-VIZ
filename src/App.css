@@ -912,51 +912,6 @@
   padding: 8px 10px;
 }
 
-.footerbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  min-height: 50px;
-  border-top: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.86);
-  color: var(--muted);
-  padding: 8px 18px;
-}
-
-.footerbar > div {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-  gap: 8px;
-}
-
-.footer-label {
-  color: var(--text);
-  font-weight: 850;
-}
-
-.pagination {
-  white-space: nowrap;
-}
-
-.pagination button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text);
-}
-
-.pagination button:disabled {
-  color: var(--line-strong);
-  background: var(--surface-muted);
-}
-
 @media (max-width: 1180px) {
   .workspace {
     grid-template-columns: minmax(0, 1fr);
@@ -982,14 +937,12 @@
     overflow: visible;
   }
 
-  .topbar,
-  .footerbar {
+  .topbar {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .topbar-status,
-  .footerbar > div {
+  .topbar-status {
     flex-wrap: wrap;
     justify-content: flex-start;
     white-space: normal;

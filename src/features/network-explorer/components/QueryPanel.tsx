@@ -198,7 +198,7 @@ export function QueryPanel({
                   <option value="1">CNY</option>
                   <option value="0">Au 微克</option>
                 </select>
-                <span className="field-hint">当前页视图过滤</span>
+                <span className="field-hint">已加载结果视图过滤</span>
               </Field>
             </div>
 

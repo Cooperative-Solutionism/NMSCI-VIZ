@@ -15,7 +15,6 @@ import type {
   ConsumeChainResponseDTORaw,
   LoopStatus,
   QueryMode,
-  SliceResponseDTO,
 } from '../lib/types'
 
 export type CurrencyFilter = 'all' | '1' | '0'
@@ -25,7 +24,6 @@ type RunQueryOverride = { mode: QueryMode; nodeId: string }
 
 const fixedConsumeChainQueryPage = 0
 const fixedConsumeChainQuerySize = dashboardQuerySize
-const initialConsumeChainSlicePage = 0
 const fixedConsumeChainQueryPageRequest = {
   page: fixedConsumeChainQueryPage,
   size: fixedConsumeChainQuerySize,
@@ -37,9 +35,6 @@ export function useConsumeChainQuery(apiBase: string) {
   const [loopStatus, setLoopStatus] = useState<LoopStatus>('all')
   const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>('all')
   const [rows, setRows] = useState<ConsumeChainResponseDTO[]>([])
-  const [slice, setSlice] = useState<SliceResponseDTO<ConsumeChainResponseDTO>>(
-    makeSlice([], dashboardQuerySize),
-  )
   const [selection, setSelection] = useState<Selection | null>(null)
   const [origin, setOrigin] = useState<DataOrigin>('idle')
   const [loading, setLoading] = useState(false)
@@ -64,8 +59,8 @@ export function useConsumeChainQuery(apiBase: string) {
     setExtended(false)
   }, [])
 
-  // currencyFilter 是「当前页视图过滤」：仅在已取回的 rows 上客户端过滤，不下推后端（/consume-chains 无 currency 参数），
-  // 也不随翻页/extend 自动重置——下一次 runQuery 取回干净数据时才回到全量口径。
+  // currencyFilter 是「已加载结果视图过滤」：仅在已取回的 rows 上客户端过滤，不下推后端（/consume-chains 无 currency 参数）。
+  // 下一次 runQuery 取回干净数据时才回到全量口径。
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
       const currencyMatches =
@@ -137,7 +132,6 @@ export function useConsumeChainQuery(apiBase: string) {
         if (generation !== graphRequestGenerationRef.current) return
         const { content, skipped } = normalizeRowsSafely(result.data.content)
         setRows(content)
-        setSlice({ ...result.data, content })
         setOrigin('backend')
         setSelection(null)
         setExtended(false)
@@ -174,7 +168,6 @@ export function useConsumeChainQuery(apiBase: string) {
         if (generation !== graphRequestGenerationRef.current) return
         const { content, skipped } = normalizeRowsSafely(result.data.content)
         setRows((currentRows) => mergeConsumeChains(currentRows, content))
-        setSlice({ ...result.data, content })
         setOrigin('backend')
         setExtended(true)
         setWarning(skipWarning(skipped))
@@ -225,22 +218,7 @@ export function useConsumeChainQuery(apiBase: string) {
     setLoopStatus: changeLoopStatus,
     setMode: changeMode,
     setNodeId: changeNodeId,
-    slice,
     warning,
-  }
-}
-
-function makeSlice(
-  rows: ConsumeChainResponseDTO[],
-  sliceSize: number,
-): SliceResponseDTO<ConsumeChainResponseDTO> {
-  return {
-    content: rows,
-    page: initialConsumeChainSlicePage,
-    size: sliceSize,
-    numberOfElements: rows.length,
-    hasNext: false,
-    hasPrevious: false,
   }
 }
 
