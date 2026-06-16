@@ -262,12 +262,23 @@ describe('App initial state', () => {
     expect(screen.queryByText(/最新区块未包含 registerDifficultyTarget/)).toBeNull()
   })
 
-  it('loads changed filters from the first page even when the page input is stale', async () => {
+  it('does not render fixed page or size controls', () => {
+    const { container } = render(<App />)
+
+    expect(container.querySelector('[name="page"]')).toBeNull()
+    expect(container.querySelector('[name="size"]')).toBeNull()
+    expect(container.querySelector('.footerbar')).toBeNull()
+    expect(screen.queryByRole('button', { name: /上一页/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /下一页/ })).toBeNull()
+  })
+
+  it('loads queries with fixed first page and dashboard size', async () => {
     const fetchMock = stubFetchByUrl((url) => {
       if (url.pathname === '/consume-chains') {
         return jsonResponse(
           sliceResponse([chainRow('chain-cny', 1)], {
             page: Number(url.searchParams.get('page')),
+            size: Number(url.searchParams.get('size')),
             hasNext: false,
           }),
         )
@@ -279,7 +290,6 @@ describe('App initial state', () => {
     fireEvent.change(screen.getByLabelText('流转节点 ID / 公钥'), {
       target: { value: 'node-1' },
     })
-    fireEvent.change(screen.getByLabelText('页码'), { target: { value: '7' } })
     fireEvent.click(screen.getByRole('button', { name: /^加载$/ }))
 
     await waitFor(() => {
@@ -287,6 +297,7 @@ describe('App initial state', () => {
     })
     const request = new URL(String(fetchMock.mock.calls[0]![0]), 'http://localhost')
     expect(request.searchParams.get('page')).toBe('0')
+    expect(request.searchParams.get('size')).toBe('200')
   })
 
   it('labels currency as a current-page filter and reports visible row counts', async () => {
@@ -310,10 +321,10 @@ describe('App initial state', () => {
     fireEvent.click(screen.getByRole('button', { name: /^加载$/ }))
 
     await screen.findByText(/当前页视图过滤/)
-    expect(screen.getByText(/可见 1 行 \/ 后端 2 行/)).toBeTruthy()
+    expect(screen.getByText(/查询完成：当前可见 1 行/)).toBeTruthy()
   })
 
-  it('does not allow pagination after an extended graph merge', async () => {
+  it('does not render pagination after an extended graph merge', async () => {
     stubFetchByUrl((url) => {
       if (url.pathname === '/consume-chains' && url.searchParams.get('nodeId') === 'node-1') {
         return jsonResponse(sliceResponse([chainRow('chain-cny', 1)], { page: 0, hasNext: true }))
@@ -340,10 +351,8 @@ describe('App initial state', () => {
     fireEvent.click(await screen.findByRole('button', { name: /select node node-a/i }))
     fireEvent.click(await screen.findByRole('button', { name: /扩展起点/ }))
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /下一页/ })).toBeDisabled()
-    })
-    expect(screen.getByText(/已扩展图谱视图/)).toBeTruthy()
+    expect(await screen.findByText(/已扩展图谱视图/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /下一页/ })).toBeNull()
   })
 
   it('queries by public key when a 66-hex value is entered', async () => {

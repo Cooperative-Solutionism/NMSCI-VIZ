@@ -41,15 +41,11 @@ export function QueryPanel({
   onSetLoopStatus,
   onSetMode,
   onSetNodeId,
-  onSetPage,
-  onSetSize,
   onSetupVault,
   onUnlockVault,
-  page,
   registrationError,
   requestUrl,
   showKeyringError,
-  size,
   vaultError,
   vaultStatus,
   warning,
@@ -68,20 +64,16 @@ export function QueryPanel({
   onImportLocalNode: () => void
   onLockVault: () => void
   onPickNode: (pubkey: string) => void
-  onRunQuery: (page: number) => Promise<void>
+  onRunQuery: () => Promise<void>
   onSetCurrencyFilter: (filter: CurrencyFilter) => void
   onSetLoopStatus: (status: LoopStatus) => void
   onSetMode: (mode: QueryMode) => void
   onSetNodeId: (nodeId: string) => void
-  onSetPage: (page: number) => void
-  onSetSize: (size: number) => void
   onSetupVault: (passphrase: string) => void
   onUnlockVault: (passphrase: string) => void
-  page: number
   registrationError: string | null
   requestUrl: string
   showKeyringError: boolean
-  size: number
   vaultError: string | null
   vaultStatus: VaultStatus
   warning: string | null
@@ -208,29 +200,6 @@ export function QueryPanel({
                 </select>
                 <span className="field-hint">当前页视图过滤</span>
               </Field>
-              <Field label="页码">
-                <input
-                  name="page"
-                  autoComplete="off"
-                  inputMode="numeric"
-                  min={0}
-                  type="number"
-                  value={page}
-                  onChange={(event) => onSetPage(Math.max(0, Number(event.currentTarget.value)))}
-                />
-              </Field>
-              <Field label="每页数量">
-                <input
-                  name="size"
-                  autoComplete="off"
-                  inputMode="numeric"
-                  min={1}
-                  max={200}
-                  type="number"
-                  value={size}
-                  onChange={(event) => onSetSize(Number(event.currentTarget.value))}
-                />
-              </Field>
             </div>
 
             <div className="action-row">
@@ -239,7 +208,7 @@ export function QueryPanel({
                 type="button"
                 disabled={loading || nodeId.trim().length === 0}
                 aria-describedby={nodeId.trim().length === 0 ? 'load-disabled-reason' : undefined}
-                onClick={() => void onRunQuery(0)}
+                onClick={() => void onRunQuery()}
               >
                 <Search size={16} />
                 {loading ? '加载中…' : '加载'}

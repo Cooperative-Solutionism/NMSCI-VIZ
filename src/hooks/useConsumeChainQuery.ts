@@ -1,5 +1,6 @@
 import { ApiClient, normalizeConsumeChainResponseDTO, queryConsumeChains } from '@nmsci/sdk'
 import { useCallback, useMemo, useRef, useState } from 'react'
+import { dashboardQuerySize } from '../app/config'
 import {
   buildConsumeChainUrl,
   buildGraphFromConsumeChains,
@@ -20,17 +21,17 @@ import type {
 export type CurrencyFilter = 'all' | '1' | '0'
 export type Selection = { kind: 'node'; id: string } | { kind: 'edge'; id: string }
 export type DataOrigin = 'idle' | 'backend'
+type RunQueryOverride = { mode: QueryMode; nodeId: string }
 
-export function useConsumeChainQuery(apiBase: string, defaultPageSize: number) {
+export function useConsumeChainQuery(apiBase: string, defaultPageSize?: number) {
+  void defaultPageSize
   const [mode, setMode] = useState<QueryMode>('node')
   const [nodeId, setNodeId] = useState('')
   const [loopStatus, setLoopStatus] = useState<LoopStatus>('all')
   const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>('all')
-  const [page, setPage] = useState(0)
-  const [size, setSize] = useState(defaultPageSize)
   const [rows, setRows] = useState<ConsumeChainResponseDTO[]>([])
   const [slice, setSlice] = useState<SliceResponseDTO<ConsumeChainResponseDTO>>(
-    makeSlice([], defaultPageSize),
+    makeSlice([], dashboardQuerySize),
   )
   const [selection, setSelection] = useState<Selection | null>(null)
   const [origin, setOrigin] = useState<DataOrigin>('idle')
@@ -97,34 +98,37 @@ export function useConsumeChainQuery(apiBase: string, defaultPageSize: number) {
   }, [filteredRows, selectedEdge])
 
   const requestUrl = useMemo(() => {
-    return buildConsumeChainUrl(apiBase, { mode, nodeId, loopStatus, page, size })
-  }, [apiBase, loopStatus, mode, nodeId, page, size])
+    return buildConsumeChainUrl(apiBase, {
+      mode,
+      nodeId,
+      loopStatus,
+      page: 0,
+      size: dashboardQuerySize,
+    })
+  }, [apiBase, loopStatus, mode, nodeId])
 
   const runQuery = useCallback(
-    async (targetPage: number, override?: { mode: QueryMode; nodeId: string }) => {
+    async (targetPageOrOverride?: number | RunQueryOverride, override?: RunQueryOverride) => {
       const generation = graphRequestGenerationRef.current + 1
       graphRequestGenerationRef.current = generation
-      const normalizedSize = Math.min(200, Math.max(1, size))
-      const normalizedPage = Math.max(0, targetPage)
+      const queryOverride = typeof targetPageOrOverride === 'object' ? targetPageOrOverride : override
       // 允许调用方一次性指定 mode/nodeId（避免 setState 异步导致 runQuery 读到旧值的竞态）。
-      const effectiveMode = override?.mode ?? mode
-      const effectiveNodeId = (override?.nodeId ?? nodeId).trim()
+      const effectiveMode = queryOverride?.mode ?? mode
+      const effectiveNodeId = (queryOverride?.nodeId ?? nodeId).trim()
 
       setLoading(true)
       setError(null)
       setWarning(null)
-      setPage(normalizedPage)
-      setSize(normalizedSize)
-      if (override) {
-        setMode(override.mode)
-        setNodeId(override.nodeId)
+      if (queryOverride) {
+        setMode(queryOverride.mode)
+        setNodeId(queryOverride.nodeId)
       }
 
       try {
         const result = await queryConsumeChains(
           client,
           consumeChainFilters(effectiveMode, effectiveNodeId, loopStatus),
-          { page: normalizedPage, size: normalizedSize },
+          { page: 0, size: dashboardQuerySize },
         )
         if (generation !== graphRequestGenerationRef.current) return
         const { content, skipped } = normalizeRowsSafely(result.data.content)
@@ -143,29 +147,25 @@ export function useConsumeChainQuery(apiBase: string, defaultPageSize: number) {
         }
       }
     },
-    [client, loopStatus, mode, nodeId, size],
+    [client, loopStatus, mode, nodeId],
   )
 
   const extendFromNode = useCallback(
     async (node: ChainGraphNode, targetMode: QueryMode) => {
       const generation = graphRequestGenerationRef.current + 1
       graphRequestGenerationRef.current = generation
-      const normalizedSize = Math.min(200, Math.max(1, size))
-
       setLoading(true)
       setExtendLoading(targetMode)
       setError(null)
       setMode(targetMode)
       setNodeId(node.id)
-      setPage(0)
-      setSize(normalizedSize)
       setSelection({ kind: 'node', id: node.id })
 
       try {
         const result = await queryConsumeChains(
           client,
           consumeChainFilters(targetMode, node.id, loopStatus),
-          { page: 0, size: normalizedSize },
+          { page: 0, size: dashboardQuerySize },
         )
         if (generation !== graphRequestGenerationRef.current) return
         const { content, skipped } = normalizeRowsSafely(result.data.content)
@@ -184,7 +184,7 @@ export function useConsumeChainQuery(apiBase: string, defaultPageSize: number) {
         }
       }
     },
-    [client, loopStatus, size],
+    [client, loopStatus],
   )
 
   const selectEdge = useCallback((edge: ChainGraphEdge) => {
@@ -209,7 +209,7 @@ export function useConsumeChainQuery(apiBase: string, defaultPageSize: number) {
     mode,
     nodeId,
     origin,
-    page,
+    page: 0,
     requestUrl,
     rows,
     runQuery,
@@ -222,9 +222,7 @@ export function useConsumeChainQuery(apiBase: string, defaultPageSize: number) {
     setLoopStatus: changeLoopStatus,
     setMode: changeMode,
     setNodeId: changeNodeId,
-    setPage,
-    setSize,
-    size,
+    size: dashboardQuerySize,
     slice,
     warning,
   }

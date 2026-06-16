@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import '../App.css'
-import { defaultApiBase, defaultPageSize } from './config'
+import { dashboardQuerySize, defaultApiBase } from './config'
 import { LoopsPanel } from '../components'
 import { mergeLocalNodes } from '../lib/chainGraph'
 import { useLocalKeyringController } from '../features/keyring/hooks/useLocalKeyringController'
@@ -8,7 +8,6 @@ import { useLocalNodeActions } from '../features/keyring/hooks/useLocalNodeActio
 import { useRegistrationController } from '../features/keyring/hooks/useRegistrationController'
 import { ExportPanelContent } from '../features/network-explorer/components/ExportPanelContent'
 import { GraphPanel } from '../features/network-explorer/components/GraphPanel'
-import { FooterBar } from '../features/network-explorer/components/FooterBar'
 import { InspectorPanel } from '../features/network-explorer/components/InspectorPanel'
 import { MetricsPanelContent } from '../features/network-explorer/components/MetricsPanelContent'
 import { QueryPanel } from '../features/network-explorer/components/QueryPanel'
@@ -18,7 +17,7 @@ import { useNetworkExplorerController } from '../features/network-explorer/hooks
 
 function App() {
   const [apiBase, setApiBase] = useState(defaultApiBase)
-  const explorer = useNetworkExplorerController(apiBase, defaultPageSize)
+  const explorer = useNetworkExplorerController(apiBase, dashboardQuerySize)
   const { flowRateView, nodeDetail, query, selection, systemStatus } = explorer
   const keyring = useLocalKeyringController({
     clearSelectedLocalNode: selection.clearSelectedLocalNode,
@@ -122,15 +121,11 @@ function App() {
             onSetLoopStatus={query.setLoopStatus}
             onSetMode={query.setMode}
             onSetNodeId={query.setNodeId}
-            onSetPage={query.setPage}
-            onSetSize={query.setSize}
             onSetupVault={(passphrase) => void keyring.vault.setup(passphrase)}
             onUnlockVault={(passphrase) => void keyring.vault.unlock(passphrase)}
-            page={query.page}
             registrationError={registration.error}
             requestUrl={query.requestUrl}
             showKeyringError={!selectedLocalNode && !selectedLocalConsumeNode}
-            size={query.size}
             vaultError={keyring.vault.error}
             vaultStatus={keyring.vault.status}
             warning={query.warning}
@@ -184,17 +179,6 @@ function App() {
           />
         </aside>
       </section>
-
-      <FooterBar
-        extended={query.extended}
-        filteredRowCount={query.filteredRows.length}
-        loading={query.loading}
-        onNextPage={() => void query.runQuery(query.page + 1)}
-        onPreviousPage={() => void query.runQuery(Math.max(0, query.page - 1))}
-        origin={query.origin}
-        rowCount={query.rows.length}
-        slice={query.slice}
-      />
     </main>
   )
 }

@@ -34,9 +34,11 @@ describe('web interface guideline regressions', () => {
     const flowPanel = read('src/components/FlowNodeOperatePanel.tsx')
     const vaultGate = read('src/components/VaultGate.tsx')
 
-    for (const name of ['apiBase', 'nodeId', 'currencyFilter', 'page', 'size']) {
+    for (const name of ['apiBase', 'nodeId', 'currencyFilter']) {
       expect(queryPanel).toContain(`name="${name}"`)
     }
+    expect(queryPanel).not.toContain('name="page"')
+    expect(queryPanel).not.toContain('name="size"')
     for (const name of [
       'consumeNodePubkey',
       'amount',
