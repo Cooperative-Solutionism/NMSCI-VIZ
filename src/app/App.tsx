@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import '../App.css'
 import { defaultApiBase } from './config'
 import { LoopsPanel } from '../components'
@@ -11,6 +11,8 @@ import { mergeLocalNodes } from '../lib/chainGraph'
 import { useLocalKeyringController } from '../features/keyring/hooks/useLocalKeyringController'
 import { useLocalNodeActions } from '../features/keyring/hooks/useLocalNodeActions'
 import { useRegistrationController } from '../features/keyring/hooks/useRegistrationController'
+import { useVaultActionGate } from '../features/keyring/hooks/useVaultActionGate'
+import { VaultPromptDialog } from '../features/keyring/components/VaultPromptDialog'
 import { ExportPanelContent } from '../features/network-explorer/components/ExportPanelContent'
 import { GraphPanel } from '../features/network-explorer/components/GraphPanel'
 import { InspectorPanel } from '../features/network-explorer/components/InspectorPanel'
@@ -66,6 +68,39 @@ function App() {
     setNodeId: query.setNodeId,
     vaultStatus: keyring.vault.status,
   })
+  const nodeActionsRef = useRef(nodeActions)
+  useEffect(() => {
+    nodeActionsRef.current = nodeActions
+  }, [nodeActions])
+
+  const { closeVaultPrompt, requestVault, vaultPromptOpen, vaultPromptReason } = useVaultActionGate(
+    keyring.vault.status,
+    { ready: keyring.keyringReady },
+  )
+  const handleVaultPromptOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open) closeVaultPrompt()
+    },
+    [closeVaultPrompt],
+  )
+  const handleOpenVault = useCallback(() => {
+    requestVault('打开本地密钥环')
+  }, [requestVault])
+  const handleAddFlowNode = useCallback(
+    (position?: { x: number; y: number }) => {
+      requestVault('添加流转节点', () => nodeActionsRef.current.handleAddFlowNode(position))
+    },
+    [requestVault],
+  )
+  const handleAddConsumeNode = useCallback(
+    (position?: { x: number; y: number }) => {
+      requestVault('添加消费节点', () => nodeActionsRef.current.handleAddConsumeNode(position))
+    },
+    [requestVault],
+  )
+  const handleImportLocalNode = useCallback(() => {
+    requestVault('导入流转节点', () => nodeActionsRef.current.handleImportLocalNode())
+  }, [requestVault])
   const networkActions = useNetworkExplorerActions({
     filteredRows: query.filteredRows,
     graphEdges: query.graph.edges,
@@ -99,23 +134,19 @@ function App() {
           loopStatus={query.loopStatus}
           mode={query.mode}
           nodeId={query.nodeId}
-          onAddConsumeNode={nodeActions.handleAddConsumeNode}
-          onAddFlowNode={nodeActions.handleAddFlowNode}
+          onAddConsumeNode={handleAddConsumeNode}
+          onAddFlowNode={handleAddFlowNode}
           onApiBaseChange={setApiBase}
-          onImportLocalNode={nodeActions.handleImportLocalNode}
+          onImportLocalNode={handleImportLocalNode}
           onLockVault={keyring.handleLockVault}
+          onOpenVault={handleOpenVault}
           onPickNode={networkActions.handlePickNode}
           onRunQuery={query.runQuery}
           onSetCurrencyFilter={query.setCurrencyFilter}
           onSetLoopStatus={query.setLoopStatus}
           onSetMode={query.setMode}
           onSetNodeId={query.setNodeId}
-          onSetupVault={(passphrase) => void keyring.vault.setup(passphrase)}
-          onUnlockVault={(passphrase) => void keyring.vault.unlock(passphrase)}
-          registrationError={registration.error}
           requestUrl={query.requestUrl}
-          showKeyringError={!selectedLocalNode && !selectedLocalConsumeNode}
-          vaultError={keyring.vault.error}
           vaultStatus={keyring.vault.status}
           warning={query.warning}
         />
@@ -201,13 +232,24 @@ function App() {
         {alertMessage}
       </div>
 
+      <VaultPromptDialog
+        open={vaultPromptOpen}
+        reason={vaultPromptReason}
+        status={keyring.vault.status}
+        error={keyring.vault.error}
+        onOpenChange={handleVaultPromptOpenChange}
+        onSetup={(passphrase) => void keyring.vault.setup(passphrase)}
+        onUnlock={(passphrase) => void keyring.vault.unlock(passphrase)}
+        onLock={keyring.handleLockVault}
+      />
+
       <DashboardWorkspace
         graph={
           <GraphPanel
             canvasGraph={canvasGraph}
             loading={query.loading}
-            onAddConsumeNode={nodeActions.handleAddConsumeNode}
-            onAddFlowNode={nodeActions.handleAddFlowNode}
+            onAddConsumeNode={handleAddConsumeNode}
+            onAddFlowNode={handleAddFlowNode}
             onSelectEdge={selection.onCanvasSelectEdge}
             onSelectNode={selection.onCanvasSelectNode}
             selectedId={selection.selectedLocalId ?? query.effectiveSelection?.id ?? null}

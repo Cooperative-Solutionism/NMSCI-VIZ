@@ -1,4 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { Search } from 'lucide-react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DockIcon } from './DockIcon'
@@ -9,6 +11,11 @@ const queryContent = '\u67e5\u8be2\u6761\u4ef6'
 const openQueryName = /\u6253\u5f00\u67e5\u8be2\u9762\u677f/
 const collapseQueryName = /\u6298\u53e0\u67e5\u8be2\u9762\u677f/
 const moveQueryName = /\u79fb\u52a8\u67e5\u8be2\u9762\u677f/
+
+function cssRule(css: string, selector: string): string {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`, 'm').exec(css)?.[1] ?? ''
+}
 
 afterEach(cleanup)
 
@@ -117,7 +124,9 @@ describe('DockIcon', () => {
     expect(button).toHaveAttribute('aria-expanded', 'false')
     expect(button).toHaveAttribute('title', queryLabel)
     expect(button).toHaveStyle({ left: '24px', top: '32px' })
+    expect(button).toHaveTextContent(queryLabel)
     expect(button.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+    expect(button.querySelector('.dock-icon__expand')).toHaveAttribute('aria-hidden', 'true')
 
     fireEvent.click(button)
 
@@ -143,6 +152,15 @@ describe('DockIcon', () => {
 
     expect(onPositionChange).toHaveBeenCalledTimes(1)
     expect(onPositionChange).toHaveBeenCalledWith({ x: 32, y: 32 })
+  })
+
+  it('sizes the collapsed button to its content instead of a fixed wide block', () => {
+    const css = readFileSync(join(process.cwd(), 'src/styles/dashboard-layout.css'), 'utf8')
+    const dockRule = cssRule(css, '.dock-icon')
+
+    expect(dockRule).toContain('width: max-content;')
+    expect(dockRule).toContain('max-width: calc(100vw - 24px);')
+    expect(dockRule).not.toContain('width: min(144px')
   })
 })
 
@@ -176,7 +194,29 @@ describe('FloatingPanel', () => {
     expect(onPositionChange).not.toHaveBeenCalled()
   })
 
-  it('ignores non-arrow keys on a real move handle button', () => {
+  it('places collapse on the left and removes the move button', () => {
+    render(
+      <FloatingPanel
+        title={queryLabel}
+        position={{ x: 72, y: 16 }}
+        onCollapse={vi.fn()}
+        onPositionChange={vi.fn()}
+      >
+        <p>{queryContent}</p>
+      </FloatingPanel>,
+    )
+
+    const collapseButton = screen.getByRole('button', { name: collapseQueryName })
+    const header = screen
+      .getByRole('heading', { name: queryLabel })
+      .closest('.floating-panel__header')
+
+    expect(header).not.toBeNull()
+    expect(header?.firstElementChild).toBe(collapseButton)
+    expect(screen.queryByRole('button', { name: moveQueryName })).not.toBeInTheDocument()
+  })
+
+  it('ignores non-arrow keys on the draggable header', () => {
     const onPositionChange = vi.fn()
 
     render(
@@ -190,11 +230,14 @@ describe('FloatingPanel', () => {
       </FloatingPanel>,
     )
 
-    const moveHandle = screen.getByRole('button', { name: moveQueryName })
+    const header = screen
+      .getByRole('heading', { name: queryLabel })
+      .closest('.floating-panel__header')
 
-    expect(moveHandle.tagName).toBe('BUTTON')
+    expect(header).not.toBeNull()
+    expect(header).toHaveAttribute('tabindex', '0')
 
-    fireEvent.keyDown(moveHandle, { key: 'Escape' })
+    fireEvent.keyDown(header as HTMLElement, { key: 'Escape' })
 
     expect(onPositionChange).not.toHaveBeenCalled()
   })
@@ -238,7 +281,7 @@ describe('FloatingPanel', () => {
     expect(onCollapse).toHaveBeenCalledTimes(1)
   })
 
-  it('nudges by 8 pixels from header arrow keys and reports the updated position', () => {
+  it('nudges by 8 pixels from focused header arrow keys and reports the updated position', () => {
     const onPositionChange = vi.fn()
 
     render(
@@ -252,7 +295,13 @@ describe('FloatingPanel', () => {
       </FloatingPanel>,
     )
 
-    fireEvent.keyDown(screen.getByRole('button', { name: moveQueryName }), {
+    const header = screen
+      .getByRole('heading', { name: queryLabel })
+      .closest('.floating-panel__header')
+
+    expect(header).not.toBeNull()
+
+    fireEvent.keyDown(header as HTMLElement, {
       key: 'ArrowDown',
     })
 

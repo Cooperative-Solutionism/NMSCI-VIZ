@@ -4,7 +4,6 @@ import {
   chainRow,
   installAppTestLifecycle,
   jsonResponse,
-  openKeysTab,
   requestInputUrl,
   sliceResponse,
   stubFetchByUrl,
@@ -51,9 +50,8 @@ describe('App initial state', () => {
     render(<App />)
 
     // a consume node (record source) then a flow node (operator) — flow node ends up selected
-    openKeysTab()
-    fireEvent.click(screen.getByRole('button', { name: /^消费节点$/ }))
-    fireEvent.click(screen.getByRole('button', { name: /^流转节点$/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /canvas add consume node/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
     fireEvent.click(await screen.findByRole('button', { name: /创建交易记录/ }))
 
     fireEvent.change(await screen.findByLabelText('金额'), { target: { value: '5000' } })
@@ -126,9 +124,8 @@ describe('App initial state', () => {
     })
     render(<App />)
 
-    openKeysTab()
-    fireEvent.click(screen.getByRole('button', { name: /^消费节点$/ }))
-    fireEvent.click(screen.getByRole('button', { name: /^流转节点$/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /canvas add consume node/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
 
     // create a record first
     fireEvent.click(await screen.findByRole('button', { name: /创建交易记录/ }))

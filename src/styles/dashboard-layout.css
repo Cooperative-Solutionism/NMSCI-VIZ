@@ -21,9 +21,12 @@
   z-index: 30;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 44px;
+  justify-content: flex-start;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
   height: 44px;
+  padding: 0 10px 0 12px;
   border: 1px solid rgb(var(--teal-rgb) / 0.24);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.9);
@@ -39,6 +42,23 @@
     border-color 160ms ease,
     box-shadow 160ms ease,
     transform 160ms ease;
+}
+
+.dock-icon__label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 780;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dock-icon__expand {
+  flex: 0 0 auto;
+  color: var(--muted);
 }
 
 .dock-icon:hover {
@@ -96,6 +116,11 @@
   cursor: grabbing;
 }
 
+.floating-panel__header:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: -2px;
+}
+
 .floating-panel__header h2 {
   flex: 1 1 auto;
   min-width: 0;
@@ -144,15 +169,6 @@
 .icon-button:focus-visible {
   outline: 2px solid var(--teal);
   outline-offset: 2px;
-}
-
-.icon-button[data-drag-handle] {
-  cursor: grab;
-  touch-action: none;
-}
-
-.icon-button[data-drag-handle]:active {
-  cursor: grabbing;
 }
 
 .status-divider {

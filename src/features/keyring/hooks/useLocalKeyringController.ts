@@ -27,6 +27,7 @@ export function useLocalKeyringController({
   const [localFlowNodes, setLocalFlowNodes] = useState<LocalFlowNode[]>([])
   const [localConsumeNodes, setLocalConsumeNodes] = useState<LocalConsumeNode[]>([])
   const [localTxRecords, setLocalTxRecords] = useState<LocalTxRecord[]>(() => loadLocalTxRecords())
+  const [keyringReady, setKeyringReady] = useState(false)
   const keyringLoadedRef = useRef(false)
 
   const persistLocalFlowNodes = useCallback(
@@ -68,6 +69,7 @@ export function useLocalKeyringController({
 
   const handleLockVault = useCallback(() => {
     vault.lock()
+    setKeyringReady(false)
     setLocalFlowNodes([])
     setLocalConsumeNodes([])
     clearSelectedLocalNode()
@@ -92,6 +94,8 @@ export function useLocalKeyringController({
         if (hasLegacyPlaintextConsumeNodes()) await saveLocalConsumeNodes(consumeNodes, vault.codec)
       } catch (loadError) {
         console.error('Failed to load encrypted keyring:', loadError)
+      } finally {
+        if (!cancelled) setKeyringReady(true)
       }
     })()
     return () => {
@@ -101,6 +105,7 @@ export function useLocalKeyringController({
 
   return {
     handleLockVault,
+    keyringReady,
     localConsumeNodes,
     localFlowNodes,
     localTxRecords,

@@ -63,7 +63,12 @@ describe('App initial state', () => {
     fireEvent.change(screen.getByLabelText('流转节点 ID / 公钥'), {
       target: { value: 'node-1' },
     })
-    fireEvent.change(screen.getByLabelText(/币种/), { target: { value: '1' } })
+    fireEvent.pointerDown(screen.getByRole('combobox', { name: /币种/ }), {
+      button: 0,
+      ctrlKey: false,
+      pointerType: 'mouse',
+    })
+    fireEvent.click(await screen.findByRole('option', { name: 'CNY' }))
     fireEvent.click(screen.getByRole('button', { name: /^加载$/ }))
 
     await screen.findByText(/已加载结果视图过滤/)

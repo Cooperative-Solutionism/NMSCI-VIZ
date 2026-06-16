@@ -171,6 +171,72 @@ describe('web interface guideline regressions', () => {
     expect(bodyRule).toContain('overflow: auto;')
   })
 
+  it('lets shadcn tabs own query tab styling', () => {
+    const appCss = readCssBundle()
+    const tabsRule = cssRule(appCss, '.floating-tabs')
+
+    expect(tabsRule).toContain('margin:')
+    expect(tabsRule).not.toContain('grid-template-columns')
+    expect(tabsRule).not.toContain('background:')
+    expect(tabsRule).not.toContain('border:')
+    expect(appCss).not.toContain('.floating-tabs button')
+  })
+
+  it('uses shadcn primitives for query panel controls', () => {
+    const queryPanel = read('src/features/network-explorer/components/QueryPanel.tsx')
+    const queryTabs = read(
+      'src/features/network-explorer/components/query-panel/QueryPanelTabs.tsx',
+    )
+    const queryForm = read(
+      'src/features/network-explorer/components/query-panel/QueryFormContent.tsx',
+    )
+
+    for (const module of [
+      '../../../../components/ui/alert',
+      '../../../../components/ui/badge',
+      '../../../../components/ui/button',
+      '../../../../components/ui/card',
+      '../../../../components/ui/field',
+      '../../../../components/ui/input',
+      '../../../../components/ui/select',
+      '../../../../components/ui/separator',
+      '../../../../components/ui/textarea',
+      '../../../../components/ui/toggle-group',
+    ]) {
+      expect(queryForm, module).toContain(module)
+    }
+
+    for (const token of [
+      '<Alert',
+      '<Badge',
+      '<Button',
+      '<Card',
+      '<Field',
+      '<FieldGroup',
+      '<Input',
+      '<Select',
+      '<Separator',
+      '<Textarea',
+      '<ToggleGroup',
+    ]) {
+      expect(queryForm, token).toContain(token)
+    }
+
+    expect(queryPanel).toContain('<Tabs')
+    expect(queryPanel).toContain('<TabsContent')
+    expect(queryTabs).toContain('TabsList')
+    expect(queryTabs).toContain('TabsTrigger')
+    expect(queryTabs).not.toContain('role="tablist"')
+
+    expect(queryForm).not.toContain("from '../../../../components'")
+    expect(queryForm).not.toMatch(/<input[\s>]/)
+    expect(queryForm).not.toMatch(/<textarea[\s>]/)
+    expect(queryForm).not.toMatch(/<select[\s>]/)
+    expect(queryForm).not.toContain('primary-button')
+    expect(queryForm).not.toContain('secondary-button')
+    expect(queryForm).not.toContain('segmented')
+  })
+
   it('keeps page arguments out of consume-chain query APIs', () => {
     const forbiddenDefaultSizeName = 'default' + 'PageSize'
     const forbiddenTargetPageName = 'target' + 'Page'
@@ -263,7 +329,6 @@ describe('web interface guideline regressions', () => {
       'src/components/NodeBrowser.tsx',
       'src/components/VaultGate.tsx',
       'src/features/network-explorer/components/query-panel/QueryFormContent.tsx',
-      'src/features/network-explorer/components/query-panel/KeyringPanelContent.tsx',
     ]) {
       const text = read(file)
       expect(text).toMatch(/aria-live="polite"|role="status"|role="alert"/)

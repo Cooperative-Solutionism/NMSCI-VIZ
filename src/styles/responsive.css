@@ -6,10 +6,6 @@
   .floating-panel__body {
     max-height: calc(100svh - 84px);
   }
-
-  .metrics-strip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 520px) {
@@ -28,11 +24,6 @@
   .node-actions {
     grid-template-columns: 1fr;
   }
-
-  .metrics-strip {
-    grid-template-columns: 1fr;
-  }
-
   .legend {
     align-items: flex-start;
     flex-direction: column;

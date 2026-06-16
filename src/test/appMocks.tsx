@@ -1,6 +1,23 @@
 import { vi } from 'vitest'
 import type { ChainGraph, ChainGraphEdge, ChainGraphNode } from '../lib/types'
 
+type MockVaultStatus = 'setup' | 'locked' | 'unlocked'
+
+const mockVault = vi.hoisted(() => ({
+  error: null as string | null,
+  status: 'unlocked' as MockVaultStatus,
+}))
+
+export function resetMockVault() {
+  mockVault.status = 'unlocked'
+  mockVault.error = null
+}
+
+export function setMockVaultStatus(status: MockVaultStatus) {
+  mockVault.status = status
+  mockVault.error = null
+}
+
 vi.mock('../components/NetworkGraph', () => ({
   NetworkGraph: ({
     graph,
@@ -37,19 +54,38 @@ vi.mock('../components/NetworkGraph', () => ({
   ),
 }))
 
-vi.mock('../hooks/useKeyVault', () => ({
-  useKeyVault: () => ({
-    status: 'unlocked' as const,
-    error: null,
-    setup: vi.fn(),
-    unlock: vi.fn(),
-    lock: vi.fn(),
-    codec: {
-      encrypt: (plaintext: string) => Promise.resolve({ iv: 'iv', ct: btoa(plaintext) }),
-      decrypt: (secret: { ct: string }) => Promise.resolve(atob(secret.ct)),
+vi.mock('../hooks/useKeyVault', async () => {
+  const React = await import('react')
+
+  return {
+    useKeyVault: () => {
+      const [status, setStatus] = React.useState<MockVaultStatus>(mockVault.status)
+      const [error, setError] = React.useState<string | null>(mockVault.error)
+      const unlockSession = () => {
+        mockVault.status = 'unlocked'
+        mockVault.error = null
+        setStatus('unlocked')
+        setError(null)
+        return true
+      }
+
+      return {
+        status,
+        error,
+        setup: vi.fn(async () => unlockSession()),
+        unlock: vi.fn(async () => unlockSession()),
+        lock: vi.fn(() => {
+          mockVault.status = 'locked'
+          setStatus('locked')
+        }),
+        codec: {
+          encrypt: (plaintext: string) => Promise.resolve({ iv: 'iv', ct: btoa(plaintext) }),
+          decrypt: (secret: { ct: string }) => Promise.resolve(atob(secret.ct)),
+        },
+      }
     },
-  }),
-}))
+  }
+})
 
 vi.mock('@nmsci/sdk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@nmsci/sdk')>()

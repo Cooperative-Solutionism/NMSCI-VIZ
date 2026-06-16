@@ -4,7 +4,7 @@ import {
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import type { LucideIcon } from 'lucide-react'
+import { ChevronRight, type LucideIcon } from 'lucide-react'
 import { useDraggable } from '../../../shared/hooks/useDraggable'
 import type { DashboardPoint } from '../dashboardLayout'
 
@@ -133,6 +133,8 @@ export function DockIcon({
       onPointerDown={handlePointerDown}
     >
       <Icon size={18} aria-hidden="true" />
+      <span className="dock-icon__label">{label}</span>
+      <ChevronRight className="dock-icon__expand" size={16} aria-hidden="true" />
     </button>
   )
 }

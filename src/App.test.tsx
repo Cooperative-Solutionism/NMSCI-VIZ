@@ -4,7 +4,6 @@ import {
   DASHBOARD_LAYOUT_STORAGE_KEY,
   installAppTestLifecycle,
   openBrowseTab,
-  openKeysTab,
   openQueryTab,
   readSource,
   sourceExists,
@@ -41,7 +40,7 @@ describe('App initial state', () => {
     expect(document.querySelector('.topbar')).toBeNull()
     expect(screen.getByRole('tab', { name: '查询' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: '浏览' })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: '密钥' })).toBeTruthy()
+    expect(screen.queryByRole('tab', { name: '密钥' })).toBeNull()
   })
 
   it('splits graph chrome into reusable panel content components', () => {
@@ -77,7 +76,8 @@ describe('App initial state', () => {
       ? readSource('src/features/network-explorer/components/SystemPanelContent.tsx')
       : ''
 
-    expect(metricsPanel).toContain('MetricCard')
+    expect(metricsPanel).toContain('@/components/ui/card')
+    expect(metricsPanel).toContain('CardHeader')
     expect(metricsPanel).toContain('formatVolumeByCurrency')
     expect(exportPanel).toContain('graphEdgeCount === 0')
     expect(exportPanel).toContain('filteredRowCount === 0')
@@ -116,9 +116,6 @@ describe('App initial state', () => {
 
     openBrowseTab()
     expect(screen.getByRole('button', { name: /浏览节点/ })).toBeTruthy()
-
-    openKeysTab()
-    expect(screen.getByRole('button', { name: /^流转节点$/ })).toBeTruthy()
 
     openQueryTab()
     expect(screen.getByLabelText('流转节点 ID / 公钥')).toBeTruthy()

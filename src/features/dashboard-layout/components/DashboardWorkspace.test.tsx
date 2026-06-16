@@ -12,7 +12,6 @@ const detailsContent = '\u8282\u70b9\u8be6\u60c5'
 const openQueryName = /\u6253\u5f00\u67e5\u8be2\u9762\u677f/
 const openDetailsName = /\u6253\u5f00\u8be6\u60c5\u9762\u677f/
 const collapseQueryName = /\u6298\u53e0\u67e5\u8be2\u9762\u677f/
-const moveQueryName = /\u79fb\u52a8\u67e5\u8be2\u9762\u677f/
 
 function panels(): DashboardPanelConfig[] {
   return [
@@ -185,11 +184,17 @@ describe('DashboardWorkspace', () => {
     expect(storedLayout().query.collapsed).toBe(true)
   })
 
-  it('persists panelPosition changes from arrow nudging a floating panel handle', () => {
+  it('persists panelPosition changes from arrow nudging a floating panel header', () => {
     renderWorkspace()
     fireEvent.click(screen.getByRole('button', { name: openQueryName }))
 
-    fireEvent.keyDown(screen.getByRole('button', { name: moveQueryName }), {
+    const header = screen
+      .getByRole('heading', { name: queryLabel })
+      .closest('.floating-panel__header')
+
+    expect(header).not.toBeNull()
+
+    fireEvent.keyDown(header as HTMLElement, {
       key: 'ArrowDown',
     })
 

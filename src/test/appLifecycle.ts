@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
 import { seedDashboardLayout } from './appDashboard'
+import { resetMockVault } from './appMocks'
 
 export function installAppTestLifecycle() {
   afterEach(() => {
@@ -11,6 +12,7 @@ export function installAppTestLifecycle() {
 
   beforeEach(() => {
     localStorage.clear()
+    resetMockVault()
     seedDashboardLayout()
   })
 }

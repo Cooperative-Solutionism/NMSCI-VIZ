@@ -1,44 +1,22 @@
-import { Database, Filter, KeyRound } from 'lucide-react'
+import { Database, Filter } from 'lucide-react'
+import { TabsList, TabsTrigger } from '../../../../components/ui/tabs'
 import type { QueryPanelTab } from './types'
 
 interface QueryPanelTabsProps {
-  activeTab: QueryPanelTab
   onChange: (tab: QueryPanelTab) => void
 }
 
-export function QueryPanelTabs({ activeTab, onChange }: QueryPanelTabsProps) {
+export function QueryPanelTabs({ onChange }: QueryPanelTabsProps) {
   return (
-    <div className="floating-tabs" role="tablist" aria-label="面板分区">
-      <button
-        role="tab"
-        aria-selected={activeTab === 'query'}
-        className={activeTab === 'query' ? 'active' : ''}
-        type="button"
-        onClick={() => onChange('query')}
-      >
-        <Filter size={15} />
+    <TabsList className="floating-tabs" aria-label="面板分区">
+      <TabsTrigger value="query" onClick={() => onChange('query')}>
+        <Filter data-icon="inline-start" />
         查询
-      </button>
-      <button
-        role="tab"
-        aria-selected={activeTab === 'browse'}
-        className={activeTab === 'browse' ? 'active' : ''}
-        type="button"
-        onClick={() => onChange('browse')}
-      >
-        <Database size={15} />
+      </TabsTrigger>
+      <TabsTrigger value="browse" onClick={() => onChange('browse')}>
+        <Database data-icon="inline-start" />
         浏览
-      </button>
-      <button
-        role="tab"
-        aria-selected={activeTab === 'keys'}
-        className={activeTab === 'keys' ? 'active' : ''}
-        type="button"
-        onClick={() => onChange('keys')}
-      >
-        <KeyRound size={15} />
-        密钥
-      </button>
-    </div>
+      </TabsTrigger>
+    </TabsList>
   )
 }

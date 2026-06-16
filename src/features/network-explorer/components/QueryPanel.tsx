@@ -1,33 +1,38 @@
 import { NodeBrowser } from '../../../components'
+import { Tabs, TabsContent } from '../../../components/ui/tabs'
 import { useUrlStateParam } from '../../../shared/hooks/useUrlQueryParam'
-import { KeyringPanelContent } from './query-panel/KeyringPanelContent'
 import { QueryFormContent } from './query-panel/QueryFormContent'
 import { QueryPanelTabs } from './query-panel/QueryPanelTabs'
-import type {
-  KeyringPanelContentProps,
-  QueryFormContentProps,
-  QueryPanelTab,
-} from './query-panel/types'
+import type { QueryFormContentProps, QueryPanelTab } from './query-panel/types'
 
-type QueryPanelProps = QueryFormContentProps &
-  KeyringPanelContentProps & {
-    onPickNode: (pubkey: string) => void
-  }
+type QueryPanelProps = QueryFormContentProps & {
+  onPickNode: (pubkey: string) => void
+}
 
 function isQueryPanelTab(value: string): value is QueryPanelTab {
-  return value === 'query' || value === 'browse' || value === 'keys'
+  return value === 'query' || value === 'browse'
 }
 
 export function QueryPanel({ onPickNode, ...props }: QueryPanelProps) {
   const [leftTab, setLeftTab] = useUrlStateParam<QueryPanelTab>('panel', 'query', isQueryPanelTab)
+  const handleTabChange = (value: string) => {
+    if (isQueryPanelTab(value)) setLeftTab(value)
+  }
 
   return (
-    <div className="query-panel-content" aria-label="消费链查询">
-      <QueryPanelTabs activeTab={leftTab} onChange={setLeftTab} />
+    <Tabs
+      value={leftTab}
+      onValueChange={handleTabChange}
+      className="query-panel-content"
+      aria-label="消费链查询"
+    >
+      <QueryPanelTabs onChange={setLeftTab} />
 
       <div className="floating-body">
-        {leftTab === 'query' ? <QueryFormContent {...props} /> : null}
-        {leftTab === 'browse' ? (
+        <TabsContent value="query" className="m-0 min-h-0">
+          <QueryFormContent {...props} />
+        </TabsContent>
+        <TabsContent value="browse" className="m-0 min-h-0">
           <NodeBrowser
             apiBase={props.apiBase}
             onPick={(pubkey) => {
@@ -35,9 +40,8 @@ export function QueryPanel({ onPickNode, ...props }: QueryPanelProps) {
               setLeftTab('query')
             }}
           />
-        ) : null}
-        {leftTab === 'keys' ? <KeyringPanelContent {...props} /> : null}
+        </TabsContent>
       </div>
-    </div>
+    </Tabs>
   )
 }

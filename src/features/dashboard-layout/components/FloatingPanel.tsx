@@ -1,4 +1,4 @@
-import { ChevronLeft, GripVertical } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { useDraggable } from '../../../shared/hooks/useDraggable'
 import type { DashboardPoint } from '../dashboardLayout'
@@ -65,7 +65,9 @@ export function FloatingPanel({
     lastPositionRef.current = position
   }, [position])
 
-  const handleMoveKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+  const handleHeaderKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return
+
     const delta = arrowKeyDelta(event.key)
     if (!delta) return
 
@@ -82,17 +84,14 @@ export function FloatingPanel({
       aria-labelledby={titleId}
       tabIndex={-1}
     >
-      <div className="floating-panel__header" onPointerDown={onPointerDown}>
-        <button
-          type="button"
-          className="icon-button"
-          data-drag-handle
-          aria-label={`移动${title}面板`}
-          onKeyDown={handleMoveKeyDown}
-        >
-          <GripVertical size={18} aria-hidden="true" />
-        </button>
-        <h2 id={titleId}>{title}</h2>
+      <div
+        className="floating-panel__header"
+        role="toolbar"
+        aria-label={`移动${title}面板`}
+        tabIndex={0}
+        onKeyDown={handleHeaderKeyDown}
+        onPointerDown={onPointerDown}
+      >
         <button
           type="button"
           className="icon-button"
@@ -101,6 +100,7 @@ export function FloatingPanel({
         >
           <ChevronLeft size={18} aria-hidden="true" />
         </button>
+        <h2 id={titleId}>{title}</h2>
       </div>
       <div className="floating-panel__body">{children}</div>
     </section>
