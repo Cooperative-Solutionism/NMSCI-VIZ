@@ -56,7 +56,7 @@ interface UseFlowNodeRegistrationParams {
   persistLocalFlowNodes: (updater: (nodes: LocalFlowNode[]) => LocalFlowNode[]) => void
   persistTxRecords: (updater: (records: LocalTxRecord[]) => LocalTxRecord[]) => void
   reloadLocalNodeState: (pubkey: string) => void
-  runQuery: (targetPage: number, override?: { mode: QueryMode; nodeId: string }) => Promise<void>
+  runQuery: (override?: { mode: QueryMode; nodeId: string }) => Promise<void>
   clearSelectedLocalNode: () => void
 }
 
@@ -253,7 +253,7 @@ export function useFlowNodeRegistration({
     if (!mountedPubkey) return
     clearSelectedLocalNode()
     setMountFormOpen(false)
-    void runQuery(0, { mode: 'node', nodeId: mountedPubkey })
+    void runQuery({ mode: 'node', nodeId: mountedPubkey })
   }, [clearSelectedLocalNode, mountedPubkey, runQuery])
 
   const fetchRegisterDifficulty = useCallback(async () => {

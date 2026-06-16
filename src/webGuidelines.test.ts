@@ -122,6 +122,27 @@ describe('web interface guideline regressions', () => {
     expect(bodyRule).toContain('overflow: auto;')
   })
 
+  it('keeps pagination arguments out of consume-chain query APIs', () => {
+    const forbiddenDefaultSizeName = 'default' + 'PageSize'
+    const forbiddenTargetPageName = 'target' + 'Page'
+    const forbiddenNumericQueryCall = new RegExp('run' + 'Query\\(\\s*\\d')
+    const files = [
+      'src/hooks/useConsumeChainQuery.ts',
+      'src/features/network-explorer/hooks/useNetworkExplorerController.ts',
+      'src/app/App.tsx',
+      'src/hooks/useFlowNodeRegistration.ts',
+      'src/features/keyring/hooks/useRegistrationController.ts',
+      'src/features/network-explorer/components/QueryPanel.tsx',
+    ]
+
+    for (const file of files) {
+      const text = read(file)
+      expect(text, file).not.toContain(forbiddenDefaultSizeName)
+      expect(text, file).not.toContain(forbiddenTargetPageName)
+      expect(text, file).not.toMatch(forbiddenNumericQueryCall)
+    }
+  })
+
   it('exposes async status and errors through live regions', () => {
     for (const file of [
       'src/components/ReturnFlowCard.tsx',

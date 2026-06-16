@@ -22,12 +22,16 @@ export function NodeBrowser({
   const [registered, setRegistered] = useUrlBooleanParam('nodeRegistered')
   const [authorized, setAuthorized] = useUrlBooleanParam('nodeAuthorized')
   const [locked, setLocked] = useUrlBooleanParam('nodeLocked')
-  const [page, setPage] = useUrlNumberParam('nodeBrowserPage', 0, normalizePage)
+  const [nodeBrowserPage, setNodeBrowserPage] = useUrlNumberParam(
+    'nodeBrowserPage',
+    0,
+    normalizePage,
+  )
 
   const browse = useCallback(
-    (targetPage: number) => {
-      const nextPage = Math.max(0, targetPage)
-      setPage(nextPage)
+    (requestedNodeBrowserPage: number) => {
+      const nextPage = Math.max(0, requestedNodeBrowserPage)
+      setNodeBrowserPage(nextPage)
       void directory.load({
         registered: registered || undefined,
         authorized: authorized || undefined,
@@ -36,7 +40,7 @@ export function NodeBrowser({
         size: PAGE_SIZE,
       })
     },
-    [authorized, directory, locked, registered, setPage],
+    [authorized, directory, locked, registered, setNodeBrowserPage],
   )
 
   return (
@@ -105,7 +109,7 @@ export function NodeBrowser({
               <button
                 type="button"
                 disabled={!directory.hasPrevious || directory.loading}
-                onClick={() => browse(page - 1)}
+                onClick={() => browse(nodeBrowserPage - 1)}
               >
                 上一页
               </button>
@@ -113,7 +117,7 @@ export function NodeBrowser({
               <button
                 type="button"
                 disabled={!directory.hasNext || directory.loading}
-                onClick={() => browse(page + 1)}
+                onClick={() => browse(nodeBrowserPage + 1)}
               >
                 下一页
               </button>

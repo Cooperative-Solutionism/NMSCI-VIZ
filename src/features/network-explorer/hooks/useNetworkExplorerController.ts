@@ -6,8 +6,8 @@ import { useNodeDetail } from '../../../hooks/useNodeDetail'
 import { useReturningFlowRate } from '../../../hooks/useReturningFlowRate'
 import { useSystemStatus } from '../../../hooks/useSystemStatus'
 
-export function useNetworkExplorerController(apiBase: string, defaultPageSize: number) {
-  const query = useConsumeChainQuery(apiBase, defaultPageSize)
+export function useNetworkExplorerController(apiBase: string) {
+  const query = useConsumeChainQuery(apiBase)
   const selection = useCanvasSelection({
     selectNode: query.selectNode,
     selectEdge: query.selectEdge,

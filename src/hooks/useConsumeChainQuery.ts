@@ -23,8 +23,7 @@ export type Selection = { kind: 'node'; id: string } | { kind: 'edge'; id: strin
 export type DataOrigin = 'idle' | 'backend'
 type RunQueryOverride = { mode: QueryMode; nodeId: string }
 
-export function useConsumeChainQuery(apiBase: string, defaultPageSize?: number) {
-  void defaultPageSize
+export function useConsumeChainQuery(apiBase: string) {
   const [mode, setMode] = useState<QueryMode>('node')
   const [nodeId, setNodeId] = useState('')
   const [loopStatus, setLoopStatus] = useState<LoopStatus>('all')
@@ -108,10 +107,9 @@ export function useConsumeChainQuery(apiBase: string, defaultPageSize?: number) 
   }, [apiBase, loopStatus, mode, nodeId])
 
   const runQuery = useCallback(
-    async (targetPageOrOverride?: number | RunQueryOverride, override?: RunQueryOverride) => {
+    async (queryOverride?: RunQueryOverride) => {
       const generation = graphRequestGenerationRef.current + 1
       graphRequestGenerationRef.current = generation
-      const queryOverride = typeof targetPageOrOverride === 'object' ? targetPageOrOverride : override
       // 允许调用方一次性指定 mode/nodeId（避免 setState 异步导致 runQuery 读到旧值的竞态）。
       const effectiveMode = queryOverride?.mode ?? mode
       const effectiveNodeId = (queryOverride?.nodeId ?? nodeId).trim()
@@ -230,12 +228,12 @@ export function useConsumeChainQuery(apiBase: string, defaultPageSize?: number) 
 
 function makeSlice(
   rows: ConsumeChainResponseDTO[],
-  defaultPageSize: number,
+  sliceSize: number,
 ): SliceResponseDTO<ConsumeChainResponseDTO> {
   return {
     content: rows,
     page: 0,
-    size: defaultPageSize,
+    size: sliceSize,
     numberOfElements: rows.length,
     hasNext: false,
     hasPrevious: false,

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import '../App.css'
-import { dashboardQuerySize, defaultApiBase } from './config'
+import { defaultApiBase } from './config'
 import { LoopsPanel } from '../components'
 import { mergeLocalNodes } from '../lib/chainGraph'
 import { useLocalKeyringController } from '../features/keyring/hooks/useLocalKeyringController'
@@ -17,7 +17,7 @@ import { useNetworkExplorerController } from '../features/network-explorer/hooks
 
 function App() {
   const [apiBase, setApiBase] = useState(defaultApiBase)
-  const explorer = useNetworkExplorerController(apiBase, dashboardQuerySize)
+  const explorer = useNetworkExplorerController(apiBase)
   const { flowRateView, nodeDetail, query, selection, systemStatus } = explorer
   const keyring = useLocalKeyringController({
     clearSelectedLocalNode: selection.clearSelectedLocalNode,

@@ -27,7 +27,7 @@ export function useRegistrationController({
   localTxRecords: LocalTxRecord[]
   persistLocalFlowNodes: (updater: (nodes: LocalFlowNode[]) => LocalFlowNode[]) => void
   persistTxRecords: (updater: (records: LocalTxRecord[]) => LocalTxRecord[]) => void
-  runQuery: (targetPage: number, override?: { mode: QueryMode; nodeId: string }) => Promise<void>
+  runQuery: (override?: { mode: QueryMode; nodeId: string }) => Promise<void>
   selectedLocalNode: LocalFlowNode | null
 }) {
   const client = useMemo(() => new ApiClient({ baseUrl: apiBase }), [apiBase])
