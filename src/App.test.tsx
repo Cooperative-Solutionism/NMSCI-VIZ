@@ -3,6 +3,12 @@ import { join } from 'node:path'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import {
+  DASHBOARD_LAYOUT_STORAGE_KEY,
+  defaultDashboardLayout,
+  type DashboardLayoutState,
+  type DashboardPanelId,
+} from './features/dashboard-layout/dashboardLayout'
 import type {
   ChainGraph,
   ChainGraphEdge,
@@ -107,6 +113,14 @@ vi.mock('@nmsci/sdk', async (importOriginal) => {
 })
 
 const firstPageIndex = 0
+const allDashboardPanels: DashboardPanelId[] = [
+  'query',
+  'details',
+  'loops',
+  'metrics',
+  'export',
+  'system',
+]
 
 function sourceExists(path: string): boolean {
   return existsSync(join(process.cwd(), path))
@@ -114,6 +128,31 @@ function sourceExists(path: string): boolean {
 
 function readSource(path: string): string {
   return readFileSync(join(process.cwd(), path), 'utf8')
+}
+
+function dashboardLayoutWithExpanded(expandedPanels = allDashboardPanels): DashboardLayoutState {
+  return Object.fromEntries(
+    allDashboardPanels.map((panelId) => {
+      const panel = defaultDashboardLayout[panelId]
+
+      return [
+        panelId,
+        {
+          ...panel,
+          collapsed: !expandedPanels.includes(panelId),
+          dockPosition: { ...panel.dockPosition },
+          panelPosition: { ...panel.panelPosition },
+        },
+      ]
+    }),
+  ) as DashboardLayoutState
+}
+
+function seedDashboardLayout(expandedPanels = allDashboardPanels) {
+  localStorage.setItem(
+    DASHBOARD_LAYOUT_STORAGE_KEY,
+    JSON.stringify(dashboardLayoutWithExpanded(expandedPanels)),
+  )
 }
 
 describe('App initial state', () => {
@@ -125,6 +164,7 @@ describe('App initial state', () => {
 
   beforeEach(() => {
     localStorage.clear()
+    seedDashboardLayout()
   })
 
   function openQueryTab() {
@@ -139,20 +179,31 @@ describe('App initial state', () => {
     fireEvent.click(screen.getByRole('tab', { name: /^密钥$/ }))
   }
 
+  it('starts as a graph-first workspace with collapsed panel entries', () => {
+    localStorage.clear()
+    const { container } = render(<App />)
+
+    expect(container.querySelector('#network-graph')).toBeTruthy()
+    expect(container.querySelectorAll('.dock-icon')).toHaveLength(6)
+    expect(container.querySelector('[role="tab"]')).toBeNull()
+    expect(container.querySelector('.topbar')).toBeNull()
+    expect(localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY)).toBeNull()
+  })
+
   it('starts without demo data or a demo reset action', () => {
     render(<App />)
 
     expect(screen.queryByRole('button', { name: /demo/i })).toBeNull()
     expect((screen.getByLabelText('流转节点 ID / 公钥') as HTMLTextAreaElement).value).toBe('')
     expect(screen.getByText('运行查询以探索消费网络。')).toBeTruthy()
-    expect(screen.getByLabelText('数据状态').textContent).toContain('暂无数据')
+    expect(document.querySelector('.topbar')).toBeNull()
   })
 
   it('renders the main interface in Chinese', () => {
     render(<App />)
 
     expect(screen.getByRole('link', { name: '跳转到图谱' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: '网络浏览器' })).toBeTruthy()
+    expect(document.querySelector('.topbar')).toBeNull()
     expect(screen.getByRole('tab', { name: '查询' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: '浏览' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: '密钥' })).toBeTruthy()
@@ -384,9 +435,7 @@ describe('App initial state', () => {
 
     stubFetchByUrl((url) => {
       if (url.pathname === '/consume-chains') {
-        return jsonResponse(
-          sliceResponse([chainRow('open-1', 1), loopedChainRow('loop-1')]),
-        )
+        return jsonResponse(sliceResponse([chainRow('open-1', 1), loopedChainRow('loop-1')]))
       }
       throw new Error(`Unexpected URL ${url.href}`)
     })

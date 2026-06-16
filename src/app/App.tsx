@@ -2,6 +2,11 @@ import { useMemo, useState } from 'react'
 import '../App.css'
 import { defaultApiBase } from './config'
 import { LoopsPanel } from '../components'
+import { DashboardWorkspace } from '../features/dashboard-layout/components/DashboardWorkspace'
+import {
+  dashboardPanelIcons,
+  type DashboardPanelConfig,
+} from '../features/dashboard-layout/panelRegistry'
 import { mergeLocalNodes } from '../lib/chainGraph'
 import { useLocalKeyringController } from '../features/keyring/hooks/useLocalKeyringController'
 import { useLocalNodeActions } from '../features/keyring/hooks/useLocalNodeActions'
@@ -11,7 +16,7 @@ import { GraphPanel } from '../features/network-explorer/components/GraphPanel'
 import { InspectorPanel } from '../features/network-explorer/components/InspectorPanel'
 import { MetricsPanelContent } from '../features/network-explorer/components/MetricsPanelContent'
 import { QueryPanel } from '../features/network-explorer/components/QueryPanel'
-import { TopBar } from '../features/network-explorer/components/TopBar'
+import { SystemPanelContent } from '../features/network-explorer/components/SystemPanelContent'
 import { useNetworkExplorerActions } from '../features/network-explorer/hooks/useNetworkExplorerActions'
 import { useNetworkExplorerController } from '../features/network-explorer/hooks/useNetworkExplorerController'
 
@@ -79,11 +84,115 @@ function App() {
     registration.status ??
     (query.origin === 'backend' ? `查询完成：当前可见 ${query.filteredRows.length} 行。` : '')
   const alertMessage = query.error ?? registration.error ?? nodeDetail.nodeDetailError ?? ''
+  const dashboardPanels = [
+    {
+      id: 'query',
+      label: '\u67e5\u8be2',
+      icon: dashboardPanelIcons.query,
+      content: (
+        <QueryPanel
+          apiBase={apiBase}
+          currencyFilter={query.currencyFilter}
+          error={query.error}
+          extended={query.extended}
+          loading={query.loading}
+          loopStatus={query.loopStatus}
+          mode={query.mode}
+          nodeId={query.nodeId}
+          onAddConsumeNode={nodeActions.handleAddConsumeNode}
+          onAddFlowNode={nodeActions.handleAddFlowNode}
+          onApiBaseChange={setApiBase}
+          onImportLocalNode={nodeActions.handleImportLocalNode}
+          onLockVault={keyring.handleLockVault}
+          onPickNode={networkActions.handlePickNode}
+          onRunQuery={query.runQuery}
+          onSetCurrencyFilter={query.setCurrencyFilter}
+          onSetLoopStatus={query.setLoopStatus}
+          onSetMode={query.setMode}
+          onSetNodeId={query.setNodeId}
+          onSetupVault={(passphrase) => void keyring.vault.setup(passphrase)}
+          onUnlockVault={(passphrase) => void keyring.vault.unlock(passphrase)}
+          registrationError={registration.error}
+          requestUrl={query.requestUrl}
+          showKeyringError={!selectedLocalNode && !selectedLocalConsumeNode}
+          vaultError={keyring.vault.error}
+          vaultStatus={keyring.vault.status}
+          warning={query.warning}
+        />
+      ),
+    },
+    {
+      id: 'details',
+      label: '\u8be6\u60c5',
+      icon: dashboardPanelIcons.details,
+      content: (
+        <InspectorPanel
+          apiBase={apiBase}
+          centralLocked={centralLocked}
+          effectiveSelection={query.effectiveSelection}
+          extendFromNode={query.extendFromNode}
+          extendLoading={query.extendLoading}
+          flowRateView={flowRateView}
+          inspectorEmptyMessage={explorer.inspectorEmptyMessage}
+          loading={query.loading}
+          localConsumeNodes={keyring.localConsumeNodes}
+          localNodeState={localNodeState}
+          localTxRecords={keyring.localTxRecords}
+          nodeActions={nodeActions}
+          nodeDetail={nodeDetail}
+          registration={registration}
+          selectedChain={query.selectedChain}
+          selectedEdge={query.selectedEdge}
+          selectedLocalConsumeNode={selectedLocalConsumeNode}
+          selectedLocalNode={selectedLocalNode}
+          selectedNode={query.selectedNode}
+        />
+      ),
+    },
+    {
+      id: 'loops',
+      label: '\u5faa\u73af',
+      icon: dashboardPanelIcons.loops,
+      content: (
+        <LoopsPanel
+          loops={explorer.loops}
+          onSelectLoop={explorer.handleSelectLoop}
+          selectedChainId={explorer.selectedChainId}
+        />
+      ),
+    },
+    {
+      id: 'metrics',
+      label: '\u6307\u6807',
+      icon: dashboardPanelIcons.metrics,
+      content: <MetricsPanelContent graph={query.graph} />,
+    },
+    {
+      id: 'export',
+      label: '\u5bfc\u51fa',
+      icon: dashboardPanelIcons.export,
+      content: (
+        <ExportPanelContent
+          filteredRowCount={query.filteredRows.length}
+          graphEdgeCount={query.graph.edges.length}
+          onCopyCurl={networkActions.handleCopyCurl}
+          onExportCsv={networkActions.handleExportCsv}
+          onExportJson={networkActions.handleExportJson}
+        />
+      ),
+    },
+    {
+      id: 'system',
+      label: '\u7cfb\u7edf',
+      icon: dashboardPanelIcons.system,
+      content: <SystemPanelContent status={systemStatus.data} />,
+    },
+  ] satisfies DashboardPanelConfig[]
 
   return (
-    <main className="app-shell">
+    <div className="app-shell">
       <a className="skip-link" href="#network-graph">
-        跳转到图谱
+        {'\u8df3\u8f6c\u5230\u56fe\u8c31'}
       </a>
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {politeMessage}
@@ -92,94 +201,21 @@ function App() {
         {alertMessage}
       </div>
 
-      <TopBar
-        edgeCount={canvasGraph.edges.length}
-        nodeCount={canvasGraph.nodes.length}
-        origin={query.origin}
-        systemStatus={systemStatus.data}
-      />
-
-      <section className="workspace">
-        <div className="query-panel">
-          <QueryPanel
-            apiBase={apiBase}
-            currencyFilter={query.currencyFilter}
-            error={query.error}
-            extended={query.extended}
+      <DashboardWorkspace
+        graph={
+          <GraphPanel
+            canvasGraph={canvasGraph}
             loading={query.loading}
-            loopStatus={query.loopStatus}
-            mode={query.mode}
-            nodeId={query.nodeId}
             onAddConsumeNode={nodeActions.handleAddConsumeNode}
             onAddFlowNode={nodeActions.handleAddFlowNode}
-            onApiBaseChange={setApiBase}
-            onImportLocalNode={nodeActions.handleImportLocalNode}
-            onLockVault={keyring.handleLockVault}
-            onPickNode={networkActions.handlePickNode}
-            onRunQuery={query.runQuery}
-            onSetCurrencyFilter={query.setCurrencyFilter}
-            onSetLoopStatus={query.setLoopStatus}
-            onSetMode={query.setMode}
-            onSetNodeId={query.setNodeId}
-            onSetupVault={(passphrase) => void keyring.vault.setup(passphrase)}
-            onUnlockVault={(passphrase) => void keyring.vault.unlock(passphrase)}
-            registrationError={registration.error}
-            requestUrl={query.requestUrl}
-            showKeyringError={!selectedLocalNode && !selectedLocalConsumeNode}
-            vaultError={keyring.vault.error}
-            vaultStatus={keyring.vault.status}
-            warning={query.warning}
+            onSelectEdge={selection.onCanvasSelectEdge}
+            onSelectNode={selection.onCanvasSelectNode}
+            selectedId={selection.selectedLocalId ?? query.effectiveSelection?.id ?? null}
           />
-        </div>
-
-        <GraphPanel
-          canvasGraph={canvasGraph}
-          loading={query.loading}
-          onAddConsumeNode={nodeActions.handleAddConsumeNode}
-          onAddFlowNode={nodeActions.handleAddFlowNode}
-          onSelectEdge={selection.onCanvasSelectEdge}
-          onSelectNode={selection.onCanvasSelectNode}
-          selectedId={selection.selectedLocalId ?? query.effectiveSelection?.id ?? null}
-        />
-
-        <aside className="inspector-panel">
-          <ExportPanelContent
-            filteredRowCount={query.filteredRows.length}
-            graphEdgeCount={query.graph.edges.length}
-            onCopyCurl={networkActions.handleCopyCurl}
-            onExportCsv={networkActions.handleExportCsv}
-            onExportJson={networkActions.handleExportJson}
-          />
-          <MetricsPanelContent graph={query.graph} />
-          <LoopsPanel
-            loops={explorer.loops}
-            onSelectLoop={explorer.handleSelectLoop}
-            selectedChainId={explorer.selectedChainId}
-          />
-          <InspectorPanel
-            apiBase={apiBase}
-            centralLocked={centralLocked}
-            effectiveSelection={query.effectiveSelection}
-            extendFromNode={query.extendFromNode}
-            extendLoading={query.extendLoading}
-            flowRateView={flowRateView}
-            inspectorEmptyMessage={explorer.inspectorEmptyMessage}
-            loading={query.loading}
-            localConsumeNodes={keyring.localConsumeNodes}
-            localNodeState={localNodeState}
-            localTxRecords={keyring.localTxRecords}
-            nodeActions={nodeActions}
-            nodeDetail={nodeDetail}
-            registration={registration}
-            selectedChain={query.selectedChain}
-            selectedEdge={query.selectedEdge}
-            selectedLocalConsumeNode={selectedLocalConsumeNode}
-            selectedLocalNode={selectedLocalNode}
-            selectedNode={query.selectedNode}
-          />
-        </aside>
-      </section>
-    </main>
+        }
+        panels={dashboardPanels}
+      />
+    </div>
   )
 }
 

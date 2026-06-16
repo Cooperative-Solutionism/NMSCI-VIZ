@@ -108,6 +108,35 @@ describe('web interface guideline regressions', () => {
     expect(app).toContain('LoopsPanel')
   })
 
+  it('uses the floating dashboard shell instead of fixed page chrome', () => {
+    const app = read('src/app/App.tsx')
+    const appCss = read('src/App.css')
+
+    expect(app).toContain('DashboardWorkspace')
+    expect(app).not.toContain('TopBar')
+
+    for (const selector of [
+      '.dashboard-workspace',
+      '.dashboard-graph',
+      '.dock-icon',
+      '.floating-panel',
+      '.floating-panel__header',
+      '.floating-panel__body',
+    ]) {
+      expect(appCss).toContain(selector)
+    }
+
+    for (const selector of [
+      '.topbar',
+      '.workspace {',
+      '.query-panel {',
+      '.floating-reopen',
+      '.graph-welcome',
+    ]) {
+      expect(appCss).not.toContain(selector)
+    }
+  })
+
   it('keeps query panel content scrollable inside the fixed shell', () => {
     const appCss = read('src/App.css')
     const contentRule = cssRule(appCss, '.query-panel-content')
