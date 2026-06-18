@@ -65,10 +65,13 @@ export function TransactionEvidence({
         <>
           <DetailRow label="金额" value={formatAmount(record.amount, record.currencyType)} />
           <DetailRow
-            label="消费节点"
+            label="消费节点公钥"
             value={<code translate="no">{record.consumeNodePubkey}</code>}
           />
-          <DetailRow label="流转节点" value={<code translate="no">{record.flowNodePubkey}</code>} />
+          <DetailRow
+            label="流转节点公钥"
+            value={<code translate="no">{record.flowNodePubkey}</code>}
+          />
           <DetailRow label="中心公钥" value={<code translate="no">{record.centralPubkey}</code>} />
           <DetailRow label="确认时间" value={formatMicros(record.confirmTimestamp)} />
           <DetailRow label="记录 txid" value={<code translate="no">{record.txid}</code>} />

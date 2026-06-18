@@ -148,15 +148,19 @@ export function useFlowNodeTransactionActions({
   }, [mountFormOpen, prefetchTxDifficulty])
 
   const createTransactionMount = useCallback(
-    async (recordId: string, difficultyHex: string) => {
+    async (recordId: string, flowNodePubkey: string, difficultyHex: string) => {
       const record = localTxRecords.find((candidate) => candidate.id === recordId)
       if (!record) return
       const consumeNode = localConsumeNodes.find(
         (node) => node.publicKeyHex === record.consumeNodePubkey,
       )
-      const flowNode = localFlowNodes.find((node) => node.publicKeyHex === record.flowNodePubkey)
-      if (!consumeNode || !flowNode) {
-        dispatch({ type: 'FAILURE', error: '此记录对应的消费/流转节点不在当前密钥环中。' })
+      const flowNode = localFlowNodes.find((node) => node.publicKeyHex === flowNodePubkey)
+      if (!consumeNode) {
+        dispatch({ type: 'FAILURE', error: '此记录对应的消费节点不在当前密钥环中。' })
+        return
+      }
+      if (!flowNode) {
+        dispatch({ type: 'FAILURE', error: '请选择一个当前密钥环中的流转节点。' })
         return
       }
       dispatch({ type: 'START', busy: 'mount' })
@@ -171,7 +175,7 @@ export function useFlowNodeTransactionActions({
             mountedTransactionRecordId: record.id,
             difficultyHex: normalizeNBitsHex(difficultyHex, '挂载难度'),
             consumeNodePubkeyHex: record.consumeNodePubkey,
-            flowNodePubkeyHex: record.flowNodePubkey,
+            flowNodePubkeyHex: flowNode.publicKeyHex,
             centralPubkeyHex: record.centralPubkey,
             consumePrivateKeyHex: consumeNode.privateKeyHex,
             flowPrivateKeyHex: flowNode.privateKeyHex,
@@ -179,7 +183,7 @@ export function useFlowNodeTransactionActions({
           (attempts) => setMiningAttempts(attempts),
         )
         await sendTransactionMountMsg(client, built.bytes)
-        setMountedPubkey(record.flowNodePubkey)
+        setMountedPubkey(flowNode.publicKeyHex)
         dispatch({ type: 'SUCCESS', status: '交易已挂载。查看消费链即可在图谱中看到结果。' })
       } catch (operationError) {
         dispatch({

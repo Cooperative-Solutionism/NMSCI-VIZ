@@ -167,6 +167,7 @@ function App() {
           inspectorEmptyMessage={explorer.inspectorEmptyMessage}
           loading={query.loading}
           localConsumeNodes={keyring.localConsumeNodes}
+          localFlowNodes={keyring.localFlowNodes}
           localNodeState={localNodeState}
           localTxRecords={keyring.localTxRecords}
           nodeActions={nodeActions}

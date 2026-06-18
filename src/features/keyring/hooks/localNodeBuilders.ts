@@ -12,9 +12,10 @@ export function createLocalFlowNode(position?: { x: number; y: number }): LocalF
 export function createLocalConsumeNode(position?: { x: number; y: number }): LocalConsumeNode {
   const keypair = generateKeyPair()
   const now = new Date().toISOString()
+  const id = makeMessageId()
   return {
-    id: makeMessageId(),
-    label: shortId(keypair.publicKey),
+    id,
+    label: shortId(id),
     privateKeyHex: keypair.privateKey,
     publicKeyHex: keypair.publicKey,
     createdAt: now,
@@ -33,9 +34,10 @@ function makeLocalFlowNode(
   position?: { x: number; y: number },
 ): LocalFlowNode {
   const now = new Date().toISOString()
+  const id = makeMessageId()
   return {
-    id: makeMessageId(),
-    label: shortId(publicKeyHex),
+    id,
+    label: '未注册',
     privateKeyHex,
     publicKeyHex,
     createdAt: now,

@@ -124,7 +124,10 @@ describe('App initial state', () => {
       expect(saved.nodes[0]?.registration?.txid).toBe('regtxid')
     })
     await waitFor(() => {
-      expect(screen.getAllByText(/已注册 021111/).length).toBeGreaterThan(0)
+      const messages = screen.getAllByText(/已注册 .+，nonce 为 42。/)
+      expect(messages.length).toBeGreaterThan(0)
+      expect(messages.some((message) => message.textContent?.includes('REG-1'))).toBe(true)
+      expect(messages.some((message) => message.textContent?.includes('021111'))).toBe(false)
     })
   })
 

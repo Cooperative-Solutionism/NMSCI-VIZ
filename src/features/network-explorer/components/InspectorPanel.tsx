@@ -7,7 +7,7 @@ import {
   TransactionMountForm,
   TransactionRecordForm,
 } from '../../../components'
-import { formatAmount, shortId } from '../../../lib/chainGraph'
+import { flowNodeDisplayName, formatAmount, shortId } from '../../../lib/chainGraph'
 import type { LocalConsumeNode } from '../../../lib/consumeNodeStorage'
 import type { LocalFlowNode } from '../../../lib/flowNodeStorage'
 import type { LocalTxRecord } from '../../../lib/txRecordStorage'
@@ -33,6 +33,7 @@ export function InspectorPanel({
   inspectorEmptyMessage,
   loading,
   localConsumeNodes,
+  localFlowNodes,
   localNodeState,
   localTxRecords,
   nodeDetail,
@@ -53,6 +54,7 @@ export function InspectorPanel({
   inspectorEmptyMessage: string
   loading: boolean
   localConsumeNodes: LocalConsumeNode[]
+  localFlowNodes: LocalFlowNode[]
   localNodeState: NodeDetail['nodeState']
   localTxRecords: LocalTxRecord[]
   nodeDetail: NodeDetail
@@ -73,6 +75,13 @@ export function InspectorPanel({
   selectedLocalNode: LocalFlowNode | null
   selectedNode: ChainGraphNode | null
 }) {
+  const selectedFlowNodeIndex = selectedLocalNode
+    ? localFlowNodes.findIndex((node) => node.publicKeyHex === selectedLocalNode.publicKeyHex)
+    : -1
+  const selectedFlowNodeDisplayName = selectedLocalNode
+    ? flowNodeDisplayName(selectedLocalNode, Math.max(0, selectedFlowNodeIndex))
+    : ''
+
   return (
     <div className="inspector-panel-content" aria-label="选择详情">
       <div className="inspector-heading">
@@ -96,6 +105,7 @@ export function InspectorPanel({
               busy={registration.busy}
               centralLocked={centralLocked}
               centralPubkey={registration.centralPubkey}
+              displayName={selectedFlowNodeDisplayName}
               error={registration.error}
               lastRawBytes={registration.lastRawBytes}
               miningAttempts={registration.miningAttempts}
@@ -144,10 +154,12 @@ export function InspectorPanel({
                 busy={registration.busy === 'mount'}
                 canViewChain={registration.mountedPubkey !== null}
                 defaultDifficulty={registration.txDifficulty}
+                defaultFlowNodePubkey={selectedLocalNode.publicKeyHex}
                 error={registration.error}
+                flowNodes={localFlowNodes}
                 miningAttempts={registration.miningAttempts}
-                onMount={(recordId, difficultyHex) =>
-                  void registration.createTransactionMount(recordId, difficultyHex)
+                onMount={(recordId, flowNodePubkey, difficultyHex) =>
+                  void registration.createTransactionMount(recordId, flowNodePubkey, difficultyHex)
                 }
                 onViewChain={registration.viewConsumeChain}
                 records={localTxRecords}

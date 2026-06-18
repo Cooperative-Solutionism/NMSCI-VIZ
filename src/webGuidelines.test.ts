@@ -68,7 +68,7 @@ describe('web interface guideline regressions', () => {
     ]) {
       expect(recordForm).toContain(`name="${name}"`)
     }
-    for (const name of ['mountedRecordId', 'mountDifficultyHex']) {
+    for (const name of ['mountedRecordId', 'mountFlowNodePubkey', 'mountDifficultyHex']) {
       expect(mountForm).toContain(`name="${name}"`)
     }
     for (const name of ['registerDifficultyTarget', 'authorizationCentralPubkey']) {

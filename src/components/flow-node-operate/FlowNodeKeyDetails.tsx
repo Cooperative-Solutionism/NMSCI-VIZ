@@ -6,6 +6,7 @@ import { DetailRow } from '../DetailRow'
 import { formatRegistrationStatus } from './formatRegistrationStatus'
 
 interface FlowNodeKeyDetailsProps {
+  displayName: string
   node: LocalFlowNode
   nodeState?: FlowNodeStateResponseDTO
   onCopy: (value: string, label: string) => void
@@ -16,6 +17,7 @@ interface FlowNodeKeyDetailsProps {
 }
 
 export function FlowNodeKeyDetails({
+  displayName,
   node,
   nodeState,
   onCopy,
@@ -30,6 +32,7 @@ export function FlowNodeKeyDetails({
 
   return (
     <div className="node-key-box">
+      <DetailRow label="节点名称" value={<code translate="no">{displayName}</code>} />
       <DetailRow
         label="公钥"
         value={

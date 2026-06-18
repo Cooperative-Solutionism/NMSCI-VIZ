@@ -159,9 +159,17 @@ function touchNode(
 
 // 本地密钥节点的最小展示信息（避免 chainGraph 依赖 storage 类型）。
 export interface LocalNodeRef {
+  id: string
   publicKeyHex: string
-  label: string
+  label?: string
   position?: CanvasPosition
+  registration?: {
+    id: string
+  }
+}
+
+export function flowNodeDisplayName(node: LocalNodeRef, index: number): string {
+  return node.registration?.id ? shortId(node.registration.id) : `未注册${index + 1}`
 }
 
 // 把本地密钥节点（流转/消费）叠加到查询得到的链图上，使其直接显示在画布、可在无查询结果时先建后查。
@@ -173,22 +181,26 @@ export function mergeLocalNodes(
 ): ChainGraph {
   const seen = new Set(graph.nodes.map((node) => node.id))
   const extra: ChainGraphNode[] = []
-  const append = (refs: LocalNodeRef[], kind: NodeKind): void => {
-    for (const ref of refs) {
-      if (seen.has(ref.publicKeyHex)) continue
+  const append = (
+    refs: LocalNodeRef[],
+    kind: NodeKind,
+    labelForNode: (node: LocalNodeRef, index: number) => string,
+  ): void => {
+    refs.forEach((ref, index) => {
+      if (seen.has(ref.publicKeyHex)) return
       seen.add(ref.publicKeyHex)
       extra.push({
         id: ref.publicKeyHex,
-        label: ref.label || shortId(ref.publicKeyHex),
+        label: labelForNode(ref, index),
         chainCount: 0,
         volumeByCurrency: new Map(),
         kind,
         position: ref.position,
       })
-    }
+    })
   }
-  append(flowNodes, 'local-flow')
-  append(consumeNodes, 'local-consume')
+  append(flowNodes, 'local-flow', flowNodeDisplayName)
+  append(consumeNodes, 'local-consume', (ref) => shortId(ref.id))
   if (extra.length === 0) return graph
   return { ...graph, nodes: [...graph.nodes, ...extra] }
 }

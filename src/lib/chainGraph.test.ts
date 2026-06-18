@@ -114,23 +114,50 @@ describe('chain graph mapping', () => {
     })
   })
 
-  it('merges local flow/consume nodes onto the chain graph by pubkey', () => {
+  it('merges local flow/consume nodes and labels unregistered flow nodes by sequence', () => {
     const graph = buildGraphFromConsumeChains(chainRows)
     const before = graph.nodes.length
+    const flowRefs = [
+      {
+        id: 'alpha-flow-node',
+        publicKeyHex: 'pk-flow',
+        label: 'Flow A',
+        position: { x: 1, y: 2 },
+      },
+      {
+        id: 'registered-local-flow-node',
+        publicKeyHex: 'pk-registered-flow',
+        label: 'Flow B',
+        registration: {
+          id: 'registered-flow-node-id',
+        },
+      },
+    ]
+    const consumeRefs = [
+      {
+        id: 'bravo-consume-node',
+        publicKeyHex: 'pk-consume',
+        label: 'Consume A',
+      },
+    ]
 
-    const merged = mergeLocalNodes(
-      graph,
-      [{ publicKeyHex: 'pk-flow', label: 'Flow A', position: { x: 1, y: 2 } }],
-      [{ publicKeyHex: 'pk-consume', label: 'Consume A' }],
-    )
-    expect(merged.nodes.length).toBe(before + 2)
+    const merged = mergeLocalNodes(graph, flowRefs, consumeRefs)
+    expect(merged.nodes.length).toBe(before + 3)
     const flow = merged.nodes.find((node) => node.id === 'pk-flow')
     expect(flow?.kind).toBe('local-flow')
+    expect(flow?.label).toBe('未注册1')
     expect(flow?.position).toEqual({ x: 1, y: 2 })
-    expect(merged.nodes.find((node) => node.id === 'pk-consume')?.kind).toBe('local-consume')
+    expect(merged.nodes.find((node) => node.id === 'pk-registered-flow')?.label).toBe('REGIST')
+    const consume = merged.nodes.find((node) => node.id === 'pk-consume')
+    expect(consume?.kind).toBe('local-consume')
+    expect(consume?.label).toBe('BRAVO-')
 
     // 已存在的 id 不重复叠加
-    const dup = mergeLocalNodes(graph, [{ publicKeyHex: graph.nodes[0]!.id, label: 'X' }], [])
+    const dup = mergeLocalNodes(
+      graph,
+      [{ id: 'duplicate-flow-node', publicKeyHex: graph.nodes[0]!.id, label: 'X' }],
+      [],
+    )
     expect(dup.nodes.length).toBe(before)
     expect(dup).toBe(graph)
   })

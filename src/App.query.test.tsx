@@ -227,7 +227,7 @@ describe('App initial state', () => {
     fireEvent.click(screen.getByRole('button', { name: /浏览节点/ }))
     fireEvent.click(screen.getByRole('button', { name: /^浏览$/ }))
 
-    const row = await screen.findByRole('button', { name: /02DDDDDDDD/i })
+    const row = await screen.findByRole('button', { name: /N1/i })
     fireEvent.click(row)
 
     expect((screen.getByLabelText('流转节点 ID / 公钥') as HTMLTextAreaElement).value).toBe(pubkey)

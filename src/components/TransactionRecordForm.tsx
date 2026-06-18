@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { shortId } from '../lib/chainGraph'
 import { formatInteger } from '../lib/format'
 import { Field } from './Field'
 
@@ -38,7 +39,7 @@ export function TransactionRecordForm({
   status,
 }: {
   busy: boolean
-  consumeNodes: Array<{ publicKeyHex: string; label: string }>
+  consumeNodes: Array<{ id: string; publicKeyHex: string; label: string }>
   defaultCentralPubkey: string
   defaultDifficulty: string
   error: string | null
@@ -103,7 +104,7 @@ export function TransactionRecordForm({
           {consumeNodes.length === 0 ? <option value="">暂无消费节点，请先添加</option> : null}
           {consumeNodes.map((node) => (
             <option key={node.publicKeyHex} value={node.publicKeyHex}>
-              {node.label}
+              {shortId(node.id)}
             </option>
           ))}
         </select>

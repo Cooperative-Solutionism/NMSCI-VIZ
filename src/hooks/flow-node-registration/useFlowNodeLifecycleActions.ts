@@ -111,7 +111,7 @@ export function useFlowNodeLifecycleActions({
       setLastRawBytes(built.rawBytesHex)
       dispatch({
         type: 'SUCCESS',
-        status: `已注册 ${shortId(selectedLocalNode.publicKeyHex)}，nonce 为 ${built.nonce}。`,
+        status: `已注册 ${shortId(registration.id)}，nonce 为 ${built.nonce}。`,
       })
       void reloadLocalNodeState(selectedLocalNode.publicKeyHex)
     } catch (operationError) {

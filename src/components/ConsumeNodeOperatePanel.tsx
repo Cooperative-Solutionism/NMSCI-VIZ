@@ -25,6 +25,7 @@ export function ConsumeNodeOperatePanel({
     <div className="inspector-content">
       <PanelHeader icon={<Wallet size={16} />} title="消费节点" />
       <div className="node-key-box">
+        <DetailRow label="节点 ID" value={<code translate="no">{node.id}</code>} />
         <DetailRow
           label="公钥"
           value={

@@ -14,6 +14,7 @@ export function FlowNodeOperatePanel({
   busy,
   centralLocked,
   centralPubkey,
+  displayName,
   error,
   lastRawBytes,
   miningAttempts,
@@ -37,6 +38,7 @@ export function FlowNodeOperatePanel({
   busy: FlowNodeBusyState
   centralLocked: boolean
   centralPubkey: string
+  displayName: string
   error: string | null
   lastRawBytes: string
   miningAttempts: number | null
@@ -61,6 +63,7 @@ export function FlowNodeOperatePanel({
     <div className="inspector-content">
       <PanelHeader icon={<KeyRound size={16} />} title="流转节点" />
       <FlowNodeKeyDetails
+        displayName={displayName}
         node={node}
         nodeState={nodeState}
         onCopy={onCopy}

@@ -1,7 +1,7 @@
 import { Search } from 'lucide-react'
 import { useCallback } from 'react'
 import { useFlowNodeDirectory } from '../hooks/useFlowNodeDirectory'
-import { shortHex } from '../lib/format'
+import { shortId } from '../lib/chainGraph'
 import { useUrlBooleanParam, useUrlNumberParam } from '../shared/hooks/useUrlQueryParam'
 
 const PAGE_SIZE = 10
@@ -96,7 +96,7 @@ export function NodeBrowser({
                     onClick={() => onPick(item.flowNodePubkey)}
                   >
                     <span className="node-browser-key" translate="no">
-                      {shortHex(item.flowNodePubkey)}
+                      {shortId(item.id)}
                     </span>
                     <span className="node-browser-badges">
                       {item.registered ? <em className="badge reg">注册</em> : null}
