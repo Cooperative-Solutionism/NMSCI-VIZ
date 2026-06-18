@@ -1,9 +1,20 @@
+const integerFormatter = new Intl.NumberFormat('zh-CN', {
+  maximumFractionDigits: 0,
+})
+
+export function formatInteger(value: number): string {
+  return integerFormatter.format(value)
+}
+
 export function formatMicros(value: number | bigint): string {
   const micros = typeof value === 'bigint' ? value : BigInt(Math.trunc(value))
   const millis = micros / 1000n
   const timestamp = Number(millis)
   if (!Number.isFinite(timestamp)) return '-'
-  return new Date(timestamp).toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC')
+  return new Date(timestamp)
+    .toISOString()
+    .replace('T', ' ')
+    .replace(/\.\d{3}Z$/, ' UTC')
 }
 
 export function formatOptional(value: string | number | bigint | undefined): string {
@@ -18,9 +29,9 @@ export function formatDateTime(value: string): string {
 }
 
 export function shortHex(hex: string): string {
-  return `${hex.slice(0, 10).toUpperCase()}...${hex.slice(-6).toUpperCase()}`
+  return `${hex.slice(0, 10).toUpperCase()}…${hex.slice(-6).toUpperCase()}`
 }
 
 export function maskSecret(hex: string): string {
-  return `${hex.slice(0, 6)}...${hex.slice(-6)}`
+  return `${hex.slice(0, 6)}…${hex.slice(-6)}`
 }

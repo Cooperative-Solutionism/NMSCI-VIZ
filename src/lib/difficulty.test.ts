@@ -3,20 +3,20 @@ import { normalizeNBitsHex } from './difficulty'
 
 describe('nBits difficulty helpers', () => {
   it('normalizes nBits hex to eight lowercase digits', () => {
-    expect(normalizeNBitsHex('1d00ffff', 'Register difficulty target')).toBe('1d00ffff')
-    expect(normalizeNBitsHex('0x1D00FFFF', 'Register difficulty target')).toBe('1d00ffff')
-    expect(normalizeNBitsHex('abc', 'Register difficulty target')).toBe('00000abc')
+    expect(normalizeNBitsHex('1d00ffff', '注册难度目标')).toBe('1d00ffff')
+    expect(normalizeNBitsHex('0x1D00FFFF', '注册难度目标')).toBe('1d00ffff')
+    expect(normalizeNBitsHex('abc', '注册难度目标')).toBe('00000abc')
   })
 
   it('rejects non-hex and oversized nBits values', () => {
-    expect(() => normalizeNBitsHex('', 'Register difficulty target')).toThrow(
-      'Register difficulty target must be 1 to 8 hex digits',
+    expect(() => normalizeNBitsHex('', '注册难度目标')).toThrow(
+      '注册难度目标必须是 1 到 8 位十六进制字符',
     )
-    expect(() => normalizeNBitsHex('200000000', 'Register difficulty target')).toThrow(
-      'Register difficulty target must be 1 to 8 hex digits',
+    expect(() => normalizeNBitsHex('200000000', '注册难度目标')).toThrow(
+      '注册难度目标必须是 1 到 8 位十六进制字符',
     )
-    expect(() => normalizeNBitsHex('1234zzzz', 'Register difficulty target')).toThrow(
-      'Register difficulty target must be 1 to 8 hex digits',
+    expect(() => normalizeNBitsHex('1234zzzz', '注册难度目标')).toThrow(
+      '注册难度目标必须是 1 到 8 位十六进制字符',
     )
   })
 })

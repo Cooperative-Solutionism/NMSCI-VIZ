@@ -13,23 +13,26 @@ export function useNodeDetail(apiBase: string, selectedPubkey: string | null) {
   const client = useMemo(() => new ApiClient({ baseUrl: apiBase }), [apiBase])
   const generationRef = useRef<Record<string, number>>({})
 
-  const loadNodeState = useCallback(async (pubkey: string) => {
-    const generation = (generationRef.current[pubkey] ?? 0) + 1
-    generationRef.current[pubkey] = generation
-    setNodeDetailStatus('loading')
-    setNodeDetailError(null)
+  const loadNodeState = useCallback(
+    async (pubkey: string) => {
+      const generation = (generationRef.current[pubkey] ?? 0) + 1
+      generationRef.current[pubkey] = generation
+      setNodeDetailStatus('loading')
+      setNodeDetailError(null)
 
-    try {
-      const detail = await getFlowNodeState(client, pubkey)
-      if (generation !== generationRef.current[pubkey]) return
-      setStateByPubkey((current) => ({ ...current, [pubkey]: detail.data }))
-      setNodeDetailStatus('loaded')
-    } catch (detailError) {
-      if (generation !== generationRef.current[pubkey]) return
-      setNodeDetailStatus('error')
-      setNodeDetailError(errorMessage(detailError, 'Unknown node state error'))
-    }
-  }, [client])
+      try {
+        const detail = await getFlowNodeState(client, pubkey)
+        if (generation !== generationRef.current[pubkey]) return
+        setStateByPubkey((current) => ({ ...current, [pubkey]: detail.data }))
+        setNodeDetailStatus('loaded')
+      } catch (detailError) {
+        if (generation !== generationRef.current[pubkey]) return
+        setNodeDetailStatus('error')
+        setNodeDetailError(errorMessage(detailError, '未知节点状态错误'))
+      }
+    },
+    [client],
+  )
 
   useEffect(() => {
     if (!selectedPubkey || stateByPubkey[selectedPubkey]) return

@@ -10,6 +10,7 @@ import {
   mergeLocalNodes,
   shortId,
 } from './chainGraph'
+import { queryNodeId } from '../test/appFixtures'
 import type { ConsumeChainResponseDTORaw } from './types'
 
 const rawChainRows: ConsumeChainResponseDTORaw[] = [
@@ -113,23 +114,50 @@ describe('chain graph mapping', () => {
     })
   })
 
-  it('merges local flow/consume nodes onto the chain graph by pubkey', () => {
+  it('merges local flow/consume nodes and labels unregistered flow nodes by sequence', () => {
     const graph = buildGraphFromConsumeChains(chainRows)
     const before = graph.nodes.length
+    const flowRefs = [
+      {
+        id: 'alpha-flow-node',
+        publicKeyHex: 'pk-flow',
+        label: 'Flow A',
+        position: { x: 1, y: 2 },
+      },
+      {
+        id: 'registered-local-flow-node',
+        publicKeyHex: 'pk-registered-flow',
+        label: 'Flow B',
+        registration: {
+          id: 'registered-flow-node-id',
+        },
+      },
+    ]
+    const consumeRefs = [
+      {
+        id: 'bravo-consume-node',
+        publicKeyHex: 'pk-consume',
+        label: 'Consume A',
+      },
+    ]
 
-    const merged = mergeLocalNodes(
-      graph,
-      [{ publicKeyHex: 'pk-flow', label: 'Flow A', position: { x: 1, y: 2 } }],
-      [{ publicKeyHex: 'pk-consume', label: 'Consume A' }],
-    )
-    expect(merged.nodes.length).toBe(before + 2)
+    const merged = mergeLocalNodes(graph, flowRefs, consumeRefs)
+    expect(merged.nodes.length).toBe(before + 3)
     const flow = merged.nodes.find((node) => node.id === 'pk-flow')
     expect(flow?.kind).toBe('local-flow')
+    expect(flow?.label).toBe('未注册1')
     expect(flow?.position).toEqual({ x: 1, y: 2 })
-    expect(merged.nodes.find((node) => node.id === 'pk-consume')?.kind).toBe('local-consume')
+    expect(merged.nodes.find((node) => node.id === 'pk-registered-flow')?.label).toBe('REGIST')
+    const consume = merged.nodes.find((node) => node.id === 'pk-consume')
+    expect(consume?.kind).toBe('local-consume')
+    expect(consume?.label).toBe('BRAVO-')
 
     // 已存在的 id 不重复叠加
-    const dup = mergeLocalNodes(graph, [{ publicKeyHex: graph.nodes[0]!.id, label: 'X' }], [])
+    const dup = mergeLocalNodes(
+      graph,
+      [{ id: 'duplicate-flow-node', publicKeyHex: graph.nodes[0]!.id, label: 'X' }],
+      [],
+    )
     expect(dup.nodes.length).toBe(before)
     expect(dup).toBe(graph)
   })
@@ -165,49 +193,56 @@ describe('chain graph mapping', () => {
     ]
 
     const graph = buildGraphFromConsumeChains(mixed)
-    expect(graph.stats.volumeByCurrency).toEqual(new Map([[1, 12500n], [0, 2_500_000n]]))
-    expect(formatVolumeByCurrency(graph.stats.volumeByCurrency)).toBe('2,500,000 ug Au · 125.00 CNY')
+    expect(graph.stats.volumeByCurrency).toEqual(
+      new Map([
+        [1, 12500n],
+        [0, 2_500_000n],
+      ]),
+    )
+    expect(formatVolumeByCurrency(graph.stats.volumeByCurrency)).toBe(
+      '2,500,000 Au 微克 · 125.00 CNY',
+    )
   })
 
   it('builds backend URLs for node-centered start and end queries', () => {
-    expect(buildConsumeChainUrl('/api', {
-      mode: 'start',
-      nodeId: 'node-1',
-      loopStatus: 'open',
-      page: 2,
-      size: 25,
-    })).toBe('/api/consume-chains?startId=node-1&isLoop=false&page=2&size=25')
+    expect(
+      buildConsumeChainUrl('/api', {
+        mode: 'start',
+        nodeId: queryNodeId,
+        loopStatus: 'open',
+      }),
+    ).toBe(`/api/consume-chains?startId=${queryNodeId}&isLoop=false&page=0&size=200`)
 
-    expect(buildConsumeChainUrl('http://localhost:8080/', {
-      mode: 'end',
-      nodeId: 'node 2',
-      loopStatus: 'looped',
-      page: 0,
-      size: 10,
-    })).toBe('http://localhost:8080/consume-chains?endId=node+2&isLoop=true&page=0&size=10')
+    expect(
+      buildConsumeChainUrl('http://localhost:8080/', {
+        mode: 'end',
+        nodeId: 'node 2',
+        loopStatus: 'looped',
+      }),
+    ).toBe('http://localhost:8080/consume-chains?endId=node+2&isLoop=true&page=0&size=200')
 
-    expect(buildConsumeChainUrl('/api', {
-      mode: 'node',
-      nodeId: 'node-3',
-      loopStatus: 'all',
-      page: 1,
-      size: 100,
-    })).toBe('/api/consume-chains?nodeId=node-3&page=1&size=100')
+    expect(
+      buildConsumeChainUrl('/api', {
+        mode: 'node',
+        nodeId: 'node-3',
+        loopStatus: 'all',
+      }),
+    ).toBe('/api/consume-chains?nodeId=node-3&page=0&size=200')
 
     const pubkey = `02${'a'.repeat(64)}`
-    expect(buildConsumeChainUrl('/api', {
-      mode: 'start',
-      nodeId: pubkey,
-      loopStatus: 'all',
-      page: 0,
-      size: 50,
-    })).toBe(`/api/consume-chains?startPubkey=${pubkey}&page=0&size=50`)
+    expect(
+      buildConsumeChainUrl('/api', {
+        mode: 'start',
+        nodeId: pubkey,
+        loopStatus: 'all',
+      }),
+    ).toBe(`/api/consume-chains?startPubkey=${pubkey}&page=0&size=200`)
   })
 
   it('formats operational labels without losing raw ids', () => {
     expect(shortId('abcdef11-1111-4111-8111-111111111111')).toBe('ABCDEF')
     expect(formatAmount(12500, 1)).toBe('125.00 CNY')
-    expect(formatAmount(2500000, 0)).toBe('2,500,000 ug Au')
+    expect(formatAmount(2500000, 0)).toBe('2,500,000 Au 微克')
     expect(chainColor('chain-a')).toBe(chainColor('chain-a'))
     expect(chainColor('chain-a')).not.toBe(chainColor('chain-b'))
   })

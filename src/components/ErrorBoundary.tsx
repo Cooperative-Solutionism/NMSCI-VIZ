@@ -18,10 +18,10 @@ export class ErrorBoundary extends Component<
     if (this.state.error) {
       return (
         <div className="error-boundary" role="alert">
-          <strong>{this.props.label ?? 'View failed'}</strong>
+          <strong>{this.props.label ?? '视图加载失败'}</strong>
           <span>{this.state.error.message}</span>
           <button type="button" onClick={() => this.setState({ error: null })}>
-            Reload view
+            重新加载视图
           </button>
         </div>
       )

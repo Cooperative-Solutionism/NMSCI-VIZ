@@ -4,7 +4,6 @@ import { formatAmount, shortId } from '../lib/chainGraph'
 import { sortLoops, type LoopSort, type LoopSummary } from '../lib/loops'
 import { PanelHeader } from './PanelHeader'
 
-// 循环交易（成环消费链）面板：把"成环"从一个计数变成可排序、可点选、可在图上高亮的清单。
 export function LoopsPanel({
   loops,
   onSelectLoop,
@@ -18,10 +17,10 @@ export function LoopsPanel({
   const sorted = useMemo(() => sortLoops(loops, sort), [loops, sort])
 
   return (
-    <section className="loops-panel" aria-label="Circular trade loops">
+    <section className="loops-panel" aria-label="循环交易链">
       <div className="loops-head">
-        <PanelHeader icon={<Repeat size={16} />} title={`Loops (${loops.length})`} />
-        <div className="segmented compact" role="group" aria-label="Loop sort">
+        <PanelHeader icon={<Repeat size={16} />} title={`循环 (${loops.length})`} />
+        <div className="segmented compact" role="group" aria-label="循环排序">
           {(['amount', 'length', 'recency'] as const).map((option) => (
             <button
               key={option}
@@ -35,7 +34,7 @@ export function LoopsPanel({
         </div>
       </div>
       {sorted.length === 0 ? (
-        <p className="empty-state small">No looped chains in the current filter.</p>
+        <p className="empty-state small">当前过滤条件下无成环链路。</p>
       ) : (
         <ul className="loops-list">
           {sorted.map((loop) => (
@@ -46,9 +45,11 @@ export function LoopsPanel({
                 aria-pressed={loop.chainId === selectedChainId}
                 onClick={() => onSelectLoop(loop.chainId)}
               >
-                <span className="loop-id">{shortId(loop.chainId)}</span>
+                <span className="loop-id" translate="no">
+                  {shortId(loop.chainId)}
+                </span>
                 <span className="loop-amount">{formatAmount(loop.amount, loop.currencyType)}</span>
-                <span className="loop-len">{loop.length} hops</span>
+                <span className="loop-len">{loop.length} 跳</span>
               </button>
             </li>
           ))}
@@ -59,7 +60,7 @@ export function LoopsPanel({
 }
 
 function sortLabel(sort: LoopSort): string {
-  if (sort === 'length') return 'Length'
-  if (sort === 'recency') return 'Recent'
-  return 'Value'
+  if (sort === 'length') return '长度'
+  if (sort === 'recency') return '最近'
+  return '价值'
 }

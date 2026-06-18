@@ -37,52 +37,60 @@ function loadVaultBlob(storage: Storage): VaultBlob | null {
 }
 
 export function useKeyVault(storage: Storage = window.localStorage) {
-  const [status, setStatus] = useState<VaultStatus>(() => (loadVaultBlob(storage) ? 'locked' : 'setup'))
+  const [status, setStatus] = useState<VaultStatus>(() =>
+    loadVaultBlob(storage) ? 'locked' : 'setup',
+  )
   const [error, setError] = useState<string | null>(null)
   const keyRef = useRef<CryptoKey | null>(null)
 
   // 首次建库：生成盐、派生密钥、写入加密 verifier，并解锁本会话。
-  const setup = useCallback(async (passphrase: string): Promise<boolean> => {
-    setError(null)
-    if (passphrase.length < 8) {
-      setError('Passphrase must be at least 8 characters.')
-      return false
-    }
-    try {
-      const salt = randomSalt()
-      const key = await deriveKey(passphrase, salt)
-      const check = await encryptSecret(key, VERIFIER_PLAINTEXT)
-      const blob: VaultBlob = { version: 1, salt, check }
-      storage.setItem(VAULT_KEY, JSON.stringify(blob))
-      keyRef.current = key
-      setStatus('unlocked')
-      return true
-    } catch (setupError) {
-      setError(setupError instanceof Error ? setupError.message : 'Failed to create vault.')
-      return false
-    }
-  }, [storage])
+  const setup = useCallback(
+    async (passphrase: string): Promise<boolean> => {
+      setError(null)
+      if (passphrase.length < 8) {
+        setError('口令至少需要 8 个字符。')
+        return false
+      }
+      try {
+        const salt = randomSalt()
+        const key = await deriveKey(passphrase, salt)
+        const check = await encryptSecret(key, VERIFIER_PLAINTEXT)
+        const blob: VaultBlob = { version: 1, salt, check }
+        storage.setItem(VAULT_KEY, JSON.stringify(blob))
+        keyRef.current = key
+        setStatus('unlocked')
+        return true
+      } catch (setupError) {
+        setError(setupError instanceof Error ? setupError.message : '创建保险库失败。')
+        return false
+      }
+    },
+    [storage],
+  )
 
   // 解锁：用口令 + 存储盐派生密钥，解密 verifier 校验口令；错误口令会因 AES-GCM 认证失败而拒绝。
-  const unlock = useCallback(async (passphrase: string): Promise<boolean> => {
-    setError(null)
-    const blob = loadVaultBlob(storage)
-    if (!blob) {
-      setStatus('setup')
-      return false
-    }
-    try {
-      const key = await deriveKey(passphrase, blob.salt)
-      const verified = await decryptSecret(key, blob.check)
-      if (verified !== VERIFIER_PLAINTEXT) throw new Error('verifier mismatch')
-      keyRef.current = key
-      setStatus('unlocked')
-      return true
-    } catch {
-      setError('Incorrect passphrase.')
-      return false
-    }
-  }, [storage])
+  const unlock = useCallback(
+    async (passphrase: string): Promise<boolean> => {
+      setError(null)
+      const blob = loadVaultBlob(storage)
+      if (!blob) {
+        setStatus('setup')
+        return false
+      }
+      try {
+        const key = await deriveKey(passphrase, blob.salt)
+        const verified = await decryptSecret(key, blob.check)
+        if (verified !== VERIFIER_PLAINTEXT) throw new Error('verifier mismatch')
+        keyRef.current = key
+        setStatus('unlocked')
+        return true
+      } catch {
+        setError('口令不正确。')
+        return false
+      }
+    },
+    [storage],
+  )
 
   const lock = useCallback(() => {
     keyRef.current = null
@@ -91,16 +99,19 @@ export function useKeyVault(storage: Storage = window.localStorage) {
   }, [storage])
 
   // 编解码器对象引用稳定（useMemo []）；加解密时读 keyRef.current，故始终用当前会话密钥，锁定时拒绝。
-  const codec = useMemo<SecretCodec>(() => ({
-    encrypt: (plaintext) =>
-      keyRef.current
-        ? encryptSecret(keyRef.current, plaintext)
-        : Promise.reject(new Error('Key vault is locked.')),
-    decrypt: (secret) =>
-      keyRef.current
-        ? decryptSecret(keyRef.current, secret)
-        : Promise.reject(new Error('Key vault is locked.')),
-  }), [])
+  const codec = useMemo<SecretCodec>(
+    () => ({
+      encrypt: (plaintext) =>
+        keyRef.current
+          ? encryptSecret(keyRef.current, plaintext)
+          : Promise.reject(new Error('密钥保险库已锁定。')),
+      decrypt: (secret) =>
+        keyRef.current
+          ? decryptSecret(keyRef.current, secret)
+          : Promise.reject(new Error('密钥保险库已锁定。')),
+    }),
+    [],
+  )
 
   return useMemo(
     () => ({ status, error, setup, unlock, lock, codec }),

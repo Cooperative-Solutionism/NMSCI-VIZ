@@ -7,24 +7,41 @@ afterEach(cleanup)
 describe('VaultGate', () => {
   it('setup state: creates a vault with the entered passphrase', () => {
     const onSetup = vi.fn()
-    render(<VaultGate status="setup" error={null} onSetup={onSetup} onUnlock={vi.fn()} onLock={vi.fn()} />)
+    render(
+      <VaultGate
+        status="setup"
+        error={null}
+        onSetup={onSetup}
+        onUnlock={vi.fn()}
+        onLock={vi.fn()}
+      />,
+    )
 
-    expect(screen.getByText(/protect your private keys/i)).toBeTruthy()
-    const input = screen.getByLabelText('New vault passphrase')
-    const button = screen.getByRole('button', { name: /create vault/i })
-    expect((button as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText(/保护你的私钥/)).toBeTruthy()
+    const input = screen.getByLabelText('新保险库口令')
+    const button = screen.getByRole('button', { name: /创建保险库/ })
+    fireEvent.click(button)
+    expect(onSetup).not.toHaveBeenCalled()
 
     fireEvent.change(input, { target: { value: 'super-secret' } })
-    fireEvent.click(screen.getByRole('button', { name: /create vault/i }))
+    fireEvent.click(screen.getByRole('button', { name: /创建保险库/ }))
     expect(onSetup).toHaveBeenCalledWith('super-secret')
   })
 
   it('locked state: unlocks on Enter key', () => {
     const onUnlock = vi.fn()
-    render(<VaultGate status="locked" error={null} onSetup={vi.fn()} onUnlock={onUnlock} onLock={vi.fn()} />)
+    render(
+      <VaultGate
+        status="locked"
+        error={null}
+        onSetup={vi.fn()}
+        onUnlock={onUnlock}
+        onLock={vi.fn()}
+      />,
+    )
 
-    expect(screen.getByText(/unlock your key vault/i)).toBeTruthy()
-    const input = screen.getByLabelText('Vault passphrase')
+    expect(screen.getByText(/解锁密钥保险库/)).toBeTruthy()
+    const input = screen.getByLabelText('保险库口令')
     fireEvent.change(input, { target: { value: 'open-sesame' } })
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(onUnlock).toHaveBeenCalledWith('open-sesame')
@@ -34,21 +51,29 @@ describe('VaultGate', () => {
     render(
       <VaultGate
         status="locked"
-        error="Incorrect passphrase."
+        error="口令不正确。"
         onSetup={vi.fn()}
         onUnlock={vi.fn()}
         onLock={vi.fn()}
       />,
     )
-    expect(screen.getByText('Incorrect passphrase.')).toBeTruthy()
+    expect(screen.getByText('口令不正确。')).toBeTruthy()
   })
 
   it('unlocked state: shows status and locks on click', () => {
     const onLock = vi.fn()
-    render(<VaultGate status="unlocked" error={null} onSetup={vi.fn()} onUnlock={vi.fn()} onLock={onLock} />)
+    render(
+      <VaultGate
+        status="unlocked"
+        error={null}
+        onSetup={vi.fn()}
+        onUnlock={vi.fn()}
+        onLock={onLock}
+      />,
+    )
 
-    expect(screen.getByText(/key vault unlocked/i)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /^lock$/i }))
+    expect(screen.getByText(/密钥保险库已解锁/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /^锁定$/ }))
     expect(onLock).toHaveBeenCalledTimes(1)
   })
 })

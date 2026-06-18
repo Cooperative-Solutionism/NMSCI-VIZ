@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { shortId } from '../lib/chainGraph'
+import { formatInteger } from '../lib/format'
 import { Field } from './Field'
 
 export interface TransactionRecordDraft {
@@ -9,26 +11,23 @@ export interface TransactionRecordDraft {
   difficultyHex: string
 }
 
-// 协议金额按 int64 序列化；客户端先做结构上界校验，避免非法值挖矿后才被后端拒绝。
 const INT64_MAX = 9223372036854775807n
 
 function amountIssue(raw: string): string | null {
   const value = raw.trim()
-  if (!/^[0-9]+$/.test(value)) return 'Amount must be a non-negative integer (smallest unit).'
+  if (!/^[0-9]+$/.test(value)) return '金额必须是非负整数（最小单位）。'
   const parsed = BigInt(value)
-  if (parsed < 1n) return 'Amount must be at least 1.'
-  if (parsed > INT64_MAX) return 'Amount exceeds the int64 protocol range.'
+  if (parsed < 1n) return '金额至少为 1。'
+  if (parsed > INT64_MAX) return '金额超出 int64 协议范围。'
   return null
 }
 
-// 轻量格式校验（压缩公钥：02/03 前缀 + 64 hex）；曲线点合法性由构建消息时的 pubkeyToBytes 兜底。
 function centralPubkeyIssue(raw: string): string | null {
   return /^0[23][0-9a-fA-F]{64}$/.test(raw.trim())
     ? null
-    : 'Central pubkey must be a 33-byte compressed key: 02/03 + 64 hex.'
+    : '中心公钥必须是 33 字节压缩公钥：02/03 + 64 位 hex。'
 }
 
-// 消费记录创建表单（在流转节点操作面板中展开）：来源消费节点 + 金额 + 币种 + 交易难度 + 中心公钥。
 export function TransactionRecordForm({
   busy,
   consumeNodes,
@@ -40,7 +39,7 @@ export function TransactionRecordForm({
   status,
 }: {
   busy: boolean
-  consumeNodes: Array<{ publicKeyHex: string; label: string }>
+  consumeNodes: Array<{ id: string; publicKeyHex: string; label: string }>
   defaultCentralPubkey: string
   defaultDifficulty: string
   error: string | null
@@ -55,89 +54,140 @@ export function TransactionRecordForm({
   const [difficultyHex, setDifficultyHex] = useState(defaultDifficulty)
   const [amountTouched, setAmountTouched] = useState(false)
   const [centralTouched, setCentralTouched] = useState(false)
+  const consumeNodeRef = useRef<HTMLSelectElement | null>(null)
+  const amountRef = useRef<HTMLInputElement | null>(null)
+  const difficultyRef = useRef<HTMLInputElement | null>(null)
+  const centralRef = useRef<HTMLTextAreaElement | null>(null)
 
   const amountError = amountIssue(amount)
   const centralError = centralPubkeyIssue(centralPubkey)
-  const ready =
-    consumeNodePubkey.length > 0
-    && !amountError
-    && !centralError
-    && difficultyHex.trim().length > 0
-    && !busy
+  const handleSubmit = () => {
+    if (busy) return
+    setAmountTouched(true)
+    setCentralTouched(true)
+    if (consumeNodePubkey.length === 0) {
+      consumeNodeRef.current?.focus()
+      return
+    }
+    if (amountError) {
+      amountRef.current?.focus()
+      return
+    }
+    if (difficultyHex.trim().length === 0) {
+      difficultyRef.current?.focus()
+      return
+    }
+    if (centralError) {
+      centralRef.current?.focus()
+      return
+    }
+    onCreate({
+      consumeNodePubkey,
+      amount: amount.trim(),
+      currencyType: Number(currencyType),
+      centralPubkey: centralPubkey.trim(),
+      difficultyHex: difficultyHex.trim(),
+    })
+  }
 
   return (
     <div className="record-form">
-      <div className="section-title">New transaction record</div>
-      <Field label="Consume node">
-        <select value={consumeNodePubkey} onChange={(event) => setConsumeNodePubkey(event.currentTarget.value)}>
-          {consumeNodes.length === 0 ? <option value="">No consume nodes — add one first</option> : null}
+      <div className="section-title">新建交易记录</div>
+      <Field label="消费节点">
+        <select
+          ref={consumeNodeRef}
+          name="consumeNodePubkey"
+          autoComplete="off"
+          value={consumeNodePubkey}
+          onChange={(event) => setConsumeNodePubkey(event.currentTarget.value)}
+        >
+          {consumeNodes.length === 0 ? <option value="">暂无消费节点，请先添加</option> : null}
           {consumeNodes.map((node) => (
             <option key={node.publicKeyHex} value={node.publicKeyHex}>
-              {node.label}
+              {shortId(node.id)}
             </option>
           ))}
         </select>
       </Field>
       <div className="form-grid">
-        <Field label="Amount">
+        <Field label="金额">
           <input
+            ref={amountRef}
+            name="amount"
+            autoComplete="off"
             value={amount}
             inputMode="numeric"
             onChange={(event) => setAmount(event.currentTarget.value)}
             onBlur={() => setAmountTouched(true)}
             aria-invalid={amountTouched && amountError ? true : undefined}
-            placeholder="smallest unit"
+            placeholder="例如 5000…"
           />
           {amountTouched && amountError ? (
-            <span className="field-error" role="alert">{amountError}</span>
+            <span className="field-error" role="alert">
+              {amountError}
+            </span>
           ) : null}
         </Field>
-        <Field label="Record currency">
-          <select value={currencyType} onChange={(event) => setCurrencyType(event.currentTarget.value)}>
-            <option value="1">CNY (cent)</option>
-            <option value="0">Au (ug)</option>
+        <Field label="记录币种">
+          <select
+            name="currencyType"
+            autoComplete="off"
+            value={currencyType}
+            onChange={(event) => setCurrencyType(event.currentTarget.value)}
+          >
+            <option value="1">CNY（分）</option>
+            <option value="0">Au（微克）</option>
           </select>
         </Field>
       </div>
-      <Field label="Transaction difficulty">
+      <Field label="交易难度">
         <input
+          ref={difficultyRef}
+          name="difficultyHex"
+          autoComplete="off"
+          inputMode="text"
+          spellCheck={false}
           value={difficultyHex}
           onChange={(event) => setDifficultyHex(event.currentTarget.value)}
-          placeholder="1d00ffff"
+          placeholder="例如 1d00ffff…"
         />
       </Field>
-      <Field label="Record central pubkey">
+      <Field label="记录中心公钥">
         <textarea
+          ref={centralRef}
+          name="centralPubkey"
+          autoComplete="off"
           rows={2}
           value={centralPubkey}
           spellCheck={false}
           onChange={(event) => setCentralPubkey(event.currentTarget.value)}
           onBlur={() => setCentralTouched(true)}
           aria-invalid={centralTouched && centralError ? true : undefined}
-          placeholder="33-byte compressed public key hex"
+          placeholder="例如 02 后接 64 位 hex…"
         />
         {centralTouched && centralError ? (
-          <span className="field-error" role="alert">{centralError}</span>
+          <span className="field-error" role="alert">
+            {centralError}
+          </span>
         ) : null}
       </Field>
-      <button
-        className="primary-button"
-        type="button"
-        disabled={!ready}
-        onClick={() =>
-          onCreate({
-            consumeNodePubkey,
-            amount: amount.trim(),
-            currencyType: Number(currencyType),
-            centralPubkey: centralPubkey.trim(),
-            difficultyHex: difficultyHex.trim(),
-          })
-        }
-      >
-        {busy ? (miningAttempts != null ? `Mining ${miningAttempts.toLocaleString()}` : 'Submitting') : 'Create record'}
+      <button className="primary-button" type="button" disabled={busy} onClick={handleSubmit}>
+        {busy
+          ? miningAttempts != null
+            ? `挖矿 ${formatInteger(miningAttempts)}…`
+            : '提交中…'
+          : '创建记录'}
       </button>
-      {status ? <p className="operation-message">{status}</p> : null}
-      {error ? <p className="operation-message error">{error}</p> : null}
+      {status ? (
+        <p className="operation-message" aria-live="polite">
+          {status}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="operation-message error" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   )
 }

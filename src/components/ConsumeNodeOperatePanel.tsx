@@ -4,7 +4,6 @@ import type { LocalConsumeNode } from '../lib/consumeNodeStorage'
 import { DetailRow } from './DetailRow'
 import { PanelHeader } from './PanelHeader'
 
-// 消费节点操作面板：消费节点仅是一对密钥（无注册/授权），故只提供密钥信息与管理。
 export function ConsumeNodeOperatePanel({
   error,
   node,
@@ -24,34 +23,46 @@ export function ConsumeNodeOperatePanel({
 }) {
   return (
     <div className="inspector-content">
-      <PanelHeader icon={<Wallet size={16} />} title="Consume node" />
+      <PanelHeader icon={<Wallet size={16} />} title="消费节点" />
       <div className="node-key-box">
+        <DetailRow label="节点 ID" value={<code translate="no">{node.id}</code>} />
         <DetailRow
-          label="Pubkey"
-          value={(
+          label="公钥"
+          value={
             <span className="copyable-value">
-              <code>{node.publicKeyHex}</code>
-              <button type="button" onClick={() => onCopy(node.publicKeyHex, 'Pubkey')}>
-                Copy
+              <code translate="no">{node.publicKeyHex}</code>
+              <button type="button" onClick={() => onCopy(node.publicKeyHex, '公钥')}>
+                复制
               </button>
             </span>
-          )}
+          }
         />
-        <DetailRow label="Secret" value={<code>{maskSecret(node.privateKeyHex)}</code>} />
-        <DetailRow label="Saved" value={formatDateTime(node.createdAt)} />
+        <DetailRow
+          label="私钥"
+          value={<code translate="no">{maskSecret(node.privateKeyHex)}</code>}
+        />
+        <DetailRow label="保存时间" value={formatDateTime(node.createdAt)} />
         <button className="secondary-button" type="button" onClick={onExportPrivateKey}>
-          Export private key
+          导出私钥
         </button>
         <button className="secondary-button" type="button" onClick={onRename}>
-          Rename
+          重命名
         </button>
         <button className="secondary-button danger" type="button" onClick={onDelete}>
-          Delete
+          删除
         </button>
       </div>
-      <p className="field-hint">Use this consume node as the source when creating a transaction record.</p>
-      {status ? <p className="operation-message">{status}</p> : null}
-      {error ? <p className="operation-message error">{error}</p> : null}
+      <p className="field-hint">创建交易记录时可将此消费节点作为来源。</p>
+      {status ? (
+        <p className="operation-message" aria-live="polite">
+          {status}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="operation-message error" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   )
 }

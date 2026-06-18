@@ -1,0 +1,160 @@
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.metric-card {
+  min-width: 0;
+  box-shadow:
+    0 12px 28px -22px rgba(15, 40, 50, 0.45),
+    0 1px 6px -5px rgba(15, 40, 50, 0.22);
+}
+
+.metric-card__header {
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.metric-card__title {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metric-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: var(--soft);
+  color: var(--teal);
+}
+
+.metric-card__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.metric-card__content {
+  min-width: 0;
+}
+
+.metric-card__value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.metric-card--looped .metric-card__icon {
+  background: var(--teal-soft);
+  color: var(--green);
+}
+
+.metric-card--open .metric-card__icon {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.graph-shell {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(28, 45, 38, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(28, 45, 38, 0.055) 1px, transparent 1px), #f9faf7;
+  background-size: 32px 32px;
+}
+
+.graph-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.graph-tools {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.88);
+  padding: 4px;
+  box-shadow: var(--shadow);
+}
+
+.graph-tools button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #33443e;
+}
+
+.graph-tools button:hover {
+  background: var(--soft);
+}
+
+.legend {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: calc(100% - 32px);
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--muted);
+  font-size: 12px;
+  padding: 9px 11px;
+  box-shadow: var(--shadow);
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.legend-line {
+  width: 26px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--green);
+}
+
+.legend-line.chain {
+  background: linear-gradient(
+    90deg,
+    var(--chain-1),
+    var(--chain-2),
+    var(--chain-3),
+    var(--chain-4)
+  );
+}
+
+.legend-line.selected {
+  height: 5px;
+  background: var(--teal);
+}

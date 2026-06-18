@@ -20,7 +20,7 @@ export function useSystemStatus(apiBase: string) {
       setError(null)
     } catch (statusError) {
       if (generation !== generationRef.current) return
-      setError(errorMessage(statusError, 'Failed to load system status'))
+      setError(errorMessage(statusError, '加载系统状态失败'))
     }
   }, [client])
 

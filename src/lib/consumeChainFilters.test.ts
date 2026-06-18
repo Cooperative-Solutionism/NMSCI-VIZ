@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { consumeChainFilters, consumeChainParamName, detectIdentityKind } from './consumeChainFilters'
+import {
+  consumeChainFilters,
+  consumeChainParamName,
+  detectIdentityKind,
+} from './consumeChainFilters'
+import { queryNodeId } from '../test/appFixtures'
 
 describe('consume chain filters', () => {
   it('detects 66-hex public keys as pubkey and everything else as id', () => {
@@ -11,14 +16,32 @@ describe('consume chain filters', () => {
   })
 
   it('maps mode + identity kind to the right backend filter', () => {
-    expect(consumeChainFilters('start', 'node-1', 'all')).toEqual({ startId: 'node-1', isLoop: undefined })
-    expect(consumeChainFilters('end', 'node-1', 'looped')).toEqual({ endId: 'node-1', isLoop: true })
-    expect(consumeChainFilters('node', 'node-1', 'open')).toEqual({ nodeId: 'node-1', isLoop: false })
+    expect(consumeChainFilters('start', queryNodeId, 'all')).toEqual({
+      startId: queryNodeId,
+      isLoop: undefined,
+    })
+    expect(consumeChainFilters('end', queryNodeId, 'looped')).toEqual({
+      endId: queryNodeId,
+      isLoop: true,
+    })
+    expect(consumeChainFilters('node', queryNodeId, 'open')).toEqual({
+      nodeId: queryNodeId,
+      isLoop: false,
+    })
 
     const pubkey = `02${'b'.repeat(64)}`
-    expect(consumeChainFilters('start', pubkey, 'all')).toEqual({ startPubkey: pubkey, isLoop: undefined })
-    expect(consumeChainFilters('end', pubkey, 'looped')).toEqual({ endPubkey: pubkey, isLoop: true })
-    expect(consumeChainFilters('node', pubkey, 'all')).toEqual({ nodePubkey: pubkey, isLoop: undefined })
+    expect(consumeChainFilters('start', pubkey, 'all')).toEqual({
+      startPubkey: pubkey,
+      isLoop: undefined,
+    })
+    expect(consumeChainFilters('end', pubkey, 'looped')).toEqual({
+      endPubkey: pubkey,
+      isLoop: true,
+    })
+    expect(consumeChainFilters('node', pubkey, 'all')).toEqual({
+      nodePubkey: pubkey,
+      isLoop: undefined,
+    })
   })
 
   it('exposes the matching query-parameter name for URL preview', () => {

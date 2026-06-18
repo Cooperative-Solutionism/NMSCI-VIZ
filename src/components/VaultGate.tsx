@@ -10,8 +10,6 @@ interface VaultGateProps {
   onLock: () => void
 }
 
-// 私钥保险库的开关面板：首次建库 / 解锁 / 已解锁三态。
-// 私钥以 AES-GCM 静态加密存于 localStorage，解锁后才载入内存供签名使用。
 export function VaultGate({ status, error, onSetup, onUnlock, onLock }: VaultGateProps) {
   const [passphrase, setPassphrase] = useState('')
 
@@ -19,10 +17,10 @@ export function VaultGate({ status, error, onSetup, onUnlock, onLock }: VaultGat
     return (
       <div className="vault-gate unlocked">
         <span className="vault-state">
-          <LockOpen size={14} aria-hidden="true" /> Key vault unlocked
+          <LockOpen size={14} aria-hidden="true" /> 密钥保险库已解锁
         </span>
         <button className="ghost-button" type="button" onClick={onLock}>
-          Lock
+          锁定
         </button>
       </div>
     )
@@ -39,31 +37,39 @@ export function VaultGate({ status, error, onSetup, onUnlock, onLock }: VaultGat
   return (
     <div className="vault-gate">
       <p className="vault-headline">
-        {isSetup ? <ShieldCheck size={14} aria-hidden="true" /> : <Lock size={14} aria-hidden="true" />}
-        {isSetup ? 'Protect your private keys' : 'Unlock your key vault'}
+        {isSetup ? (
+          <ShieldCheck size={14} aria-hidden="true" />
+        ) : (
+          <Lock size={14} aria-hidden="true" />
+        )}
+        {isSetup ? '保护你的私钥' : '解锁密钥保险库'}
       </p>
       <p className="field-hint">
         {isSetup
-          ? 'Set a passphrase. Private keys are encrypted (AES-GCM) at rest; the passphrase is never stored.'
-          : 'Enter your passphrase to decrypt the local keyring for this session.'}
+          ? '设置口令后，私钥会以 AES-GCM 加密存储；口令不会被保存。'
+          : '输入口令以解密本次会话的本地密钥环。'}
       </p>
       <div className="action-row two">
         <input
+          name="vaultPassphrase"
           type="password"
-          aria-label={isSetup ? 'New vault passphrase' : 'Vault passphrase'}
+          aria-label={isSetup ? '新保险库口令' : '保险库口令'}
           autoComplete={isSetup ? 'new-password' : 'current-password'}
-          placeholder="Passphrase"
           value={passphrase}
           onChange={(event) => setPassphrase(event.currentTarget.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter') submit()
           }}
         />
-        <button className="primary-button" type="button" disabled={passphrase.length === 0} onClick={submit}>
-          {isSetup ? 'Create vault' : 'Unlock'}
+        <button className="primary-button" type="button" onClick={submit}>
+          {isSetup ? '创建保险库' : '解锁'}
         </button>
       </div>
-      {error ? <p className="operation-message error">{error}</p> : null}
+      {error ? (
+        <p className="operation-message error" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   )
 }

@@ -21,25 +21,32 @@ export function EdgeInspector({
 }) {
   return (
     <div className="inspector-content">
-      <PanelHeader icon={<GitBranch size={16} />} title="Selected edge" />
-      <div className={`status-pill ${edge.status}`}>{edge.status}</div>
-      <DetailRow label="Edge ID" value={<code>{edge.id}</code>} />
-      <DetailRow label="Chain ID" value={<code>{edge.chainId}</code>} />
-      <DetailRow label="Amount" value={formatAmount(edge.amount, edge.currencyType)} />
-      <DetailRow label="Source" value={<code>{edge.source}</code>} />
-      <DetailRow label="Target" value={<code>{edge.target}</code>} />
-      <DetailRow label="Record" value={<code>{edge.relatedTransactionRecord}</code>} />
-      <DetailRow label="Mount" value={<code>{edge.relatedTransactionMount}</code>} />
-      <DetailRow label="Mount time" value={formatMicros(edge.relatedTransactionMountTimestamp)} />
+      <PanelHeader icon={<GitBranch size={16} />} title="已选边" />
+      <div className={`status-pill ${edge.status}`}>
+        {edge.status === 'looped' ? '成环' : '开放'}
+      </div>
+      <DetailRow label="边 ID" value={<code translate="no">{edge.id}</code>} />
+      <DetailRow label="链路 ID" value={<code translate="no">{edge.chainId}</code>} />
+      <DetailRow label="金额" value={formatAmount(edge.amount, edge.currencyType)} />
+      <DetailRow label="来源" value={<code translate="no">{edge.source}</code>} />
+      <DetailRow label="目标" value={<code translate="no">{edge.target}</code>} />
+      <DetailRow label="记录" value={<code translate="no">{edge.relatedTransactionRecord}</code>} />
+      <DetailRow label="挂载" value={<code translate="no">{edge.relatedTransactionMount}</code>} />
+      <DetailRow label="挂载时间" value={formatMicros(edge.relatedTransactionMountTimestamp)} />
       {chain ? (
         <>
-          <div className="section-title">Chain tail</div>
-          <DetailRow label="Start" value={<code>{chain.consumeChain.start}</code>} />
-          <DetailRow label="End" value={<code>{chain.consumeChain.end}</code>} />
-          <DetailRow label="Tail mount" value={formatMicros(chain.consumeChain.tailMountTimestamp)} />
+          <div className="section-title">链尾</div>
+          <DetailRow label="起点" value={<code translate="no">{chain.consumeChain.start}</code>} />
+          <DetailRow label="终点" value={<code translate="no">{chain.consumeChain.end}</code>} />
+          <DetailRow label="尾部挂载" value={formatMicros(chain.consumeChain.tailMountTimestamp)} />
         </>
       ) : null}
-      <ReturnFlowCard data={flowRate.data} error={flowRate.error} mode="edge" status={flowRate.status} />
+      <ReturnFlowCard
+        data={flowRate.data}
+        error={flowRate.error}
+        mode="edge"
+        status={flowRate.status}
+      />
       <TransactionEvidence
         apiBase={apiBase}
         mountId={edge.relatedTransactionMount}

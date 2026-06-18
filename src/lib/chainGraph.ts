@@ -8,6 +8,7 @@ import type {
   NodeKind,
   VolumeByCurrency,
 } from './types'
+import { dashboardQueryPage, dashboardQuerySize } from '../app/config'
 import { consumeChainParamName, detectIdentityKind } from './consumeChainFilters'
 import { readGraphTokens } from './tokens'
 
@@ -71,8 +72,8 @@ export function buildConsumeChainUrl(baseUrl: string, query: ConsumeChainQuery):
     params.set('isLoop', String(query.loopStatus === 'looped'))
   }
 
-  params.set('page', String(query.page))
-  params.set('size', String(query.size))
+  params.set('page', String(dashboardQueryPage))
+  params.set('size', String(dashboardQuerySize))
 
   return `${normalizedBaseUrl}/consume-chains?${params.toString()}`
 }
@@ -105,12 +106,12 @@ export function formatAmount(amount: number | bigint, currencyType: number): str
     return `${whole.toLocaleString()}.${cents.toString().padStart(2, '0')} CNY`
   }
   if (currencyType === 0) {
-    return `${normalizedAmount.toLocaleString()} ug Au`
+    return `${normalizedAmount.toLocaleString()} Au 微克`
   }
   return `${normalizedAmount.toLocaleString()} #${currencyType}`
 }
 
-// 把按币种分桶的金额渲染成单行（"125.00 CNY · 2,500,000 ug Au"）。空桶显示 0。
+// 把按币种分桶的金额渲染成单行（"125.00 CNY · 2,500,000 Au 微克"）。空桶显示 0。
 export function formatVolumeByCurrency(volumeByCurrency: VolumeByCurrency): string {
   if (volumeByCurrency.size === 0) return formatAmount(0n, 1)
   return [...volumeByCurrency.entries()]
@@ -158,9 +159,17 @@ function touchNode(
 
 // 本地密钥节点的最小展示信息（避免 chainGraph 依赖 storage 类型）。
 export interface LocalNodeRef {
+  id: string
   publicKeyHex: string
-  label: string
+  label?: string
   position?: CanvasPosition
+  registration?: {
+    id: string
+  }
+}
+
+export function flowNodeDisplayName(node: LocalNodeRef, index: number): string {
+  return node.registration?.id ? shortId(node.registration.id) : `未注册${index + 1}`
 }
 
 // 把本地密钥节点（流转/消费）叠加到查询得到的链图上，使其直接显示在画布、可在无查询结果时先建后查。
@@ -172,22 +181,26 @@ export function mergeLocalNodes(
 ): ChainGraph {
   const seen = new Set(graph.nodes.map((node) => node.id))
   const extra: ChainGraphNode[] = []
-  const append = (refs: LocalNodeRef[], kind: NodeKind): void => {
-    for (const ref of refs) {
-      if (seen.has(ref.publicKeyHex)) continue
+  const append = (
+    refs: LocalNodeRef[],
+    kind: NodeKind,
+    labelForNode: (node: LocalNodeRef, index: number) => string,
+  ): void => {
+    refs.forEach((ref, index) => {
+      if (seen.has(ref.publicKeyHex)) return
       seen.add(ref.publicKeyHex)
       extra.push({
         id: ref.publicKeyHex,
-        label: ref.label || shortId(ref.publicKeyHex),
+        label: labelForNode(ref, index),
         chainCount: 0,
         volumeByCurrency: new Map(),
         kind,
         position: ref.position,
       })
-    }
+    })
   }
-  append(flowNodes, 'local-flow')
-  append(consumeNodes, 'local-consume')
+  append(flowNodes, 'local-flow', flowNodeDisplayName)
+  append(consumeNodes, 'local-consume', (ref) => shortId(ref.id))
   if (extra.length === 0) return graph
   return { ...graph, nodes: [...graph.nodes, ...extra] }
 }
