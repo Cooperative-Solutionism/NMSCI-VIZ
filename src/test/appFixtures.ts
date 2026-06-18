@@ -1,10 +1,17 @@
 import type { ConsumeChainResponseDTORaw } from '../lib/types'
 
+export const queryNodeId = '11111111-1111-4111-8111-111111111111'
+export const graphNodeAId = '22222222-2222-4222-8222-222222222222'
+export const graphNodeBId = '33333333-3333-4333-8333-333333333333'
+export const graphNodeCId = '44444444-4444-4444-8444-444444444444'
+export const evidenceRecordId = '55555555-5555-4555-8555-555555555555'
+export const evidenceMountId = '66666666-6666-4666-8666-666666666666'
+
 export function chainRow(
   id: string,
   currencyType: number,
-  start = 'node-a',
-  end = 'node-b',
+  start = graphNodeAId,
+  end = graphNodeBId,
 ): ConsumeChainResponseDTORaw {
   return {
     consumeChain: {
@@ -24,8 +31,8 @@ export function chainRow(
         amount: 1200,
         currencyType,
         chain: id,
-        relatedTransactionRecord: `${id}-record`,
-        relatedTransactionMount: `${id}-mount`,
+        relatedTransactionRecord: evidenceRecordId,
+        relatedTransactionMount: evidenceMountId,
         relatedTransactionMountTimestamp: 1_700_000_000_000_000,
         isLoop: false,
       },
@@ -34,7 +41,7 @@ export function chainRow(
 }
 
 export function loopedChainRow(id: string): ConsumeChainResponseDTORaw {
-  const row = chainRow(id, 1, 'node-a', 'node-b')
+  const row = chainRow(id, 1, graphNodeAId, graphNodeBId)
   row.consumeChain.isLoop = true
   row.consumeChainEdges = row.consumeChainEdges.map((edge) => ({ ...edge, isLoop: true }))
   return row
@@ -71,7 +78,7 @@ export function transactionMount(id: string) {
     data: {
       id,
       msgType: 3,
-      mountedTransactionRecordId: 'chain-1-record',
+      mountedTransactionRecordId: evidenceRecordId,
       transactionDifficultyTarget: '1d00ffff',
       nonce: 1,
       consumeNodePubkey: '03'.padEnd(66, 'a'),

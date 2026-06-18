@@ -10,6 +10,7 @@ import {
   mergeLocalNodes,
   shortId,
 } from './chainGraph'
+import { queryNodeId } from '../test/appFixtures'
 import type { ConsumeChainResponseDTORaw } from './types'
 
 const rawChainRows: ConsumeChainResponseDTORaw[] = [
@@ -180,10 +181,10 @@ describe('chain graph mapping', () => {
     expect(
       buildConsumeChainUrl('/api', {
         mode: 'start',
-        nodeId: 'node-1',
+        nodeId: queryNodeId,
         loopStatus: 'open',
       }),
-    ).toBe('/api/consume-chains?startId=node-1&isLoop=false&page=0&size=200')
+    ).toBe(`/api/consume-chains?startId=${queryNodeId}&isLoop=false&page=0&size=200`)
 
     expect(
       buildConsumeChainUrl('http://localhost:8080/', {

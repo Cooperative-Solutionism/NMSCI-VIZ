@@ -2,11 +2,16 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import {
   chainRow,
+  evidenceMountId,
+  evidenceRecordId,
   flowNodeDetail,
+  graphNodeAId,
+  graphNodeCId,
   installAppTestLifecycle,
   jsonResponse,
   loopedChainRow,
   openBrowseTab,
+  queryNodeId,
   readSource,
   requestInputUrl,
   sliceResponse,
@@ -35,7 +40,7 @@ describe('App initial state', () => {
     render(<App />)
 
     fireEvent.change(screen.getByLabelText('流转节点 ID / 公钥'), {
-      target: { value: 'node-1' },
+      target: { value: queryNodeId },
     })
     fireEvent.click(screen.getByRole('button', { name: /^加载$/ }))
 
@@ -61,7 +66,7 @@ describe('App initial state', () => {
     render(<App />)
 
     fireEvent.change(screen.getByLabelText('流转节点 ID / 公钥'), {
-      target: { value: 'node-1' },
+      target: { value: queryNodeId },
     })
     fireEvent.pointerDown(screen.getByRole('combobox', { name: /币种/ }), {
       button: 0,
@@ -77,28 +82,30 @@ describe('App initial state', () => {
 
   it('does not render page controls after an extended graph merge', async () => {
     stubFetchByUrl((url) => {
-      if (url.pathname === '/consume-chains' && url.searchParams.get('nodeId') === 'node-1') {
+      if (url.pathname === '/consume-chains' && url.searchParams.get('nodeId') === queryNodeId) {
         return jsonResponse(sliceResponse([chainRow('chain-cny', 1)], { hasNext: true }))
       }
-      if (url.pathname === '/consume-chains' && url.searchParams.get('startId') === 'node-a') {
+      if (url.pathname === '/consume-chains' && url.searchParams.get('startId') === graphNodeAId) {
         return jsonResponse(
-          sliceResponse([chainRow('chain-extra', 1, 'node-a', 'node-c')], {
+          sliceResponse([chainRow('chain-extra', 1, graphNodeAId, graphNodeCId)], {
             hasNext: true,
           }),
         )
       }
       if (url.pathname.startsWith('/flow-node-registrations/')) {
-        return jsonResponse(flowNodeDetail(url.pathname.split('/').pop() ?? 'node-a'))
+        return jsonResponse(flowNodeDetail(url.pathname.split('/').pop() ?? graphNodeAId))
       }
       throw new Error(`Unexpected URL ${url.href}`)
     })
     render(<App />)
 
     fireEvent.change(screen.getByLabelText('流转节点 ID / 公钥'), {
-      target: { value: 'node-1' },
+      target: { value: queryNodeId },
     })
     fireEvent.click(screen.getByRole('button', { name: /^加载$/ }))
-    fireEvent.click(await screen.findByRole('button', { name: /select node node-a/i }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: new RegExp(`select node ${graphNodeAId}`, 'i') }),
+    )
     fireEvent.click(await screen.findByRole('button', { name: /扩展起点/ }))
 
     expect(await screen.findByText(/已扩展图谱视图/)).toBeTruthy()
@@ -142,7 +149,7 @@ describe('App initial state', () => {
     render(<App />)
 
     fireEvent.change(screen.getByLabelText('流转节点 ID / 公钥'), {
-      target: { value: 'node-1' },
+      target: { value: queryNodeId },
     })
     fireEvent.click(screen.getByRole('button', { name: /^加载$/ }))
 
@@ -165,18 +172,18 @@ describe('App initial state', () => {
       if (url.pathname === '/consume-chains') {
         return jsonResponse(sliceResponse([chainRow('chain-1', 1)]))
       }
-      if (url.pathname === '/transaction-records/chain-1-record') {
-        return jsonResponse(transactionRecord('chain-1-record'))
+      if (url.pathname === `/transaction-records/${evidenceRecordId}`) {
+        return jsonResponse(transactionRecord(evidenceRecordId))
       }
-      if (url.pathname === '/transaction-mounts/chain-1-mount') {
-        return jsonResponse(transactionMount('chain-1-mount'))
+      if (url.pathname === `/transaction-mounts/${evidenceMountId}`) {
+        return jsonResponse(transactionMount(evidenceMountId))
       }
       throw new Error(`Unexpected URL ${url.href}`)
     })
     render(<App />)
 
     fireEvent.change(screen.getByLabelText('流转节点 ID / 公钥'), {
-      target: { value: 'node-1' },
+      target: { value: queryNodeId },
     })
     fireEvent.click(screen.getByRole('button', { name: /^加载$/ }))
 
