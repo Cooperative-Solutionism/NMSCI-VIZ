@@ -28,7 +28,9 @@ export interface LocalNodePanelProps {
   localFlowNodes: LocalFlowNode[]
   localConsumeNodes: LocalConsumeNode[]
   selectedLocalId?: string | null
+  canvasNodeIds?: ReadonlySet<string>
   onSelectLocalNode?: (publicKeyHex: string) => void
+  onToggleCanvas?: (publicKeyHex: string) => void
   onAddConsumeNode: () => void
   onAddFlowNode: () => void
   onImportLocalNode: () => void
@@ -81,7 +83,9 @@ export function LocalNodePanel({
   localFlowNodes,
   localConsumeNodes,
   selectedLocalId,
+  canvasNodeIds,
   onSelectLocalNode,
+  onToggleCanvas,
   onAddConsumeNode,
   onAddFlowNode,
   onImportLocalNode,
@@ -89,6 +93,7 @@ export function LocalNodePanel({
   onOpenVault,
   vaultStatus,
 }: LocalNodePanelProps) {
+  const showCanvasColumn = Boolean(onToggleCanvas)
   const VaultIcon =
     vaultStatus === 'unlocked' ? Lock : vaultStatus === 'setup' ? ShieldCheck : LockOpen
   const vaultLabel =
@@ -112,11 +117,12 @@ export function LocalNodePanel({
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <Button variant="secondary" type="button" onClick={onAddFlowNode}>
+            {/* 不直接把 onClick 事件透传为落点参数，面板新建的节点无落点、不自动上画布。 */}
+            <Button variant="secondary" type="button" onClick={() => onAddFlowNode()}>
               <Plus data-icon="inline-start" />
               新建流转节点
             </Button>
-            <Button variant="secondary" type="button" onClick={onAddConsumeNode}>
+            <Button variant="secondary" type="button" onClick={() => onAddConsumeNode()}>
               <Plus data-icon="inline-start" />
               新建消费节点
             </Button>
@@ -143,11 +149,13 @@ export function LocalNodePanel({
                     <TableHead>类型</TableHead>
                     <TableHead>公钥</TableHead>
                     <TableHead>状态</TableHead>
+                    {showCanvasColumn ? <TableHead>画布</TableHead> : null}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rows.map((row) => {
                     const selected = row.publicKeyHex === selectedLocalId
+                    const onCanvas = canvasNodeIds?.has(row.publicKeyHex) ?? false
 
                     return (
                       <TableRow
@@ -179,6 +187,19 @@ export function LocalNodePanel({
                           <code translate="no">{shortId(row.publicKeyHex)}</code>
                         </TableCell>
                         <TableCell>{row.status}</TableCell>
+                        {showCanvasColumn ? (
+                          <TableCell>
+                            <Button
+                              variant={onCanvas ? 'secondary' : 'outline'}
+                              size="sm"
+                              type="button"
+                              aria-pressed={onCanvas}
+                              onClick={() => onToggleCanvas?.(row.publicKeyHex)}
+                            >
+                              {onCanvas ? '移出画布' : '添加到画布'}
+                            </Button>
+                          </TableCell>
+                        ) : null}
                       </TableRow>
                     )
                   })}

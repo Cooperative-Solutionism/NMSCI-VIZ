@@ -181,4 +181,36 @@ describe('LocalNodePanel', () => {
     expect(screen.queryByRole('button', { name: '选择本地节点 未注册1' })).toBeNull()
     expect(screen.getByText('未注册1')).toBeTruthy()
   })
+
+  it('omits the canvas column when no toggle handler is provided', () => {
+    renderPanel({ localFlowNodes: [flowNode()] })
+
+    expect(screen.queryByRole('button', { name: '添加到画布' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '移出画布' })).toBeNull()
+  })
+
+  it('toggles a node onto the canvas via the per-row button', () => {
+    const onToggleCanvas = vi.fn()
+    renderPanel({ localFlowNodes: [flowNode()], onToggleCanvas })
+
+    const addButton = screen.getByRole('button', { name: '添加到画布' })
+    expect(addButton).toHaveAttribute('aria-pressed', 'false')
+
+    fireEvent.click(addButton)
+
+    expect(onToggleCanvas).toHaveBeenCalledTimes(1)
+    expect(onToggleCanvas).toHaveBeenCalledWith('03aaaaaa1111')
+  })
+
+  it('shows nodes already on the canvas as removable and pressed', () => {
+    renderPanel({
+      localFlowNodes: [flowNode()],
+      onToggleCanvas: vi.fn(),
+      canvasNodeIds: new Set(['03aaaaaa1111']),
+    })
+
+    const removeButton = screen.getByRole('button', { name: '移出画布' })
+    expect(removeButton).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('button', { name: '添加到画布' })).toBeNull()
+  })
 })

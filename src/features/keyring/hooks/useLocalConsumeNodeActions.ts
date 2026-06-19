@@ -5,6 +5,7 @@ import { createLocalConsumeNode } from './localNodeBuilders'
 
 interface UseLocalConsumeNodeActionsParams {
   clearSelectedLocalNode: () => void
+  markNodeOnCanvas: (publicKeyHex: string) => void
   notifyError: (error: string | null) => void
   notifyStatus: (status: string | null) => void
   onCopyPrivateKey: (privateKeyHex: string) => Promise<void>
@@ -16,6 +17,7 @@ interface UseLocalConsumeNodeActionsParams {
 
 export function useLocalConsumeNodeActions({
   clearSelectedLocalNode,
+  markNodeOnCanvas,
   notifyError,
   notifyStatus,
   onCopyPrivateKey,
@@ -33,9 +35,18 @@ export function useLocalConsumeNodeActions({
       const node = createLocalConsumeNode(position)
       persistLocalConsumeNodes((currentNodes) => [node, ...currentNodes])
       selectLocalNode(node.publicKeyHex)
+      // 右键画布放置的节点直接显示；面板新建（无落点）则等待"添加到画布"。
+      if (position) markNodeOnCanvas(node.publicKeyHex)
       notifyStatus('消费节点已添加。')
     },
-    [notifyError, notifyStatus, persistLocalConsumeNodes, selectLocalNode, vaultStatus],
+    [
+      markNodeOnCanvas,
+      notifyError,
+      notifyStatus,
+      persistLocalConsumeNodes,
+      selectLocalNode,
+      vaultStatus,
+    ],
   )
 
   const handleRenameConsumeNode = useCallback(() => {

@@ -7,6 +7,7 @@ import { createLocalFlowNode, importLocalFlowNode } from './localNodeBuilders'
 interface UseLocalFlowNodeActionsParams {
   clearLastRawBytes: () => void
   clearSelectedLocalNode: () => void
+  markNodeOnCanvas: (publicKeyHex: string) => void
   notifyError: (error: string | null) => void
   notifyStatus: (status: string | null) => void
   onCopyPrivateKey: (privateKeyHex: string) => Promise<void>
@@ -19,6 +20,7 @@ interface UseLocalFlowNodeActionsParams {
 export function useLocalFlowNodeActions({
   clearLastRawBytes,
   clearSelectedLocalNode,
+  markNodeOnCanvas,
   notifyError,
   notifyStatus,
   onCopyPrivateKey,
@@ -36,11 +38,14 @@ export function useLocalFlowNodeActions({
       const node = createLocalFlowNode(position)
       persistLocalFlowNodes((currentNodes) => [node, ...currentNodes])
       selectLocalNode(node.publicKeyHex)
+      // 右键画布放置的节点直接显示；面板新建（无落点）则等待"添加到画布"。
+      if (position) markNodeOnCanvas(node.publicKeyHex)
       notifyStatus('流转节点已添加。')
       clearLastRawBytes()
     },
     [
       clearLastRawBytes,
+      markNodeOnCanvas,
       notifyError,
       notifyStatus,
       persistLocalFlowNodes,

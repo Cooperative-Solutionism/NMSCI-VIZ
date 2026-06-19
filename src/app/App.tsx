@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import '../App.css'
 import { defaultApiBase } from './config'
 import { LoopsPanel } from '../components'
@@ -30,6 +30,24 @@ function App() {
   const keyring = useLocalKeyringController({
     clearSelectedLocalNode: selection.clearSelectedLocalNode,
   })
+  // 哪些本地节点已被绘制到画布（按公钥）。默认空：本地节点不再自动铺到画布。
+  const [canvasNodeIds, setCanvasNodeIds] = useState<ReadonlySet<string>>(() => new Set())
+  const markNodeOnCanvas = useCallback((publicKeyHex: string) => {
+    setCanvasNodeIds((current) => {
+      if (current.has(publicKeyHex)) return current
+      const next = new Set(current)
+      next.add(publicKeyHex)
+      return next
+    })
+  }, [])
+  const toggleCanvasNode = useCallback((publicKeyHex: string) => {
+    setCanvasNodeIds((current) => {
+      const next = new Set(current)
+      if (next.has(publicKeyHex)) next.delete(publicKeyHex)
+      else next.add(publicKeyHex)
+      return next
+    })
+  }, [])
   const selectedLocalNode = useMemo(
     () =>
       keyring.localFlowNodes.find(
@@ -58,6 +76,7 @@ function App() {
   const nodeActions = useLocalNodeActions({
     clearLastRawBytes: registration.clearLastRawBytes,
     clearSelectedLocalNode: selection.clearSelectedLocalNode,
+    markNodeOnCanvas,
     notifyError: registration.notifyError,
     notifyStatus: registration.notifyStatus,
     persistLocalConsumeNodes: keyring.persistLocalConsumeNodes,
@@ -107,9 +126,15 @@ function App() {
     notifyStatus: registration.notifyStatus,
     requestUrl: query.requestUrl,
   })
+  // 仅把用户显式"添加到画布"的本地节点合并进图谱。
   const canvasGraph = useMemo(
-    () => mergeLocalNodes(query.graph, keyring.localFlowNodes, keyring.localConsumeNodes),
-    [keyring.localConsumeNodes, keyring.localFlowNodes, query.graph],
+    () =>
+      mergeLocalNodes(
+        query.graph,
+        keyring.localFlowNodes.filter((node) => canvasNodeIds.has(node.publicKeyHex)),
+        keyring.localConsumeNodes.filter((node) => canvasNodeIds.has(node.publicKeyHex)),
+      ),
+    [canvasNodeIds, keyring.localConsumeNodes, keyring.localFlowNodes, query.graph],
   )
   const centralLocked = systemStatus.data?.currentCentralPubkeyLocked ?? false
   const politeMessage =
@@ -129,6 +154,7 @@ function App() {
       icon: dashboardPanelIcons.localNodes,
       content: (
         <LocalNodePanel
+          canvasNodeIds={canvasNodeIds}
           localConsumeNodes={keyring.localConsumeNodes}
           localFlowNodes={keyring.localFlowNodes}
           onAddConsumeNode={handleAddConsumeNode}
@@ -137,6 +163,7 @@ function App() {
           onLockVault={keyring.handleLockVault}
           onOpenVault={handleOpenVault}
           onSelectLocalNode={selection.selectLocalNode}
+          onToggleCanvas={toggleCanvasNode}
           selectedLocalId={selection.selectedLocalId}
           vaultStatus={keyring.vault.status}
         />

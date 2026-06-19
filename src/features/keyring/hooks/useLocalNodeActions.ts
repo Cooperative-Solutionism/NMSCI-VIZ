@@ -9,6 +9,7 @@ import { useLocalFlowNodeActions } from './useLocalFlowNodeActions'
 export function useLocalNodeActions({
   clearLastRawBytes,
   clearSelectedLocalNode,
+  markNodeOnCanvas,
   notifyError,
   notifyStatus,
   persistLocalConsumeNodes,
@@ -20,6 +21,7 @@ export function useLocalNodeActions({
 }: {
   clearLastRawBytes: () => void
   clearSelectedLocalNode: () => void
+  markNodeOnCanvas: (publicKeyHex: string) => void
   notifyError: (error: string | null) => void
   notifyStatus: (status: string | null) => void
   persistLocalConsumeNodes: (updater: (nodes: LocalConsumeNode[]) => LocalConsumeNode[]) => void
@@ -44,6 +46,7 @@ export function useLocalNodeActions({
   const flowNodeActions = useLocalFlowNodeActions({
     clearLastRawBytes,
     clearSelectedLocalNode,
+    markNodeOnCanvas,
     notifyError,
     notifyStatus,
     onCopyPrivateKey: (privateKeyHex) => handleCopyText(privateKeyHex, '私钥'),
@@ -54,6 +57,7 @@ export function useLocalNodeActions({
   })
   const consumeNodeActions = useLocalConsumeNodeActions({
     clearSelectedLocalNode,
+    markNodeOnCanvas,
     notifyError,
     notifyStatus,
     onCopyPrivateKey: (privateKeyHex) => handleCopyText(privateKeyHex, '私钥'),
