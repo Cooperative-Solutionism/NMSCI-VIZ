@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react'
 import {
+  createDefaultDashboardLayout,
   loadDashboardLayout,
   saveDashboardLayout,
   updatePanelLayout,
@@ -59,6 +60,19 @@ export function DashboardWorkspace({ graph, panels }: DashboardWorkspaceProps) {
     },
     [updateLayout],
   )
+  const closePanel = useCallback(
+    (panelId: DashboardPanelId) => {
+      const bounds = workspaceBounds(workspaceRef.current)
+      const defaults = createDefaultDashboardLayout(bounds)[panelId]
+
+      updateLayout(panelId, {
+        collapsed: true,
+        dockPosition: defaults.dockPosition,
+        panelPosition: defaults.panelPosition,
+      })
+    },
+    [updateLayout],
+  )
   const clearFocusedPanel = useCallback((panelId: DashboardPanelId) => {
     setFocusPanelId((current) => (current === panelId ? null : current))
   }, [])
@@ -87,6 +101,7 @@ export function DashboardWorkspace({ graph, panels }: DashboardWorkspaceProps) {
             boundsRef={workspaceRef}
             focusOnMount={focusPanelId === panel.id}
             onCollapse={() => updateLayout(panel.id, { collapsed: true })}
+            onClose={() => closePanel(panel.id)}
             onFocusMount={() => clearFocusedPanel(panel.id)}
             onPositionChange={(panelPosition) => updateLayout(panel.id, { panelPosition })}
           >

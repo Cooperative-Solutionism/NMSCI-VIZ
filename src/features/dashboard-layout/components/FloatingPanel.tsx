@@ -1,4 +1,4 @@
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { useDraggable } from '../../../shared/hooks/useDraggable'
@@ -11,6 +11,7 @@ type FloatingPanelProps = {
   boundsRef?: { current: HTMLElement | null }
   focusOnMount?: boolean
   onCollapse: () => void
+  onClose: () => void
   onFocusMount?: () => void
   onPositionChange: (position: DashboardPoint) => void
 }
@@ -37,6 +38,7 @@ export function FloatingPanel({
   boundsRef,
   focusOnMount = false,
   onCollapse,
+  onClose,
   onFocusMount,
   onPositionChange,
 }: FloatingPanelProps) {
@@ -104,6 +106,16 @@ export function FloatingPanel({
           <ChevronLeft aria-hidden="true" />
         </Button>
         <h2 id={titleId}>{title}</h2>
+        <Button
+          variant="ghost"
+          size="icon"
+          type="button"
+          className="floating-panel__close"
+          aria-label={`关闭${title}面板`}
+          onClick={onClose}
+        >
+          <X aria-hidden="true" />
+        </Button>
       </div>
       <div className="floating-panel__body">{children}</div>
     </section>

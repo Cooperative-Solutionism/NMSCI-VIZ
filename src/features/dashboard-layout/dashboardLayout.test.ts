@@ -10,6 +10,16 @@ import {
   type DashboardLayoutState,
 } from './dashboardLayout'
 
+const defaultTopRowPanelPositions = [
+  { x: 84, y: 16 },
+  { x: 180, y: 16 },
+  { x: 276, y: 16 },
+  { x: 372, y: 16 },
+  { x: 468, y: 16 },
+  { x: 564, y: 16 },
+  { x: 660, y: 16 },
+]
+
 function fakeStorage(initial: Record<string, string> = {}): Storage {
   const map = new Map(Object.entries(initial))
 
@@ -48,20 +58,37 @@ describe('dashboard layout state', () => {
     ])
   })
 
-  it('includes expected default dock positions', () => {
+  it('places default panel origins in a top-centered horizontal row', () => {
     const layout = normalizeDashboardLayout(undefined)
 
-    expect(layout.query.dockPosition).toEqual({ x: 16, y: 16 })
-    expect(layout.system.dockPosition).toEqual({ x: 16, y: 296 })
-    expect(layout.localNodes.dockPosition).toEqual({ x: 16, y: 352 })
+    expect(dashboardPanelIds.map((panelId) => layout[panelId].panelPosition)).toEqual(
+      defaultTopRowPanelPositions,
+    )
+    expect(dashboardPanelIds.map((panelId) => layout[panelId].dockPosition)).toEqual(
+      defaultTopRowPanelPositions,
+    )
   })
 
   it('exports the default layout with expected query defaults', () => {
     expect(defaultDashboardLayout.query).toEqual({
       collapsed: true,
-      dockPosition: { x: 16, y: 16 },
-      panelPosition: { x: 72, y: 16 },
+      dockPosition: { x: 84, y: 16 },
+      panelPosition: { x: 84, y: 16 },
     })
+  })
+
+  it('centers default panel origins against the provided workspace width', () => {
+    const layout = normalizeDashboardLayout(undefined, { width: 1440, height: 900 })
+
+    expect(dashboardPanelIds.map((panelId) => layout[panelId].panelPosition)).toEqual([
+      { x: 292, y: 16 },
+      { x: 388, y: 16 },
+      { x: 484, y: 16 },
+      { x: 580, y: 16 },
+      { x: 676, y: 16 },
+      { x: 772, y: 16 },
+      { x: 868, y: 16 },
+    ])
   })
 
   it('repairs malformed or missing saved layout data from defaults', () => {
@@ -81,13 +108,13 @@ describe('dashboard layout state', () => {
     expect(Object.keys(layout)).toEqual(dashboardPanelIds)
     expect(layout.query).toEqual({
       collapsed: true,
-      dockPosition: { x: 16, y: 16 },
+      dockPosition: { x: 84, y: 16 },
       panelPosition: { x: 120, y: 140 },
     })
     expect(layout.details).toEqual({
       collapsed: true,
-      dockPosition: { x: 16, y: 72 },
-      panelPosition: { x: 880, y: 80 },
+      dockPosition: { x: 180, y: 16 },
+      panelPosition: { x: 180, y: 16 },
     })
   })
 
@@ -123,11 +150,12 @@ describe('dashboard layout state', () => {
     expect(layout.query.panelPosition).toEqual({ x: 0, y: 22 })
   })
 
-  it('keeps default right-side panels visible on narrow viewports', () => {
+  it('keeps top-row panel defaults visible on narrow viewports', () => {
     const layout = normalizeDashboardLayout(undefined, { width: 320, height: 240 })
 
-    expect(layout.details.panelPosition).toEqual({ x: 40, y: 80 })
-    expect(layout.loops.panelPosition).toEqual({ x: 40, y: 192 })
+    expect(layout.query.panelPosition).toEqual({ x: 0, y: 16 })
+    expect(layout.details.panelPosition).toEqual({ x: 7, y: 16 })
+    expect(layout.localNodes.panelPosition).toEqual({ x: 40, y: 16 })
   })
 
   it('falls back to defaults for empty, invalid, or unreadable storage', () => {
@@ -219,7 +247,7 @@ describe('dashboard layout state', () => {
     expect(next).not.toBe(layout)
     expect(next.query).toEqual({
       collapsed: false,
-      dockPosition: { x: 16, y: 16 },
+      dockPosition: { x: 84, y: 16 },
       panelPosition: { x: 144, y: 188 },
     })
     expect(next.details).toEqual(layout.details)

@@ -12,6 +12,7 @@ const detailsContent = '\u8282\u70b9\u8be6\u60c5'
 const openQueryName = /\u6253\u5f00\u6d4f\u89c8\u9762\u677f/
 const openDetailsName = /\u6253\u5f00\u8be6\u60c5\u9762\u677f/
 const collapseQueryName = /\u6298\u53e0\u6d4f\u89c8\u9762\u677f/
+const closeQueryName = /\u5173\u95ed\u6d4f\u89c8\u9762\u677f/
 
 function panels(): DashboardPanelConfig[] {
   return [
@@ -33,6 +34,8 @@ function panels(): DashboardPanelConfig[] {
 function renderWorkspace() {
   return render(<DashboardWorkspace graph={<div>{graphText}</div>} panels={panels()} />)
 }
+
+const defaultQueryPosition = defaultDashboardLayout.query.panelPosition
 
 function storedLayout() {
   return JSON.parse(window.localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY) ?? '{}')
@@ -67,7 +70,10 @@ describe('DashboardWorkspace', () => {
     expect(screen.getByRole('main')).toHaveClass('dashboard-workspace')
     expect(screen.getByText(graphText).parentElement).toHaveClass('dashboard-graph')
     expect(queryDock).toBeInTheDocument()
-    expect(queryDock).toHaveStyle({ left: '72px', top: '16px' })
+    expect(queryDock).toHaveStyle({
+      left: `${defaultQueryPosition.x}px`,
+      top: `${defaultQueryPosition.y}px`,
+    })
     expect(screen.getByRole('button', { name: openDetailsName })).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
@@ -139,7 +145,7 @@ describe('DashboardWorkspace', () => {
 
     expect(screen.getByRole('dialog', { name: detailsLabel })).toHaveStyle({
       left: '40px',
-      top: '80px',
+      top: '16px',
     })
   })
 
@@ -150,7 +156,10 @@ describe('DashboardWorkspace', () => {
       key: 'ArrowRight',
     })
 
-    expect(storedLayout().query.panelPosition).toEqual({ x: 80, y: 16 })
+    expect(storedLayout().query.panelPosition).toEqual({
+      x: defaultQueryPosition.x + 8,
+      y: defaultQueryPosition.y,
+    })
     expect(storedLayout().query.collapsed).toBe(true)
   })
 
@@ -162,7 +171,10 @@ describe('DashboardWorkspace', () => {
     fireEvent.pointerMove(window, { clientX: 118, clientY: 225 })
     fireEvent.pointerUp(window)
 
-    expect(storedLayout().query.panelPosition).toEqual({ x: 90, y: 41 })
+    expect(storedLayout().query.panelPosition).toEqual({
+      x: defaultQueryPosition.x + 18,
+      y: defaultQueryPosition.y + 25,
+    })
     expect(storedLayout().query.collapsed).toBe(true)
   })
 
@@ -198,8 +210,33 @@ describe('DashboardWorkspace', () => {
       key: 'ArrowDown',
     })
 
-    expect(storedLayout().query.panelPosition).toEqual({ x: 72, y: 24 })
+    expect(storedLayout().query.panelPosition).toEqual({
+      x: defaultQueryPosition.x,
+      y: defaultQueryPosition.y + 8,
+    })
     expect(storedLayout().query.collapsed).toBe(false)
+  })
+
+  it('resets a closed panel to its original position', () => {
+    renderWorkspace()
+    fireEvent.click(screen.getByRole('button', { name: openQueryName }))
+
+    const header = screen
+      .getByRole('heading', { name: queryLabel })
+      .closest('.floating-panel__header')
+
+    expect(header).not.toBeNull()
+
+    fireEvent.pointerDown(header as HTMLElement, { button: 0, clientX: 100, clientY: 200 })
+    fireEvent.pointerMove(window, { clientX: 128, clientY: 234 })
+    fireEvent.pointerUp(window)
+    fireEvent.click(screen.getByRole('button', { name: closeQueryName }))
+
+    expect(screen.getByRole('button', { name: openQueryName })).toHaveStyle({
+      left: `${defaultDashboardLayout.query.panelPosition.x}px`,
+      top: `${defaultDashboardLayout.query.panelPosition.y}px`,
+    })
+    expect(storedLayout().query).toEqual(defaultDashboardLayout.query)
   })
 
   it('keeps a collapsed dock icon at the floating panel position after collapse', () => {
@@ -218,9 +255,12 @@ describe('DashboardWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: collapseQueryName }))
 
     expect(screen.getByRole('button', { name: openQueryName })).toHaveStyle({
-      left: '100px',
-      top: '50px',
+      left: `${defaultQueryPosition.x + 28}px`,
+      top: `${defaultQueryPosition.y + 34}px`,
     })
-    expect(storedLayout().query.panelPosition).toEqual({ x: 100, y: 50 })
+    expect(storedLayout().query.panelPosition).toEqual({
+      x: defaultQueryPosition.x + 28,
+      y: defaultQueryPosition.y + 34,
+    })
   })
 })

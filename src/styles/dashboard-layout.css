@@ -142,7 +142,8 @@
   padding: 14px;
 }
 
-.floating-panel__collapse {
+.floating-panel__collapse,
+.floating-panel__close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -160,13 +161,15 @@
     background 160ms ease;
 }
 
-.floating-panel__collapse:hover {
+.floating-panel__collapse:hover,
+.floating-panel__close:hover {
   border-color: rgb(var(--teal-rgb) / 0.22);
   background: var(--teal-soft);
   color: var(--teal);
 }
 
-.floating-panel__collapse:focus-visible {
+.floating-panel__collapse:focus-visible,
+.floating-panel__close:focus-visible {
   outline: 2px solid var(--teal);
   outline-offset: 2px;
 }
