@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import type { CanvasPosition, ChainGraphNode } from '../../lib/types'
 import { Button } from '../ui/button'
 import type { ContextMenuState } from './types'
@@ -25,25 +25,51 @@ export function GraphContextMenu({
   onClose,
 }: GraphContextMenuProps) {
   const node = menu.node
+  const menuRef = useRef<HTMLDivElement>(null)
   const run = (action: () => void) => () => {
     action()
     onClose()
   }
 
+  // 菜单打开后把焦点移入第一个菜单项，便于键盘操作。
+  useEffect(() => {
+    menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
+  }, [])
+
   let items: ReactNode
   if (node?.kind === 'local-flow') {
     items = (
       <>
-        <Button variant="ghost" type="button" onClick={run(() => onRegisterFlowNode?.(node))}>
+        <Button
+          role="menuitem"
+          variant="ghost"
+          type="button"
+          onClick={run(() => onRegisterFlowNode?.(node))}
+        >
           注册
         </Button>
-        <Button variant="ghost" type="button" onClick={run(() => onAuthorizeFlowNode?.(node))}>
+        <Button
+          role="menuitem"
+          variant="ghost"
+          type="button"
+          onClick={run(() => onAuthorizeFlowNode?.(node))}
+        >
           授权
         </Button>
-        <Button variant="ghost" type="button" onClick={run(() => onGenerateRecord?.(node))}>
+        <Button
+          role="menuitem"
+          variant="ghost"
+          type="button"
+          onClick={run(() => onGenerateRecord?.(node))}
+        >
           生成消费记录
         </Button>
-        <Button variant="ghost" type="button" onClick={run(() => onMountRecord?.(node))}>
+        <Button
+          role="menuitem"
+          variant="ghost"
+          type="button"
+          onClick={run(() => onMountRecord?.(node))}
+        >
           挂载消费记录
         </Button>
       </>
@@ -51,10 +77,20 @@ export function GraphContextMenu({
   } else if (node?.kind === 'local-consume') {
     items = (
       <>
-        <Button variant="ghost" type="button" onClick={run(() => onGenerateRecord?.(node))}>
+        <Button
+          role="menuitem"
+          variant="ghost"
+          type="button"
+          onClick={run(() => onGenerateRecord?.(node))}
+        >
           生成消费记录
         </Button>
-        <Button variant="ghost" type="button" onClick={run(() => onMountRecord?.(node))}>
+        <Button
+          role="menuitem"
+          variant="ghost"
+          type="button"
+          onClick={run(() => onMountRecord?.(node))}
+        >
           挂载消费记录
         </Button>
       </>
@@ -62,10 +98,16 @@ export function GraphContextMenu({
   } else {
     items = (
       <>
-        <Button variant="ghost" type="button" onClick={run(() => onAddFlowNode?.(menu.position))}>
+        <Button
+          role="menuitem"
+          variant="ghost"
+          type="button"
+          onClick={run(() => onAddFlowNode?.(menu.position))}
+        >
           添加流转节点
         </Button>
         <Button
+          role="menuitem"
           variant="ghost"
           type="button"
           onClick={run(() => onAddConsumeNode?.(menu.position))}
@@ -77,7 +119,13 @@ export function GraphContextMenu({
   }
 
   return (
-    <div className="graph-context-menu" aria-label="画布操作" style={{ left: menu.x, top: menu.y }}>
+    <div
+      ref={menuRef}
+      className="graph-context-menu"
+      role="menu"
+      aria-label="画布操作"
+      style={{ left: menu.x, top: menu.y }}
+    >
       {items}
     </div>
   )

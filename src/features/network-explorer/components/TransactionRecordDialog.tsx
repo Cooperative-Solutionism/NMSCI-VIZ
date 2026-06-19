@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Button } from '../../../components/ui/button'
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -71,8 +70,9 @@ function RecordDialogBody({
   const [amountTouched, setAmountTouched] = useState(false)
 
   const amountError = amountIssue(amount)
+  const missingNodes = consumeNodes.length === 0 || flowNodes.length === 0
   const handleSubmit = () => {
-    if (busy) return
+    if (busy || missingNodes) return
     setAmountTouched(true)
     if (!consumeNodePubkey || !flowNodePubkey || amountError) return
     onCreate({
@@ -155,6 +155,11 @@ function RecordDialogBody({
         </div>
       </FieldGroup>
 
+      {missingNodes ? (
+        <p className="text-sm text-muted-foreground">
+          需要至少一个消费节点和一个流转节点才能创建记录。
+        </p>
+      ) : null}
       {status ? (
         <p className="text-sm text-muted-foreground" aria-live="polite">
           {status}
@@ -167,12 +172,7 @@ function RecordDialogBody({
       ) : null}
 
       <DialogFooter>
-        <DialogClose asChild>
-          <Button variant="outline" type="button">
-            关闭
-          </Button>
-        </DialogClose>
-        <Button type="button" disabled={busy} onClick={handleSubmit}>
+        <Button type="button" disabled={busy || missingNodes} onClick={handleSubmit}>
           {busy
             ? miningAttempts != null
               ? `挖矿 ${formatInteger(miningAttempts)}…`

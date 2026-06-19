@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Button } from '../../../components/ui/button'
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -53,9 +52,10 @@ function MountDialogBody({
   const [flowNodePubkey, setFlowNodePubkey] = useState(
     defaultFlowNodePubkey ?? flowNodes[0]?.publicKeyHex ?? '',
   )
+  const missingInputs = records.length === 0 || flowNodes.length === 0
 
   const handleSubmit = () => {
-    if (busy || !recordId || !flowNodePubkey) return
+    if (busy || missingInputs || !recordId || !flowNodePubkey) return
     onMount(recordId, flowNodePubkey)
   }
 
@@ -100,6 +100,11 @@ function MountDialogBody({
         </Field>
       </FieldGroup>
 
+      {missingInputs ? (
+        <p className="text-sm text-muted-foreground">
+          需要至少一条消费记录和一个流转节点才能挂载。
+        </p>
+      ) : null}
       {status ? (
         <p className="text-sm text-muted-foreground" aria-live="polite">
           {status}
@@ -112,17 +117,12 @@ function MountDialogBody({
       ) : null}
 
       <DialogFooter>
-        <DialogClose asChild>
-          <Button variant="outline" type="button">
-            关闭
-          </Button>
-        </DialogClose>
         {canViewChain ? (
           <Button variant="secondary" type="button" onClick={onViewChain}>
             查看消费链
           </Button>
         ) : null}
-        <Button type="button" disabled={busy} onClick={handleSubmit}>
+        <Button type="button" disabled={busy || missingInputs} onClick={handleSubmit}>
           {busy
             ? miningAttempts != null
               ? `挖矿 ${formatInteger(miningAttempts)}…`

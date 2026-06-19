@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import '../App.css'
 import { defaultApiBase } from './config'
-import { LoopsPanel } from '../components'
+import { LoopsPanel, OperationStatusToast } from '../components'
 import { DashboardWorkspace } from '../features/dashboard-layout/components/DashboardWorkspace'
 import {
   dashboardPanelIcons,
@@ -133,14 +133,20 @@ function App() {
   const handleRegisterFlowNode = useCallback(
     (node: ChainGraphNode) => {
       const localNode = keyring.localFlowNodes.find((item) => item.publicKeyHex === node.id)
-      if (localNode) void registration.registerFlowNode(localNode)
+      if (!localNode) return
+      registration.notifyStatus(null)
+      registration.notifyError(null)
+      void registration.registerFlowNode(localNode)
     },
     [keyring.localFlowNodes, registration],
   )
   const handleAuthorizeFlowNode = useCallback(
     (node: ChainGraphNode) => {
       const localNode = keyring.localFlowNodes.find((item) => item.publicKeyHex === node.id)
-      if (localNode) void registration.authorizeCentralPubkey(localNode)
+      if (!localNode) return
+      registration.notifyStatus(null)
+      registration.notifyError(null)
+      void registration.authorizeCentralPubkey(localNode)
     },
     [keyring.localFlowNodes, registration],
   )
@@ -358,6 +364,13 @@ function App() {
           registration.viewConsumeChain()
           setMountDialog(null)
         }}
+      />
+
+      <OperationStatusToast
+        busy={registration.busy}
+        status={registration.status}
+        error={registration.error}
+        miningAttempts={registration.miningAttempts}
       />
     </div>
   )

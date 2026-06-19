@@ -105,6 +105,52 @@ describe('App initial state', () => {
     ).toBe(true)
   })
 
+  it('authorizes a flow node from the context menu, auto-fetching the central pubkey', async () => {
+    const pubkey = '02'.padEnd(66, '1')
+    const centralPubkey = '03dfb2c7716697bba0a12c21c431f86d4bfe3b536b2ec0b7f32e7f97bbcfb20cbe'
+    stubFetchByUrl((url, init) => {
+      if (url.pathname === '/blocks/latest') {
+        return jsonResponse({
+          code: 200,
+          message: 'ok',
+          data: { height: 2518, registerDifficultyTarget: '20ffffff', centralPubkey },
+        })
+      }
+      if (url.pathname === '/central-pubkey-empowerments' && init?.method === 'POST') {
+        return jsonResponse({
+          code: 200,
+          message: 'ok',
+          data: { id: 'empower-1', txid: 'emptxid' },
+        })
+      }
+      if (url.pathname === `/flow-nodes/${pubkey}`) {
+        return jsonResponse({
+          code: 200,
+          message: 'ok',
+          data: {
+            registered: true,
+            authorized: true,
+            locked: false,
+            currentCentralPubkeyAuthorized: true,
+          },
+        })
+      }
+      throw new Error(`Unexpected URL ${url.href}`)
+    })
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /context authorize/ }))
+
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
+        nodes: Array<{ authorizations?: Array<{ status: string; centralPubkeyHex: string }> }>
+      }
+      expect(saved.nodes[0]?.authorizations?.[0]?.status).toBe('sent')
+      expect(saved.nodes[0]?.authorizations?.[0]?.centralPubkeyHex).toBe(centralPubkey)
+    })
+  })
+
   it('renames and deletes a local flow node', async () => {
     render(<App />)
 
