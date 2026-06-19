@@ -26,15 +26,15 @@ export function NetworkGraph({
   onLoadChain,
 }: NetworkGraphProps) {
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
-  const selectedChainId = useMemo(
-    () => graph.edges.find((edge) => edge.id === selectedId)?.chainId ?? null,
-    [graph.edges, selectedId],
+  const selectedChainIds = useMemo(
+    () => chainsForSelection(graph, selectedId),
+    [graph, selectedId],
   )
   const closeMenu = useCallback(() => setMenu(null), [])
   const { containerRef, cyRef } = useCytoscapeGraph({
     graph,
     selectedId,
-    selectedChainId,
+    selectedChainIds,
     onSelectNode,
     onSelectEdge,
     onOpenMenu: setMenu,
@@ -146,4 +146,24 @@ export function NetworkGraph({
       <GraphLegend />
     </div>
   )
+}
+
+function chainsForSelection(
+  graph: NetworkGraphProps['graph'],
+  selectedId: string | null,
+): Set<string> {
+  if (!selectedId) return new Set()
+
+  const selectedEdge = graph.edges.find((edge) => edge.id === selectedId)
+  if (selectedEdge) return new Set([selectedEdge.chainId])
+
+  if (!graph.nodes.some((node) => node.id === selectedId)) return new Set()
+
+  const chainIds = new Set<string>()
+  for (const edge of graph.edges) {
+    if (edge.source === selectedId || edge.target === selectedId) {
+      chainIds.add(edge.chainId)
+    }
+  }
+  return chainIds
 }

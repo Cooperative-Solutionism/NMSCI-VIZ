@@ -9,7 +9,7 @@ import type { ContextMenuState } from './types'
 interface UseCytoscapeGraphParams {
   graph: ChainGraph
   selectedId: string | null
-  selectedChainId: string | null
+  selectedChainIds: ReadonlySet<string>
   onSelectNode: (node: ChainGraphNode) => void
   onSelectEdge: (edge: ChainGraphEdge) => void
   onOpenMenu: (menu: ContextMenuState) => void
@@ -19,7 +19,7 @@ interface UseCytoscapeGraphParams {
 export function useCytoscapeGraph({
   graph,
   selectedId,
-  selectedChainId,
+  selectedChainIds,
   onSelectNode,
   onSelectEdge,
   onOpenMenu,
@@ -147,15 +147,17 @@ export function useCytoscapeGraph({
     cy.elements().unselect()
     cy.edges().removeClass('chain-highlight chain-dimmed')
 
-    if (selectedChainId) {
+    if (selectedChainIds.size > 0) {
       cy.edges().forEach((edge) => {
-        edge.toggleClass('chain-highlight', edge.data('chainId') === selectedChainId)
-        edge.toggleClass('chain-dimmed', edge.data('chainId') !== selectedChainId)
+        const { chainId } = edge.data() as { chainId?: unknown }
+        const selected = typeof chainId === 'string' && selectedChainIds.has(chainId)
+        edge.toggleClass('chain-highlight', selected)
+        edge.toggleClass('chain-dimmed', !selected)
       })
     }
 
     if (selectedId) cy.getElementById(selectedId).select()
-  }, [selectedChainId, selectedId])
+  }, [selectedChainIds, selectedId])
 
   return { containerRef, cyRef }
 }

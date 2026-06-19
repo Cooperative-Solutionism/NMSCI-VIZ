@@ -1,5 +1,5 @@
 import type { Core, NodeSingular } from 'cytoscape'
-import { flowNodeStatusLabels, formatAmount } from '../../lib/chainGraph'
+import { flowNodeStatusLabels } from '../../lib/chainGraph'
 import { deterministicOffset, type Point } from '../../lib/graphLayout'
 import type { ChainGraphEdge, ChainGraphNode } from '../../lib/types'
 
@@ -62,7 +62,7 @@ function syncEdges(cy: Core, edges: ChainGraphEdge[]): void {
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      label: formatAmount(edge.amount, edge.currencyType),
+      label: edge.label,
       status: edge.status,
       chainId: edge.chainId,
       color: edge.color,

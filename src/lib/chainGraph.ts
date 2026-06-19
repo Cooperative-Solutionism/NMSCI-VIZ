@@ -50,7 +50,7 @@ export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTO[]): Ch
 
   return {
     nodes: Array.from(nodes.values()),
-    edges,
+    edges: withEndpointSequenceLabels(edges),
     stats: {
       totalChains: rows.length,
       loopedChains,
@@ -269,7 +269,37 @@ export function mergeLocalNodes(
   })
 
   if (!changed && extra.length === 0) return graph
-  return { ...graph, nodes: [...nodes, ...extra], edges }
+  return { ...graph, nodes: [...nodes, ...extra], edges: withEndpointSequenceLabels(edges) }
+}
+
+function withEndpointSequenceLabels(edges: ChainGraphEdge[]): ChainGraphEdge[] {
+  const originalOrder = new Map<ChainGraphEdge, number>()
+  const edgesByEndpoint = new Map<string, ChainGraphEdge[]>()
+
+  edges.forEach((edge, index) => {
+    originalOrder.set(edge, index)
+    const key = `${edge.source}\0${edge.target}`
+    const group = edgesByEndpoint.get(key)
+    if (group) group.push(edge)
+    else edgesByEndpoint.set(key, [edge])
+  })
+
+  const labelByEdge = new Map<ChainGraphEdge, string>()
+  for (const group of edgesByEndpoint.values()) {
+    const sorted = [...group].sort((left, right) => {
+      if (left.relatedTransactionMountTimestamp < right.relatedTransactionMountTimestamp) return -1
+      if (left.relatedTransactionMountTimestamp > right.relatedTransactionMountTimestamp) return 1
+      return (originalOrder.get(left) ?? 0) - (originalOrder.get(right) ?? 0)
+    })
+    sorted.forEach((edge, index) => {
+      labelByEdge.set(edge, `第${index + 1}笔 ${formatAmount(edge.amount, edge.currencyType)}`)
+    })
+  }
+
+  return edges.map((edge) => {
+    const label = labelByEdge.get(edge) ?? formatAmount(edge.amount, edge.currencyType)
+    return edge.label === label ? edge : { ...edge, label }
+  })
 }
 
 function mergeBaseNode(left: ChainGraphNode, right: ChainGraphNode): ChainGraphNode {
