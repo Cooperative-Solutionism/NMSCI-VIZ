@@ -12,7 +12,6 @@ export type { FlowNodeBusyState }
 
 interface UseFlowNodeRegistrationParams {
   client: ApiClient
-  selectedLocalNode: LocalFlowNode | null
   localFlowNodes: LocalFlowNode[]
   localConsumeNodes: LocalConsumeNode[]
   localTxRecords: LocalTxRecord[]
@@ -25,7 +24,6 @@ interface UseFlowNodeRegistrationParams {
 
 export function useFlowNodeRegistration({
   client,
-  selectedLocalNode,
   localFlowNodes,
   localConsumeNodes,
   localTxRecords,
@@ -48,7 +46,6 @@ export function useFlowNodeRegistration({
     dispatch,
     persistLocalFlowNodes,
     reloadLocalNodeState,
-    selectedLocalNode,
     setLastRawBytes,
     setMiningAttempts,
   })
@@ -61,7 +58,6 @@ export function useFlowNodeRegistration({
     localTxRecords,
     persistTxRecords,
     runQuery,
-    selectedLocalNode,
     setMiningAttempts,
   })
 
@@ -72,22 +68,13 @@ export function useFlowNodeRegistration({
       error,
       miningAttempts,
       lastRawBytes,
-      registerDifficultyTarget: lifecycleActions.registerDifficultyTarget,
-      setRegisterDifficultyTarget: lifecycleActions.setRegisterDifficultyTarget,
-      centralPubkey: lifecycleActions.centralPubkey,
-      setCentralPubkey: lifecycleActions.setCentralPubkey,
-      txDifficulty: transactionActions.txDifficulty,
-      recordFormOpen: transactionActions.recordFormOpen,
-      mountFormOpen: transactionActions.mountFormOpen,
       mountedPubkey: transactionActions.mountedPubkey,
-      fetchRegisterDifficulty: lifecycleActions.fetchRegisterDifficulty,
       registerFlowNode: lifecycleActions.registerFlowNode,
       authorizeCentralPubkey: lifecycleActions.authorizeCentralPubkey,
       createTransactionRecord: transactionActions.createTransactionRecord,
       createTransactionMount: transactionActions.createTransactionMount,
-      toggleRecordForm: transactionActions.toggleRecordForm,
-      toggleMountForm: transactionActions.toggleMountForm,
       viewConsumeChain: transactionActions.viewConsumeChain,
+      clearMountedPubkey: transactionActions.clearMountedPubkey,
       notifyStatus,
       notifyError,
       clearLastRawBytes,

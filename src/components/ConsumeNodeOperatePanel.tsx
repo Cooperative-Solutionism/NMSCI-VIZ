@@ -6,21 +6,17 @@ import { PanelHeader } from './PanelHeader'
 import { Button } from './ui/button'
 
 export function ConsumeNodeOperatePanel({
-  error,
   node,
   onCopy,
   onDelete,
   onExportPrivateKey,
   onRename,
-  status,
 }: {
-  error: string | null
   node: LocalConsumeNode
   onCopy: (value: string, label: string) => void
   onDelete: () => void
   onExportPrivateKey: () => void
   onRename: () => void
-  status: string | null
 }) {
   return (
     <div className="inspector-content">
@@ -58,17 +54,7 @@ export function ConsumeNodeOperatePanel({
           删除
         </Button>
       </div>
-      <p className="field-hint">创建交易记录时可将此消费节点作为来源。</p>
-      {status ? (
-        <p className="operation-message" aria-live="polite">
-          {status}
-        </p>
-      ) : null}
-      {error ? (
-        <p className="operation-message error" role="alert">
-          {error}
-        </p>
-      ) : null}
+      <p className="field-hint">右键此消费节点即可作为付款方生成消费记录。</p>
     </div>
   )
 }

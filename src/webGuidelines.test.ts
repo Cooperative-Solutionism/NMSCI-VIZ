@@ -53,39 +53,21 @@ describe('web interface guideline regressions', () => {
       read('src/features/network-explorer/components/browse-panel/BlockBrowser.tsx'),
       read('src/features/network-explorer/components/browse-panel/FlowNodeBrowser.tsx'),
     ].join('\n')
-    const recordForm = read('src/components/TransactionRecordForm.tsx')
-    const mountForm = read('src/components/TransactionMountForm.tsx')
-    const flowPanel = [
-      read('src/components/flow-node-operate/FlowNodeRegistrationControls.tsx'),
-      read('src/components/flow-node-operate/FlowNodeAuthorizationControls.tsx'),
-    ].join('\n')
+    const recordDialog = read(
+      'src/features/network-explorer/components/TransactionRecordDialog.tsx',
+    )
     const vaultGate = read('src/components/VaultGate.tsx')
 
-    for (const name of [
-      'blockPage',
-      'blockPageSize',
-      'flowNodePage',
-      'flowNodePageSize',
-    ]) {
+    for (const name of ['blockPage', 'blockPageSize', 'flowNodePage', 'flowNodePageSize']) {
       expect(browseForms).toContain(`name="${name}"`)
     }
     expect(browseForms).not.toContain('name="page"')
     expect(browseForms).not.toContain('name="size"')
-    for (const name of [
-      'consumeNodePubkey',
-      'amount',
-      'currencyType',
-      'difficultyHex',
-      'centralPubkey',
-    ]) {
-      expect(recordForm).toContain(`name="${name}"`)
-    }
-    for (const name of ['mountedRecordId', 'mountFlowNodePubkey', 'mountDifficultyHex']) {
-      expect(mountForm).toContain(`name="${name}"`)
-    }
-    for (const name of ['registerDifficultyTarget', 'authorizationCentralPubkey']) {
-      expect(flowPanel).toContain(`name="${name}"`)
-    }
+    // 难度与中心公钥已内化为自动拉取，记录弹窗只保留金额输入。
+    expect(recordDialog).toContain('name="amount"')
+    expect(recordDialog).toContain('autoComplete="off"')
+    expect(recordDialog).not.toContain('name="difficultyHex"')
+    expect(recordDialog).not.toContain('name="centralPubkey"')
     expect(vaultGate).toContain('name="vaultPassphrase"')
   })
 

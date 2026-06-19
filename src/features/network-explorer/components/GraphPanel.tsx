@@ -11,6 +11,10 @@ export function GraphPanel({
   loading,
   onAddConsumeNode,
   onAddFlowNode,
+  onRegisterFlowNode,
+  onAuthorizeFlowNode,
+  onGenerateRecord,
+  onMountRecord,
   onSelectEdge,
   onSelectNode,
   selectedId,
@@ -19,6 +23,10 @@ export function GraphPanel({
   loading: boolean
   onAddConsumeNode: (position?: { x: number; y: number }) => void
   onAddFlowNode: (position?: { x: number; y: number }) => void
+  onRegisterFlowNode: (node: ChainGraphNode) => void
+  onAuthorizeFlowNode: (node: ChainGraphNode) => void
+  onGenerateRecord: (node: ChainGraphNode) => void
+  onMountRecord: (node: ChainGraphNode) => void
   onSelectEdge: (edge: ChainGraphEdge) => void
   onSelectNode: (node: ChainGraphNode) => void
   selectedId: string | null
@@ -38,6 +46,10 @@ export function GraphPanel({
               onSelectEdge={onSelectEdge}
               onAddFlowNode={onAddFlowNode}
               onAddConsumeNode={onAddConsumeNode}
+              onRegisterFlowNode={onRegisterFlowNode}
+              onAuthorizeFlowNode={onAuthorizeFlowNode}
+              onGenerateRecord={onGenerateRecord}
+              onMountRecord={onMountRecord}
             />
           </Suspense>
         </ErrorBoundary>

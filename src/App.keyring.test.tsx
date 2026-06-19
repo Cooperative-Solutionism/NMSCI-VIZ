@@ -4,6 +4,7 @@ import {
   installAppTestLifecycle,
   jsonResponse,
   openFlowNodesTab,
+  requestInputUrl,
   setMockVaultStatus,
   stubFetchByUrl,
 } from './test/appTestHarness'
@@ -27,8 +28,8 @@ describe('App initial state', () => {
       expect(saved.nodes[0]?.publicKeyHex).toBe('02'.padEnd(66, '1'))
       expect(atob(saved.nodes[0]!.privateKey.ct)).toBe('0'.repeat(63) + '1')
     })
-    // selecting the new node opens its operate panel in the inspector
-    expect(await screen.findByRole('button', { name: /注册节点/ })).toBeTruthy()
+    // selecting the new node opens its key-details panel in the inspector
+    expect(await screen.findByRole('button', { name: /导出私钥/ })).toBeTruthy()
   })
 
   it('does not expose the removed consume-chain query shortcut for local flow nodes', async () => {
@@ -40,40 +41,17 @@ describe('App initial state', () => {
     expect(screen.queryByLabelText('流转节点 ID / 公钥')).toBeNull()
   })
 
-  it('loads a hex register difficulty target returned by the backend', async () => {
-    const centralPubkey = '03dfb2c7716697bba0a12c21c431f86d4bfe3b536b2ec0b7f32e7f97bbcfb20cbe'
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(
-        async () =>
-          new Response(
-            JSON.stringify({
-              code: 200,
-              message: 'ok',
-              data: { height: 2518, registerDifficultyTarget: '20ffffff', centralPubkey },
-            }),
-            {
-              headers: { 'Content-Type': 'application/json' },
-              status: 200,
-            },
-          ),
-      ),
-    )
-    render(<App />)
-
-    fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
-    fireEvent.click(await screen.findByRole('button', { name: /使用最新难度/ }))
-
-    await waitFor(() => {
-      expect((screen.getByLabelText('注册难度目标') as HTMLInputElement).value).toBe('20ffffff')
-    })
-    expect((screen.getByLabelText('中心公钥') as HTMLTextAreaElement).value).toBe(centralPubkey)
-    expect(screen.queryByText(/最新区块未包含 registerDifficultyTarget/)).toBeNull()
-  })
-
-  it('registers a flow node end to end and persists a sent registration', async () => {
+  it('registers a flow node from the context menu, auto-fetching the latest difficulty', async () => {
     const pubkey = '02'.padEnd(66, '1')
-    stubFetchByUrl((url, init) => {
+    const centralPubkey = '03dfb2c7716697bba0a12c21c431f86d4bfe3b536b2ec0b7f32e7f97bbcfb20cbe'
+    const fetchMock = stubFetchByUrl((url, init) => {
+      if (url.pathname === '/blocks/latest') {
+        return jsonResponse({
+          code: 200,
+          message: 'ok',
+          data: { height: 2518, registerDifficultyTarget: '20ffffff', centralPubkey },
+        })
+      }
       if (url.pathname === '/flow-node-registrations' && init?.method === 'POST') {
         return jsonResponse({
           code: 200,
@@ -81,7 +59,7 @@ describe('App initial state', () => {
           data: {
             id: 'reg-1',
             msgType: 0,
-            registerDifficultyTarget: '1d00ffff',
+            registerDifficultyTarget: '20ffffff',
             nonce: 42,
             flowNodePubkey: pubkey,
             flowNodeSignature: '00',
@@ -107,32 +85,31 @@ describe('App initial state', () => {
     render(<App />)
 
     fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
-    fireEvent.change(await screen.findByLabelText('注册难度目标'), {
-      target: { value: '1d00ffff' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /注册节点/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /context register/ }))
 
     await waitFor(() => {
       const raw = localStorage.getItem('nmsci.flowNodes.v1')
       const saved = JSON.parse(raw ?? '{"nodes":[]}') as {
-        nodes: Array<{ registration?: { status: string; txid?: string } }>
+        nodes: Array<{
+          registration?: { status: string; txid?: string; registerDifficultyTarget?: string }
+        }>
       }
       expect(saved.nodes[0]?.registration?.status).toBe('sent')
       expect(saved.nodes[0]?.registration?.txid).toBe('regtxid')
+      // 难度目标取自最新区块，无需手动填写。
+      expect(saved.nodes[0]?.registration?.registerDifficultyTarget).toBe('20ffffff')
     })
-    await waitFor(() => {
-      const messages = screen.getAllByText(/已注册 .+，nonce 为 42。/)
-      expect(messages.length).toBeGreaterThan(0)
-      expect(messages.some((message) => message.textContent?.includes('REG-1'))).toBe(true)
-      expect(messages.some((message) => message.textContent?.includes('021111'))).toBe(false)
-    })
+    // 注册前自动拉取了最新区块。
+    expect(
+      fetchMock.mock.calls.some(([input]) => requestInputUrl(input).includes('/blocks/latest')),
+    ).toBe(true)
   })
 
   it('renames and deletes a local flow node', async () => {
     render(<App />)
 
     fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
-    await screen.findByRole('button', { name: /注册节点/ })
+    await screen.findByRole('button', { name: /导出私钥/ })
 
     vi.stubGlobal(
       'prompt',

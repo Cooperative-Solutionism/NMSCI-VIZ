@@ -8,6 +8,7 @@ import {
   type DashboardPanelConfig,
 } from '../features/dashboard-layout/panelRegistry'
 import { mergeLocalNodes } from '../lib/chainGraph'
+import type { ChainGraphNode } from '../lib/types'
 import { useLocalKeyringController } from '../features/keyring/hooks/useLocalKeyringController'
 import { useLocalNodeActions } from '../features/keyring/hooks/useLocalNodeActions'
 import { useRegistrationController } from '../features/keyring/hooks/useRegistrationController'
@@ -20,6 +21,8 @@ import { GraphPanel } from '../features/network-explorer/components/GraphPanel'
 import { InspectorPanel } from '../features/network-explorer/components/InspectorPanel'
 import { MetricsPanelContent } from '../features/network-explorer/components/MetricsPanelContent'
 import { SystemPanelContent } from '../features/network-explorer/components/SystemPanelContent'
+import { TransactionRecordDialog } from '../features/network-explorer/components/TransactionRecordDialog'
+import { TransactionMountDialog } from '../features/network-explorer/components/TransactionMountDialog'
 import { useNetworkExplorerActions } from '../features/network-explorer/hooks/useNetworkExplorerActions'
 import { useNetworkExplorerController } from '../features/network-explorer/hooks/useNetworkExplorerController'
 
@@ -126,6 +129,49 @@ function App() {
     notifyStatus: registration.notifyStatus,
     requestUrl: query.requestUrl,
   })
+  // 右键流转节点的注册/授权直接对该节点生效（私钥已在内存中，节点能出现在画布即代表保险库已解锁）。
+  const handleRegisterFlowNode = useCallback(
+    (node: ChainGraphNode) => {
+      const localNode = keyring.localFlowNodes.find((item) => item.publicKeyHex === node.id)
+      if (localNode) void registration.registerFlowNode(localNode)
+    },
+    [keyring.localFlowNodes, registration],
+  )
+  const handleAuthorizeFlowNode = useCallback(
+    (node: ChainGraphNode) => {
+      const localNode = keyring.localFlowNodes.find((item) => item.publicKeyHex === node.id)
+      if (localNode) void registration.authorizeCentralPubkey(localNode)
+    },
+    [keyring.localFlowNodes, registration],
+  )
+  // 生成/挂载消费记录走弹窗：按右键来源预填对应节点。
+  const [recordDialog, setRecordDialog] = useState<{
+    flowNodePubkey?: string
+    consumeNodePubkey?: string
+  } | null>(null)
+  const [mountDialog, setMountDialog] = useState<{ flowNodePubkey?: string } | null>(null)
+  const handleGenerateRecord = useCallback(
+    (node: ChainGraphNode) => {
+      registration.notifyStatus(null)
+      registration.notifyError(null)
+      setRecordDialog(
+        node.kind === 'local-consume'
+          ? { consumeNodePubkey: node.id }
+          : { flowNodePubkey: node.id },
+      )
+    },
+    [registration],
+  )
+  const handleMountRecord = useCallback(
+    (node: ChainGraphNode) => {
+      registration.notifyStatus(null)
+      registration.notifyError(null)
+      registration.clearMountedPubkey()
+      setMountDialog(node.kind === 'local-flow' ? { flowNodePubkey: node.id } : {})
+    },
+    [registration],
+  )
+
   // 仅把用户显式"添加到画布"的本地节点合并进图谱。
   const canvasGraph = useMemo(
     () =>
@@ -136,7 +182,6 @@ function App() {
       ),
     [canvasNodeIds, keyring.localConsumeNodes, keyring.localFlowNodes, query.graph],
   )
-  const centralLocked = systemStatus.data?.currentCentralPubkeyLocked ?? false
   const politeMessage =
     registration.status ??
     (query.origin === 'backend' ? `浏览完成：当前可见 ${query.filteredRows.length} 行。` : '')
@@ -176,20 +221,16 @@ function App() {
       content: (
         <InspectorPanel
           apiBase={apiBase}
-          centralLocked={centralLocked}
           effectiveSelection={query.effectiveSelection}
           extendFromNode={query.extendFromNode}
           extendLoading={query.extendLoading}
           flowRateView={flowRateView}
           inspectorEmptyMessage={explorer.inspectorEmptyMessage}
           loading={query.loading}
-          localConsumeNodes={keyring.localConsumeNodes}
           localFlowNodes={keyring.localFlowNodes}
           localNodeState={localNodeState}
-          localTxRecords={keyring.localTxRecords}
           nodeActions={nodeActions}
           nodeDetail={nodeDetail}
-          registration={registration}
           selectedChain={query.selectedChain}
           selectedEdge={query.selectedEdge}
           selectedLocalConsumeNode={selectedLocalConsumeNode}
@@ -260,6 +301,10 @@ function App() {
             loading={query.loading}
             onAddConsumeNode={handleAddConsumeNode}
             onAddFlowNode={handleAddFlowNode}
+            onRegisterFlowNode={handleRegisterFlowNode}
+            onAuthorizeFlowNode={handleAuthorizeFlowNode}
+            onGenerateRecord={handleGenerateRecord}
+            onMountRecord={handleMountRecord}
             onSelectEdge={selection.onCanvasSelectEdge}
             onSelectNode={selection.onCanvasSelectNode}
             selectedId={selection.selectedLocalId ?? query.effectiveSelection?.id ?? null}
@@ -277,6 +322,43 @@ function App() {
           onExportJson={networkActions.handleExportJson}
         />
       </div>
+
+      <TransactionRecordDialog
+        open={recordDialog !== null}
+        busy={registration.busy === 'record'}
+        consumeNodes={keyring.localConsumeNodes}
+        defaultConsumeNodePubkey={recordDialog?.consumeNodePubkey}
+        defaultFlowNodePubkey={recordDialog?.flowNodePubkey}
+        error={registration.error}
+        flowNodes={keyring.localFlowNodes}
+        miningAttempts={registration.miningAttempts}
+        status={registration.status}
+        onCreate={(draft) => void registration.createTransactionRecord(draft)}
+        onOpenChange={(open) => {
+          if (!open) setRecordDialog(null)
+        }}
+      />
+      <TransactionMountDialog
+        open={mountDialog !== null}
+        busy={registration.busy === 'mount'}
+        canViewChain={registration.mountedPubkey !== null}
+        defaultFlowNodePubkey={mountDialog?.flowNodePubkey}
+        error={registration.error}
+        flowNodes={keyring.localFlowNodes}
+        miningAttempts={registration.miningAttempts}
+        records={keyring.localTxRecords}
+        status={registration.status}
+        onMount={(recordId, flowNodePubkey) =>
+          void registration.createTransactionMount(recordId, flowNodePubkey)
+        }
+        onOpenChange={(open) => {
+          if (!open) setMountDialog(null)
+        }}
+        onViewChain={() => {
+          registration.viewConsumeChain()
+          setMountDialog(null)
+        }}
+      />
     </div>
   )
 }

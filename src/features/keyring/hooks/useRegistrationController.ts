@@ -43,7 +43,6 @@ export function useRegistrationController({
   )
   const registration = useFlowNodeRegistration({
     client,
-    selectedLocalNode,
     localFlowNodes,
     localConsumeNodes,
     localTxRecords,

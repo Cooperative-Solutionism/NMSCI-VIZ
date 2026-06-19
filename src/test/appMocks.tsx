@@ -23,6 +23,10 @@ vi.mock('../components/NetworkGraph', () => ({
     graph,
     onAddConsumeNode,
     onAddFlowNode,
+    onRegisterFlowNode,
+    onAuthorizeFlowNode,
+    onGenerateRecord,
+    onMountRecord,
     onSelectEdge,
     onSelectNode,
   }: {
@@ -32,6 +36,10 @@ vi.mock('../components/NetworkGraph', () => ({
     onSelectNode: (node: ChainGraphNode) => void
     onAddFlowNode?: (position: { x: number; y: number }) => void
     onAddConsumeNode?: (position: { x: number; y: number }) => void
+    onRegisterFlowNode?: (node: ChainGraphNode) => void
+    onAuthorizeFlowNode?: (node: ChainGraphNode) => void
+    onGenerateRecord?: (node: ChainGraphNode) => void
+    onMountRecord?: (node: ChainGraphNode) => void
   }) => (
     <div data-testid="network-graph">
       <button type="button" onClick={() => onAddFlowNode?.({ x: 12, y: 34 })}>
@@ -41,9 +49,31 @@ vi.mock('../components/NetworkGraph', () => ({
         canvas add consume node
       </button>
       {graph.nodes.map((node) => (
-        <button key={node.id} type="button" onClick={() => onSelectNode(node)}>
-          Select node {node.id}
-        </button>
+        <div key={node.id}>
+          <button type="button" onClick={() => onSelectNode(node)}>
+            Select node {node.id}
+          </button>
+          {node.kind === 'local-flow' ? (
+            <>
+              <button type="button" onClick={() => onRegisterFlowNode?.(node)}>
+                context register {node.id}
+              </button>
+              <button type="button" onClick={() => onAuthorizeFlowNode?.(node)}>
+                context authorize {node.id}
+              </button>
+            </>
+          ) : null}
+          {node.kind === 'local-flow' || node.kind === 'local-consume' ? (
+            <>
+              <button type="button" onClick={() => onGenerateRecord?.(node)}>
+                context generate record {node.id}
+              </button>
+              <button type="button" onClick={() => onMountRecord?.(node)}>
+                context mount record {node.id}
+              </button>
+            </>
+          ) : null}
+        </div>
       ))}
       {graph.edges.map((edge) => (
         <button key={edge.id} type="button" onClick={() => onSelectEdge(edge)}>

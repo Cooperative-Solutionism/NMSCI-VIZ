@@ -19,6 +19,10 @@ export function NetworkGraph({
   onSelectEdge,
   onAddFlowNode,
   onAddConsumeNode,
+  onRegisterFlowNode,
+  onAuthorizeFlowNode,
+  onGenerateRecord,
+  onMountRecord,
 }: NetworkGraphProps) {
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
   const selectedChainId = useMemo(
@@ -128,6 +132,10 @@ export function NetworkGraph({
           menu={menu}
           onAddConsumeNode={onAddConsumeNode}
           onAddFlowNode={onAddFlowNode}
+          onRegisterFlowNode={onRegisterFlowNode}
+          onAuthorizeFlowNode={onAuthorizeFlowNode}
+          onGenerateRecord={onGenerateRecord}
+          onMountRecord={onMountRecord}
           onClose={closeMenu}
         />
       ) : null}

@@ -23,11 +23,22 @@ const sendTransactionMountMsgMock = vi.hoisted(() =>
   })),
 )
 
+const getLastBlockMock = vi.hoisted(() =>
+  vi.fn(async () => ({
+    data: {
+      height: 100,
+      transactionDifficultyTarget: '1d00ffff',
+      centralPubkey: `02${'c'.repeat(64)}`,
+    },
+  })),
+)
+
 vi.mock('@nmsci/sdk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@nmsci/sdk')>()
   return {
     ...actual,
     sendTransactionMountMsg: sendTransactionMountMsgMock,
+    getLastBlock: getLastBlockMock,
   }
 })
 
@@ -90,9 +101,10 @@ describe('useFlowNodeTransactionActions', () => {
   beforeEach(() => {
     buildTransactionMountMessageMock.mockClear()
     sendTransactionMountMsgMock.mockClear()
+    getLastBlockMock.mockClear()
   })
 
-  it('builds an existing-record mount with the user-selected flow node', async () => {
+  it('builds an existing-record mount with the user-selected flow node and the latest difficulty', async () => {
     const dispatch = vi.fn()
     const { result } = renderHook(() =>
       useFlowNodeTransactionActions({
@@ -104,18 +116,12 @@ describe('useFlowNodeTransactionActions', () => {
         localTxRecords: [record],
         persistTxRecords: vi.fn(),
         runQuery: vi.fn(),
-        selectedLocalNode: originalFlowNode,
         setMiningAttempts: vi.fn(),
       }),
     )
-    const createMount = result.current.createTransactionMount as unknown as (
-      recordId: string,
-      flowNodePubkey: string,
-      difficultyHex: string,
-    ) => Promise<void>
 
     await act(async () => {
-      await createMount(record.id, targetFlowNode.publicKeyHex, '1d00ffff')
+      await result.current.createTransactionMount(record.id, targetFlowNode.publicKeyHex)
     })
 
     expect(buildTransactionMountMessageMock).toHaveBeenCalledWith(

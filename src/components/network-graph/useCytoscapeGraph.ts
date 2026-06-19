@@ -86,14 +86,32 @@ export function useCytoscapeGraph({
     })
     cy.on('tap', () => onCloseMenuRef.current())
     cy.on('cxttap', (event) => {
-      if (event.target !== cy) {
-        onCloseMenuRef.current()
-        return
-      }
       const rendered = event.renderedPosition
       const model = event.position
       if (!rendered || !model) return
-      onOpenMenuRef.current({ x: rendered.x, y: rendered.y, position: { x: model.x, y: model.y } })
+      // 空白画布右键 → 添加节点菜单；节点右键 → 该节点的操作菜单；其余（边）关闭菜单。
+      if (event.target === cy) {
+        onOpenMenuRef.current({
+          x: rendered.x,
+          y: rendered.y,
+          position: { x: model.x, y: model.y },
+        })
+        return
+      }
+      const target = event.target as NodeSingular
+      if (typeof target.isNode === 'function' && target.isNode()) {
+        const node = nodeMapRef.current.get(target.id())
+        if (node) {
+          onOpenMenuRef.current({
+            x: rendered.x,
+            y: rendered.y,
+            position: { x: model.x, y: model.y },
+            node,
+          })
+          return
+        }
+      }
+      onCloseMenuRef.current()
     })
 
     cyRef.current = cy

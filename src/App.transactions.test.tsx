@@ -10,21 +10,29 @@ import {
 } from './test/appTestHarness'
 import App from './App'
 
+const centralPubkey = '02'.padEnd(66, '2')
+
+// 记录创建/挂载所需的难度目标与中心公钥统一来自最新区块。
+function latestBlock() {
+  return {
+    code: 200,
+    message: 'ok',
+    data: {
+      height: 100,
+      registerDifficultyTarget: '1d00ffff',
+      transactionDifficultyTarget: '1d00ffff',
+      centralPubkey,
+    },
+  }
+}
+
 describe('App initial state', () => {
   installAppTestLifecycle()
 
-  it('creates a transaction record with consume + flow double-signing', async () => {
-    const pubkey = '02'.padEnd(66, '1')
+  it('creates a transaction record from the context menu with consume + flow double-signing', async () => {
     const fetchMock = stubFetchByUrl((url, init) => {
-      if (url.pathname === '/metadata/difficulty') {
-        return jsonResponse({
-          code: 200,
-          message: 'ok',
-          data: {
-            register: { nbitsInt: 0, nbitsHex: '1d00ffff', targetDecimal: '0', targetHex: '0' },
-            transaction: { nbitsInt: 0, nbitsHex: '1d00ffff', targetDecimal: '0', targetHex: '0' },
-          },
-        })
+      if (url.pathname === '/blocks/latest') {
+        return jsonResponse(latestBlock())
       }
       if (url.pathname === '/transaction-records' && init?.method === 'POST') {
         return jsonResponse({
@@ -33,34 +41,16 @@ describe('App initial state', () => {
           data: { id: 'tx-rec-1', txid: 'txid-rec' },
         })
       }
-      if (url.pathname === `/flow-nodes/${pubkey}`) {
-        return jsonResponse({
-          code: 200,
-          message: 'ok',
-          data: {
-            registered: true,
-            authorized: true,
-            locked: false,
-            currentCentralPubkeyAuthorized: true,
-          },
-        })
-      }
       throw new Error(`Unexpected URL ${url.href}`)
     })
     render(<App />)
 
-    // a consume node (record source) then a flow node (operator) — flow node ends up selected
+    // a consume node (payer) and a flow node (payee), both in the keyring
     fireEvent.click(await screen.findByRole('button', { name: /canvas add consume node/i }))
     fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
-    fireEvent.click(await screen.findByRole('button', { name: /创建交易记录/ }))
 
+    fireEvent.click(await screen.findByRole('button', { name: /context generate record/ }))
     fireEvent.change(await screen.findByLabelText('金额'), { target: { value: '5000' } })
-    fireEvent.change(screen.getByLabelText('记录中心公钥'), {
-      target: { value: '02'.padEnd(66, '2') },
-    })
-    await waitFor(() => {
-      expect((screen.getByLabelText('交易难度') as HTMLInputElement).value).toBe('1d00ffff')
-    })
     fireEvent.click(screen.getByRole('button', { name: /^创建记录$/ }))
 
     await waitFor(() => {
@@ -81,15 +71,8 @@ describe('App initial state', () => {
   it('mounts a created record and views the resulting consume chain by pubkey', async () => {
     const pubkey = '02'.padEnd(66, '1')
     const fetchMock = stubFetchByUrl((url, init) => {
-      if (url.pathname === '/metadata/difficulty') {
-        return jsonResponse({
-          code: 200,
-          message: 'ok',
-          data: {
-            register: { nbitsInt: 0, nbitsHex: '1d00ffff', targetDecimal: '0', targetHex: '0' },
-            transaction: { nbitsInt: 0, nbitsHex: '1d00ffff', targetDecimal: '0', targetHex: '0' },
-          },
-        })
+      if (url.pathname === '/blocks/latest') {
+        return jsonResponse(latestBlock())
       }
       if (url.pathname === '/transaction-records' && init?.method === 'POST') {
         return jsonResponse({
@@ -105,18 +88,6 @@ describe('App initial state', () => {
           data: { id: '22222222-2222-4222-8222-2222222222bb', txid: 'm' },
         })
       }
-      if (url.pathname === `/flow-nodes/${pubkey}`) {
-        return jsonResponse({
-          code: 200,
-          message: 'ok',
-          data: {
-            registered: true,
-            authorized: true,
-            locked: false,
-            currentCentralPubkeyAuthorized: true,
-          },
-        })
-      }
       if (url.pathname === '/consume-chains') {
         return jsonResponse(sliceResponse([chainRow('chain-x', 1)]))
       }
@@ -128,23 +99,20 @@ describe('App initial state', () => {
     fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
 
     // create a record first
-    fireEvent.click(await screen.findByRole('button', { name: /创建交易记录/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /context generate record/ }))
     fireEvent.change(await screen.findByLabelText('金额'), { target: { value: '5000' } })
-    fireEvent.change(screen.getByLabelText('记录中心公钥'), {
-      target: { value: '02'.padEnd(66, '2') },
-    })
-    await waitFor(() => {
-      expect((screen.getByLabelText('交易难度') as HTMLInputElement).value).toBe('1d00ffff')
-    })
     fireEvent.click(screen.getByRole('button', { name: /^创建记录$/ }))
     await waitFor(() => {
       expect(localStorage.getItem('nmsci.txRecords.v1')).toContain(
         '11111111-1111-4111-8111-1111111111aa',
       )
     })
+    // close the record dialog
+    fireEvent.keyDown(screen.getByRole('dialog', { name: '生成消费记录' }), { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '生成消费记录' })).toBeNull())
 
     // mount it
-    fireEvent.click(screen.getByRole('button', { name: /挂载已有记录/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /context mount record/ }))
     fireEvent.click(await screen.findByRole('button', { name: /^提交挂载$/ }))
     await waitFor(() => {
       expect(
