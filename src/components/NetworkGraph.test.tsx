@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { ChainGraph } from '../lib/types'
 import { NetworkGraph } from './NetworkGraph'
@@ -34,6 +34,45 @@ const baseGraph: ChainGraph = {
 }
 
 describe('NetworkGraph selection highlighting', () => {
+  it('renders a canvas status bar with graph counts and selection state', () => {
+    render(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId="node-b"
+        onSelectEdge={vi.fn()}
+        onSelectNode={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('NMSCI 交易画布')).toBeInTheDocument()
+    expect(screen.getByText('节点 5')).toBeInTheDocument()
+    expect(screen.getByText('连接 4')).toBeInTheDocument()
+    expect(screen.getByText('已选择对象')).toBeInTheDocument()
+  })
+
+  it('offers direct add actions on an empty canvas', () => {
+    const onAddFlowNode = vi.fn()
+    const onAddConsumeNode = vi.fn()
+
+    render(
+      <NetworkGraph
+        graph={{ ...baseGraph, nodes: [], edges: [] }}
+        selectedId={null}
+        onSelectEdge={vi.fn()}
+        onSelectNode={vi.fn()}
+        onAddFlowNode={onAddFlowNode}
+        onAddConsumeNode={onAddConsumeNode}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '添加流转节点' }))
+    fireEvent.click(screen.getByRole('button', { name: '添加消费节点' }))
+
+    expect(screen.getByText('空白交易画布')).toBeInTheDocument()
+    expect(onAddFlowNode).toHaveBeenCalledWith({ x: 0, y: 0 })
+    expect(onAddConsumeNode).toHaveBeenCalledWith({ x: 0, y: 0 })
+  })
+
   it('passes every chain containing the selected node to the Cytoscape hook', () => {
     render(
       <NetworkGraph

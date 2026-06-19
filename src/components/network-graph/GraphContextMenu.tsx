@@ -33,7 +33,6 @@ export function GraphContextMenu({
     onClose()
   }
 
-  // 菜单打开后把焦点移入第一个菜单项，便于键盘操作。
   useEffect(() => {
     menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
   }, [])
@@ -44,12 +43,11 @@ export function GraphContextMenu({
     </Button>
   )
 
-  // 加载消费链：前链=节点为尾('end')、后链=节点为头('start')、全部=('node')。本地与链节点都提供。
   const loadItems = (target: ChainGraphNode): ReactNode => (
     <>
-      {menuItem('加载前消费链', () => onLoadChain?.(target, 'end'))}
-      {menuItem('加载后消费链', () => onLoadChain?.(target, 'start'))}
-      {menuItem('加载全部消费链', () => onLoadChain?.(target, 'node'))}
+      {menuItem('加载前序消费链', () => onLoadChain?.(target, 'end'))}
+      {menuItem('加载后续消费链', () => onLoadChain?.(target, 'start'))}
+      {menuItem('加载完整消费链', () => onLoadChain?.(target, 'node'))}
     </>
   )
 
@@ -64,8 +62,8 @@ export function GraphContextMenu({
   } else if (node.kind === 'local-flow') {
     items = (
       <>
-        {menuItem('注册', () => onRegisterFlowNode?.(node))}
-        {menuItem('授权', () => onAuthorizeFlowNode?.(node))}
+        {menuItem('注册流转节点', () => onRegisterFlowNode?.(node))}
+        {menuItem('授权中心公钥', () => onAuthorizeFlowNode?.(node))}
         {menuItem('生成消费记录', () => onGenerateRecord?.(node))}
         {menuItem('挂载消费记录', () => onMountRecord?.(node))}
         {loadItems(node)}
@@ -80,7 +78,6 @@ export function GraphContextMenu({
       </>
     )
   } else {
-    // 非本地的消费链节点：仅提供加载选项。
     items = loadItems(node)
   }
 

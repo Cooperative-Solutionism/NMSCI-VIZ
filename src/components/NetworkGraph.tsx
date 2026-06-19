@@ -5,12 +5,16 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
+import { Plus, Workflow } from 'lucide-react'
+import { Button } from './ui/button'
 import { GraphAccessList } from './network-graph/GraphAccessList'
 import { GraphContextMenu } from './network-graph/GraphContextMenu'
 import { GraphLegend } from './network-graph/GraphLegend'
 import { GraphTools } from './network-graph/GraphTools'
 import type { ContextMenuState, NetworkGraphProps } from './network-graph/types'
 import { useCytoscapeGraph } from './network-graph/useCytoscapeGraph'
+
+const emptyCanvasPosition = { x: 0, y: 0 }
 
 export function NetworkGraph({
   graph,
@@ -114,8 +118,22 @@ export function NetworkGraph({
     [fitGraph, openMenuAtCenter, zoomBy],
   )
 
+  const selectedState = selectedId ? '已选择对象' : '未选择'
+
   return (
     <div className="graph-shell" onContextMenu={(event) => event.preventDefault()}>
+      <div className="graph-statusbar" aria-label="画布状态">
+        <div className="graph-statusbar__brand">
+          <Workflow aria-hidden="true" />
+          <strong>NMSCI 交易画布</strong>
+        </div>
+        <div className="graph-statusbar__meta">
+          <span>节点 {graph.nodes.length}</span>
+          <span>连接 {graph.edges.length}</span>
+          <span>{selectedState}</span>
+        </div>
+      </div>
+
       {/* Cytoscape owns this custom canvas widget; keyboard affordances are wired below. */}
       {/* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
       <div
@@ -128,6 +146,34 @@ export function NetworkGraph({
         onKeyDown={handleCanvasKeyDown}
       />
       {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
+
+      {graph.nodes.length === 0 ? (
+        <div className="graph-empty-state" aria-label="空画布">
+          <div className="graph-empty-state__mark">
+            <Workflow aria-hidden="true" />
+          </div>
+          <h2>空白交易画布</h2>
+          <div className="graph-empty-state__actions">
+            <Button
+              type="button"
+              variant="default"
+              onClick={() => onAddFlowNode?.(emptyCanvasPosition)}
+            >
+              <Plus aria-hidden="true" />
+              添加流转节点
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => onAddConsumeNode?.(emptyCanvasPosition)}
+            >
+              <Plus aria-hidden="true" />
+              添加消费节点
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       {menu ? (
         <GraphContextMenu
           menu={menu}

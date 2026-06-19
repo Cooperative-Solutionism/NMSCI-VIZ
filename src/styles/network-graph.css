@@ -69,31 +69,176 @@
 
 .graph-shell {
   position: relative;
-  min-height: 0;
-  overflow: hidden;
-  background:
-    linear-gradient(rgba(28, 45, 38, 0.055) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(28, 45, 38, 0.055) 1px, transparent 1px), #f9faf7;
-  background-size: 32px 32px;
-}
-
-.graph-canvas {
   width: 100%;
   height: 100%;
   min-height: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 1px 1px, rgb(93 107 128 / 0.16) 1px, transparent 0),
+    linear-gradient(rgb(93 107 128 / 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(93 107 128 / 0.055) 1px, transparent 1px), #f7f9fc;
+  background-position:
+    0 0,
+    -1px -1px,
+    -1px -1px;
+  background-size:
+    24px 24px,
+    96px 96px,
+    96px 96px;
+}
+
+.graph-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.graph-statusbar {
+  position: absolute;
+  top: 16px;
+  left: 72px;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: min(640px, calc(100vw - 168px));
+  min-height: 42px;
+  border: 1px solid rgb(198 207 220 / 0.82);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  box-shadow:
+    0 16px 42px -28px rgba(30, 42, 62, 0.42),
+    0 1px 8px -5px rgba(30, 42, 62, 0.22);
+  color: var(--text);
+  padding: 7px 10px;
+  pointer-events: none;
+}
+
+.graph-statusbar__brand,
+.graph-statusbar__meta {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.graph-statusbar__brand {
+  gap: 8px;
+}
+
+.graph-statusbar__brand svg {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  color: var(--teal);
+}
+
+.graph-statusbar__brand strong {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 820;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-statusbar__meta {
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.graph-statusbar__meta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border: 1px solid rgb(217 222 232 / 0.88);
+  border-radius: 999px;
+  background: rgb(246 248 252 / 0.86);
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+.graph-empty-state {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 11;
+  display: flex;
+  transform: translate(-50%, -50%);
+  align-items: center;
+  flex-direction: column;
+  gap: 14px;
+  width: min(360px, calc(100vw - 48px));
+  border: 1px solid rgb(198 207 220 / 0.78);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  box-shadow: 0 24px 72px -36px rgba(30, 42, 62, 0.5);
+  padding: 22px;
+  text-align: center;
+}
+
+.graph-empty-state__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgb(var(--teal-rgb) / 0.2);
+  border-radius: 8px;
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.graph-empty-state__mark svg {
+  width: 22px;
+  height: 22px;
+}
+
+.graph-empty-state h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 820;
+  line-height: 1.2;
+}
+
+.graph-empty-state__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.graph-empty-state__actions button {
+  min-width: 132px;
 }
 
 .graph-tools {
   position: absolute;
   top: 16px;
   right: 16px;
+  z-index: 14;
   display: flex;
-  gap: 6px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  gap: 4px;
+  border: 1px solid rgb(198 207 220 / 0.82);
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
   padding: 4px;
-  box-shadow: var(--shadow);
+  box-shadow:
+    0 16px 42px -28px rgba(30, 42, 62, 0.42),
+    0 1px 8px -5px rgba(30, 42, 62, 0.22);
 }
 
 .graph-tools button {
@@ -103,31 +248,38 @@
   width: 32px;
   height: 32px;
   border: 0;
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
-  color: #33443e;
+  color: #354052;
 }
 
 .graph-tools button:hover {
   background: var(--soft);
+  color: var(--teal);
 }
 
 .legend {
   position: absolute;
   left: 16px;
   bottom: 16px;
+  z-index: 12;
   display: flex;
   align-items: center;
   gap: 14px;
   max-width: calc(100% - 32px);
   overflow-x: auto;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgb(198 207 220 / 0.82);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
   color: var(--muted);
   font-size: 12px;
+  font-weight: 620;
   padding: 9px 11px;
-  box-shadow: var(--shadow);
+  box-shadow:
+    0 16px 42px -28px rgba(30, 42, 62, 0.42),
+    0 1px 8px -5px rgba(30, 42, 62, 0.22);
 }
 
 .legend span {

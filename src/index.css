@@ -6,30 +6,30 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --bg: #f3f5f1;
+  --bg: #f6f7fb;
   --surface: #ffffff;
-  --surface-muted: #f7f8f5;
-  --line: #d8ded6;
-  --line-strong: #aebbb2;
-  --text: #18211e;
-  --muted: #61706a;
+  --surface-muted: #f3f5f8;
+  --line: #d9dee8;
+  --line-strong: #aab4c3;
+  --text: #18202f;
+  --muted: #647086;
   --shadcn-muted: var(--surface-muted);
-  --soft: #eef2eb;
-  --teal: #08776c;
-  --teal-rgb: 8 119 108;
-  --teal-soft: #e3f4ef;
-  --green: #178f69;
-  --amber: #d88a21;
-  --amber-soft: #fbefd9;
-  --red: #ad3e32;
-  --red-soft: #f8e7e2;
-  --shadow: 0 20px 40px rgba(32, 45, 39, 0.09);
-  --graph-panel-bg: #edf1ea;
-  --graph-node-bg: #f8fafc;
-  --graph-node-border: #b9c6d3;
-  --graph-node-text: #16202a;
-  --graph-node-selected-bg: #effdfa;
-  --graph-node-selected-border: #08776c;
+  --soft: #edf2f7;
+  --teal: #126e82;
+  --teal-rgb: 18 110 130;
+  --teal-soft: #e4f3f7;
+  --green: #17745b;
+  --amber: #b7791f;
+  --amber-soft: #fff2d6;
+  --red: #b54b42;
+  --red-soft: #fae7e3;
+  --shadow: 0 24px 60px rgba(30, 42, 62, 0.12);
+  --graph-panel-bg: #f4f6fa;
+  --graph-node-bg: #ffffff;
+  --graph-node-border: #aeb9ca;
+  --graph-node-text: #172033;
+  --graph-node-selected-bg: #eaf8fb;
+  --graph-node-selected-border: #126e82;
   --graph-edge-text: #334155;
   --graph-edge-label-bg: #ffffff;
   --node-local-flow-bg: #e3f4ef;
@@ -49,7 +49,8 @@
   --chain-11: #b91c1c;
   --chain-12: #0e7490;
   --font-sans:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    'Geist Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
   --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', ui-monospace, monospace;
 
   color: var(--text);

@@ -1,6 +1,6 @@
 export function GraphLegend() {
   return (
-    <div className="legend">
+    <div className="legend" aria-label="图例">
       <span>
         <i className="legend-line chain" />
         颜色 = 消费链

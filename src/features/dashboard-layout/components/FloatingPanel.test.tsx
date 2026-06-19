@@ -184,13 +184,13 @@ describe('DockIcon', () => {
     expect(onPositionChange).toHaveBeenCalledWith({ x: 32, y: 32 })
   })
 
-  it('sizes the collapsed button to its content instead of a fixed wide block', () => {
+  it('sizes the collapsed button as a compact icon rail entry', () => {
     const css = readFileSync(join(process.cwd(), 'src/styles/dashboard-layout.css'), 'utf8')
     const dockRule = cssRule(css, '.dock-icon')
 
-    expect(dockRule).toContain('width: max-content;')
-    expect(dockRule).toContain('max-width: calc(100vw - 24px);')
-    expect(dockRule).not.toContain('width: min(144px')
+    expect(dockRule).toContain('width: 44px;')
+    expect(dockRule).toContain('max-width: 44px;')
+    expect(dockRule).toContain('justify-content: center;')
   })
 })
 

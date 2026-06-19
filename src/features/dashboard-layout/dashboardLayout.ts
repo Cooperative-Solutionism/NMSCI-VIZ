@@ -38,6 +38,9 @@ export const dashboardPanelIds: DashboardPanelId[] = [
 const defaultReferenceBounds = { width: 1024, height: 768 } satisfies DashboardBounds
 const defaultPanelTop = 16
 const defaultPanelHorizontalStep = 96
+const defaultDockLeft = 16
+const defaultDockTop = 84
+const defaultDockVerticalStep = 54
 const dockReservedSize = { width: 48, height: 48 }
 const panelReservedSize = { width: 280, height: 48 }
 
@@ -61,14 +64,22 @@ function defaultPanelPosition(index: number, bounds?: DashboardBounds): Dashboar
   }
 }
 
+function defaultDockPosition(index: number): DashboardPoint {
+  return {
+    x: defaultDockLeft,
+    y: defaultDockTop + defaultDockVerticalStep * index,
+  }
+}
+
 export const createDefaultDashboardLayout = (bounds?: DashboardBounds): DashboardLayoutState =>
   dashboardPanelIds.reduce((layout, panelId, index) => {
-    const position = defaultPanelPosition(index, bounds)
+    const dockPosition = defaultDockPosition(index)
+    const panelPosition = defaultPanelPosition(index, bounds)
 
     layout[panelId] = {
       collapsed: true,
-      dockPosition: { ...position },
-      panelPosition: { ...position },
+      dockPosition,
+      panelPosition,
     }
 
     return layout

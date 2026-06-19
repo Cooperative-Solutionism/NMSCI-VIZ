@@ -2,6 +2,9 @@ import type { GraphTokens } from '../../lib/tokens'
 
 type GraphStyle = NonNullable<cytoscape.CytoscapeOptions['style']>
 
+const graphFontFamily =
+  'Geist Variable, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+
 export function createGraphStyle(tokens: GraphTokens): GraphStyle {
   return [
     {
@@ -12,7 +15,7 @@ export function createGraphStyle(tokens: GraphTokens): GraphStyle {
         'border-width': 1.4,
         color: tokens.nodeText,
         content: 'data(label)',
-        'font-family': 'Inter, ui-sans-serif, system-ui',
+        'font-family': graphFontFamily,
         'font-size': 11,
         height: 48,
         'overlay-opacity': 0,
@@ -72,7 +75,7 @@ export function createGraphStyle(tokens: GraphTokens): GraphStyle {
       style: {
         color: tokens.edgeText,
         'curve-style': 'bezier',
-        'font-family': 'Inter, ui-sans-serif, system-ui',
+        'font-family': graphFontFamily,
         'font-size': 10,
         label: 'data(label)',
         'line-color': 'data(color)',

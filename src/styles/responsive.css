@@ -6,6 +6,11 @@
   .floating-panel__body {
     max-height: calc(100svh - 84px);
   }
+
+  .graph-statusbar {
+    left: 12px;
+    max-width: calc(100vw - 104px);
+  }
 }
 
 @media (max-width: 520px) {
@@ -28,6 +33,33 @@
     align-items: flex-start;
     flex-direction: column;
     gap: 7px;
+  }
+
+  .graph-statusbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+    max-width: calc(100vw - 24px);
+  }
+
+  .graph-tools {
+    top: 116px;
+    right: 12px;
+    bottom: auto;
+    flex-direction: column;
+  }
+
+  .graph-empty-state {
+    width: calc(100vw - 32px);
+    padding: 18px;
+  }
+
+  .graph-empty-state__actions {
+    width: 100%;
+  }
+
+  .graph-empty-state__actions button {
+    flex: 1 1 100%;
   }
 
   .detail-row {

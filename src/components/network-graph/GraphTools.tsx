@@ -18,7 +18,7 @@ export function GraphTools({ onDownloadPng, onFit, onZoomBy }: GraphToolsProps) 
         title="放大"
         onClick={() => onZoomBy(0.15)}
       >
-        <ZoomIn />
+        <ZoomIn aria-hidden="true" />
       </Button>
       <Button
         variant="ghost"
@@ -28,7 +28,7 @@ export function GraphTools({ onDownloadPng, onFit, onZoomBy }: GraphToolsProps) 
         title="缩小"
         onClick={() => onZoomBy(-0.15)}
       >
-        <ZoomOut />
+        <ZoomOut aria-hidden="true" />
       </Button>
       <Button
         variant="ghost"
@@ -38,7 +38,7 @@ export function GraphTools({ onDownloadPng, onFit, onZoomBy }: GraphToolsProps) 
         title="适配图谱"
         onClick={onFit}
       >
-        <Maximize2 />
+        <Maximize2 aria-hidden="true" />
       </Button>
       <Button
         variant="ghost"
@@ -48,7 +48,7 @@ export function GraphTools({ onDownloadPng, onFit, onZoomBy }: GraphToolsProps) 
         title="下载 PNG"
         onClick={onDownloadPng}
       >
-        <Download />
+        <Download aria-hidden="true" />
       </Button>
     </div>
   )

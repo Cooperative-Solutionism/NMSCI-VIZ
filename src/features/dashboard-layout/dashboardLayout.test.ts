@@ -18,6 +18,14 @@ const defaultTopRowPanelPositions = [
   { x: 516, y: 16 },
   { x: 612, y: 16 },
 ]
+const defaultLeftRailDockPositions = [
+  { x: 16, y: 84 },
+  { x: 16, y: 138 },
+  { x: 16, y: 192 },
+  { x: 16, y: 246 },
+  { x: 16, y: 300 },
+  { x: 16, y: 354 },
+]
 
 function fakeStorage(initial: Record<string, string> = {}): Storage {
   const map = new Map(Object.entries(initial))
@@ -56,21 +64,21 @@ describe('dashboard layout state', () => {
     ])
   })
 
-  it('places default panel origins in a top-centered horizontal row', () => {
+  it('places default panel origins in a top-centered row and dock entries in a left rail', () => {
     const layout = normalizeDashboardLayout(undefined)
 
     expect(dashboardPanelIds.map((panelId) => layout[panelId].panelPosition)).toEqual(
       defaultTopRowPanelPositions,
     )
     expect(dashboardPanelIds.map((panelId) => layout[panelId].dockPosition)).toEqual(
-      defaultTopRowPanelPositions,
+      defaultLeftRailDockPositions,
     )
   })
 
   it('exports the default layout with expected query defaults', () => {
     expect(defaultDashboardLayout.query).toEqual({
       collapsed: true,
-      dockPosition: { x: 132, y: 16 },
+      dockPosition: { x: 16, y: 84 },
       panelPosition: { x: 132, y: 16 },
     })
   })
@@ -105,12 +113,12 @@ describe('dashboard layout state', () => {
     expect(Object.keys(layout)).toEqual(dashboardPanelIds)
     expect(layout.query).toEqual({
       collapsed: true,
-      dockPosition: { x: 132, y: 16 },
+      dockPosition: { x: 16, y: 84 },
       panelPosition: { x: 120, y: 140 },
     })
     expect(layout.details).toEqual({
       collapsed: true,
-      dockPosition: { x: 228, y: 16 },
+      dockPosition: { x: 16, y: 138 },
       panelPosition: { x: 228, y: 16 },
     })
   })
@@ -244,7 +252,7 @@ describe('dashboard layout state', () => {
     expect(next).not.toBe(layout)
     expect(next.query).toEqual({
       collapsed: false,
-      dockPosition: { x: 132, y: 16 },
+      dockPosition: { x: 16, y: 84 },
       panelPosition: { x: 144, y: 188 },
     })
     expect(next.details).toEqual(layout.details)
