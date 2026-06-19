@@ -31,7 +31,8 @@ export function useLocalFlowNodeActions({
 }: UseLocalFlowNodeActionsParams) {
   const handleAddFlowNode = useCallback(
     (position?: { x: number; y: number }) => {
-      if (vaultStatus !== 'unlocked') {
+      // 关闭态(disabled)与解锁态都可直接操作；仅锁定/设置态需先解锁。
+      if (vaultStatus === 'locked' || vaultStatus === 'setup') {
         notifyError('添加节点前请先解锁密钥保险库。')
         return
       }
@@ -55,7 +56,7 @@ export function useLocalFlowNodeActions({
   )
 
   const handleImportLocalNode = useCallback(() => {
-    if (vaultStatus !== 'unlocked') {
+    if (vaultStatus === 'locked' || vaultStatus === 'setup') {
       notifyError('导入节点前请先解锁密钥保险库。')
       return
     }
@@ -101,10 +102,13 @@ export function useLocalFlowNodeActions({
 
   const handleExportPrivateKey = useCallback(async () => {
     if (!selectedLocalNode) return
-    const confirmed = window.confirm('从 localStorage 导出私钥？解锁后私钥会以明文复制。')
-    if (!confirmed) return
+    const message =
+      vaultStatus === 'disabled'
+        ? '从 localStorage 导出私钥？私钥当前以明文存储，将直接复制。'
+        : '从 localStorage 导出私钥？解锁后私钥会以明文复制。'
+    if (!window.confirm(message)) return
     await onCopyPrivateKey(selectedLocalNode.privateKeyHex)
-  }, [onCopyPrivateKey, selectedLocalNode])
+  }, [onCopyPrivateKey, selectedLocalNode, vaultStatus])
 
   return {
     handleAddFlowNode,

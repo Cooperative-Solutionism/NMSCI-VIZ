@@ -100,13 +100,29 @@ function App() {
   )
   const handleVaultPromptOpenChange = useCallback(
     (open: boolean) => {
-      if (!open) closeVaultPrompt()
+      if (open) return
+      closeVaultPrompt()
+      // 在“创建口令”过程中关闭弹窗即放弃启用，回退到关闭态（私钥仍是明文）。
+      if (keyring.vault.status === 'setup') keyring.handleDisableVault()
     },
-    [closeVaultPrompt],
+    [closeVaultPrompt, keyring],
   )
   const handleOpenVault = useCallback(() => {
     requestVault('打开本地密钥环')
   }, [requestVault])
+  const handleEnableVault = useCallback(() => {
+    keyring.vault.enable()
+  }, [keyring.vault])
+  // 关闭保险库会解除加密并把私钥明文落盘，是降级安全的破坏性操作——与删除/导出一致，先确认。
+  // 注意：放弃“启用”的弹窗关闭路径直接调用 keyring.handleDisableVault（此时尚未加密，无需确认）。
+  const handleDisableVault = useCallback(() => {
+    if (
+      !window.confirm('关闭密钥保险库将解除 AES-GCM 加密，并把所有本地私钥以明文写入浏览器存储。确定继续？')
+    ) {
+      return
+    }
+    keyring.handleDisableVault()
+  }, [keyring])
   const handleAddFlowNode = useCallback(
     (position?: { x: number; y: number }) => {
       requestVault('添加流转节点', () => nodeActionsRef.current.handleAddFlowNode(position))
@@ -211,6 +227,8 @@ function App() {
           onAddConsumeNode={handleAddConsumeNode}
           onAddFlowNode={handleAddFlowNode}
           onImportLocalNode={handleImportLocalNode}
+          onDisableVault={handleDisableVault}
+          onEnableVault={handleEnableVault}
           onLockVault={keyring.handleLockVault}
           onOpenVault={handleOpenVault}
           onSelectLocalNode={selection.selectLocalNode}
@@ -290,7 +308,7 @@ function App() {
       </div>
 
       <VaultPromptDialog
-        open={vaultPromptOpen}
+        open={vaultPromptOpen || keyring.vault.status === 'setup'}
         reason={vaultPromptReason}
         status={keyring.vault.status}
         error={keyring.vault.error}

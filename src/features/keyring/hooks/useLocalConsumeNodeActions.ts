@@ -28,7 +28,8 @@ export function useLocalConsumeNodeActions({
 }: UseLocalConsumeNodeActionsParams) {
   const handleAddConsumeNode = useCallback(
     (position?: { x: number; y: number }) => {
-      if (vaultStatus !== 'unlocked') {
+      // 关闭态(disabled)与解锁态都可直接操作；仅锁定/设置态需先解锁。
+      if (vaultStatus === 'locked' || vaultStatus === 'setup') {
         notifyError('添加节点前请先解锁密钥保险库。')
         return
       }
@@ -76,9 +77,13 @@ export function useLocalConsumeNodeActions({
 
   const handleExportConsumeKey = useCallback(async () => {
     if (!selectedLocalConsumeNode) return
-    if (!window.confirm('从 localStorage 导出私钥？解锁后私钥会以明文复制。')) return
+    const message =
+      vaultStatus === 'disabled'
+        ? '从 localStorage 导出私钥？私钥当前以明文存储，将直接复制。'
+        : '从 localStorage 导出私钥？解锁后私钥会以明文复制。'
+    if (!window.confirm(message)) return
     await onCopyPrivateKey(selectedLocalConsumeNode.privateKeyHex)
-  }, [onCopyPrivateKey, selectedLocalConsumeNode])
+  }, [onCopyPrivateKey, selectedLocalConsumeNode, vaultStatus])
 
   return {
     handleAddConsumeNode,

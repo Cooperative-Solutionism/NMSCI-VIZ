@@ -36,6 +36,8 @@ function renderPanel(overrides: Partial<LocalNodePanelProps> = {}) {
     onAddConsumeNode: vi.fn(),
     onAddFlowNode: vi.fn(),
     onImportLocalNode: vi.fn(),
+    onDisableVault: vi.fn(),
+    onEnableVault: vi.fn(),
     onLockVault: vi.fn(),
     onOpenVault: vi.fn(),
     vaultStatus: 'unlocked',
@@ -55,11 +57,12 @@ describe('LocalNodePanel', () => {
     expect(screen.getByRole('button', { name: '新建消费节点' })).toBeTruthy()
   })
 
-  it('shows a locked hint and no table when the vault is not unlocked', () => {
+  it('shows a locked hint and an unlock action when the vault is locked', () => {
     renderPanel({ vaultStatus: 'locked' })
 
     expect(screen.queryByRole('table', { name: '本地节点列表' })).toBeNull()
     expect(screen.getByText('解锁密钥保险库后可查看本地节点。')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '解锁密钥保险库' })).toBeTruthy()
   })
 
   it('shows an empty hint when unlocked with no nodes', () => {
@@ -67,6 +70,30 @@ describe('LocalNodePanel', () => {
 
     expect(screen.queryByRole('table', { name: '本地节点列表' })).toBeNull()
     expect(screen.getByText('尚无本地节点，点击上方按钮创建。')).toBeTruthy()
+  })
+
+  it('defaults to vault off: offers enable, no lock prompt, and shows the empty hint', () => {
+    const onEnableVault = vi.fn()
+    renderPanel({ vaultStatus: 'disabled', onEnableVault })
+
+    expect(screen.getByText('尚无本地节点，点击上方按钮创建。')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '解锁密钥保险库' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '启用密钥保险库' }))
+    expect(onEnableVault).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers lock and disable actions when the vault is unlocked', () => {
+    const onLockVault = vi.fn()
+    const onDisableVault = vi.fn()
+    renderPanel({ vaultStatus: 'unlocked', onLockVault, onDisableVault })
+
+    fireEvent.click(screen.getByRole('button', { name: '锁定保险库' }))
+    expect(onLockVault).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭保险库' }))
+    expect(onDisableVault).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: '启用密钥保险库' })).toBeNull()
   })
 
   it('renders one row per local node with name, type, public key, and status', () => {

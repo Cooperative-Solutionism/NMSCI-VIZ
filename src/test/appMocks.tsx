@@ -1,15 +1,16 @@
 import { vi } from 'vitest'
 import type { ChainGraph, ChainGraphEdge, ChainGraphNode } from '../lib/types'
 
-type MockVaultStatus = 'setup' | 'locked' | 'unlocked'
+type MockVaultStatus = 'disabled' | 'setup' | 'locked' | 'unlocked'
 
 const mockVault = vi.hoisted(() => ({
   error: null as string | null,
-  status: 'unlocked' as MockVaultStatus,
+  // 默认关闭：贴合真实默认（保险库关闭、私钥明文存储、无需口令）。
+  status: 'disabled' as MockVaultStatus,
 }))
 
 export function resetMockVault() {
-  mockVault.status = 'unlocked'
+  mockVault.status = 'disabled'
   mockVault.error = null
 }
 
@@ -108,10 +109,22 @@ vi.mock('../hooks/useKeyVault', async () => {
           mockVault.status = 'locked'
           setStatus('locked')
         }),
-        codec: {
-          encrypt: (plaintext: string) => Promise.resolve({ iv: 'iv', ct: btoa(plaintext) }),
-          decrypt: (secret: { ct: string }) => Promise.resolve(atob(secret.ct)),
-        },
+        enable: vi.fn(() => {
+          mockVault.status = 'setup'
+          setStatus('setup')
+        }),
+        disable: vi.fn(() => {
+          mockVault.status = 'disabled'
+          setStatus('disabled')
+        }),
+        // 关闭态 codec 为 null：存储层据此以明文落盘，贴合真实行为。
+        codec:
+          status === 'disabled'
+            ? null
+            : {
+                encrypt: (plaintext: string) => Promise.resolve({ iv: 'iv', ct: btoa(plaintext) }),
+                decrypt: (secret: { ct: string }) => Promise.resolve(atob(secret.ct)),
+              },
       }
     },
   }

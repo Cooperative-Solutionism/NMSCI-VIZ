@@ -34,6 +34,8 @@ export interface LocalNodePanelProps {
   onAddConsumeNode: () => void
   onAddFlowNode: () => void
   onImportLocalNode: () => void
+  onDisableVault: () => void
+  onEnableVault: () => void
   onLockVault: () => void
   onOpenVault: () => void
   vaultStatus: VaultStatus
@@ -89,20 +91,18 @@ export function LocalNodePanel({
   onAddConsumeNode,
   onAddFlowNode,
   onImportLocalNode,
+  onDisableVault,
+  onEnableVault,
   onLockVault,
   onOpenVault,
   vaultStatus,
 }: LocalNodePanelProps) {
   const showCanvasColumn = Boolean(onToggleCanvas)
-  const VaultIcon =
-    vaultStatus === 'unlocked' ? Lock : vaultStatus === 'setup' ? ShieldCheck : LockOpen
-  const vaultLabel =
-    vaultStatus === 'unlocked'
-      ? '锁定密钥保险库'
-      : vaultStatus === 'setup'
-        ? '创建密钥保险库'
-        : '解锁密钥保险库'
-  const vaultAction = vaultStatus === 'unlocked' ? onLockVault : onOpenVault
+  const keysAvailable = vaultStatus === 'unlocked' || vaultStatus === 'disabled'
+  const description =
+    vaultStatus === 'disabled'
+      ? '保险库已关闭：私钥以明文存储于本地，无需口令。可随时启用以加密保护。'
+      : '需要访问私钥的操作会按需打开密钥保险库弹窗。'
   const rows = buildRows(localFlowNodes, localConsumeNodes)
 
   return (
@@ -113,7 +113,7 @@ export function LocalNodePanel({
             <KeyRound aria-hidden="true" />
             本地节点
           </CardTitle>
-          <CardDescription>需要访问私钥的操作会按需打开密钥保险库弹窗。</CardDescription>
+          <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -128,10 +128,28 @@ export function LocalNodePanel({
             </Button>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button variant="outline" type="button" onClick={vaultAction}>
-              <VaultIcon data-icon="inline-start" />
-              {vaultLabel}
-            </Button>
+            {vaultStatus === 'disabled' ? (
+              <Button variant="outline" type="button" onClick={onEnableVault}>
+                <ShieldCheck data-icon="inline-start" />
+                启用密钥保险库
+              </Button>
+            ) : vaultStatus === 'unlocked' ? (
+              <>
+                <Button variant="outline" type="button" onClick={onLockVault}>
+                  <Lock data-icon="inline-start" />
+                  锁定保险库
+                </Button>
+                <Button variant="ghost" type="button" onClick={onDisableVault}>
+                  <LockOpen data-icon="inline-start" />
+                  关闭保险库
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" type="button" onClick={onOpenVault}>
+                <LockOpen data-icon="inline-start" />
+                解锁密钥保险库
+              </Button>
+            )}
             <Button variant="outline" type="button" onClick={onImportLocalNode}>
               <Download data-icon="inline-start" />
               导入流转节点
@@ -208,7 +226,7 @@ export function LocalNodePanel({
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              {vaultStatus === 'unlocked'
+              {keysAvailable
                 ? '尚无本地节点，点击上方按钮创建。'
                 : '解锁密钥保险库后可查看本地节点。'}
             </p>

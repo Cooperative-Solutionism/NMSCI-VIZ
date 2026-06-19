@@ -13,7 +13,7 @@ import App from './App'
 describe('App initial state', () => {
   installAppTestLifecycle()
 
-  it('adds a flow node from the keys toolbar and persists it', async () => {
+  it('adds a flow node from the canvas and persists it as plaintext by default (vault off)', async () => {
     render(<App />)
 
     fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
@@ -21,15 +21,140 @@ describe('App initial state', () => {
     await waitFor(() => {
       const raw = localStorage.getItem('nmsci.flowNodes.v1')
       const saved = JSON.parse(raw ?? '{"nodes":[]}') as {
-        nodes: Array<{ privateKey: { ct: string }; publicKeyHex: string }>
+        nodes: Array<{ privateKeyHex?: string; privateKey?: unknown; publicKeyHex: string }>
       }
-      // 私钥以密文落盘（明文不出现在 raw），pubkey 明文；密文用替身编解码器可解回原私钥。
-      expect(raw).not.toContain('0'.repeat(63) + '1')
+      // 默认保险库关闭：私钥以明文 privateKeyHex 落盘，没有密文字段，pubkey 明文。
       expect(saved.nodes[0]?.publicKeyHex).toBe('02'.padEnd(66, '1'))
-      expect(atob(saved.nodes[0]!.privateKey.ct)).toBe('0'.repeat(63) + '1')
+      expect(saved.nodes[0]?.privateKeyHex).toBe('0'.repeat(63) + '1')
+      expect(saved.nodes[0]?.privateKey).toBeUndefined()
     })
     // selecting the new node opens its key-details panel in the inspector
     expect(await screen.findByRole('button', { name: /导出私钥/ })).toBeTruthy()
+  })
+
+  it('encrypts existing plaintext nodes when the vault is enabled', async () => {
+    render(<App />)
+
+    // 关闭态下添加一个明文节点。
+    fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
+        nodes: Array<{ privateKeyHex?: string }>
+      }
+      expect(saved.nodes[0]?.privateKeyHex).toBe('0'.repeat(63) + '1')
+    })
+
+    // 启用保险库并创建口令：现存明文私钥应迁移为密文。
+    fireEvent.click(screen.getByRole('button', { name: /启用密钥保险库/ }))
+    fireEvent.change(await screen.findByLabelText('新保险库口令'), {
+      target: { value: 'session-passphrase' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /创建保险库/ }))
+
+    await waitFor(() => {
+      const raw = localStorage.getItem('nmsci.flowNodes.v1')
+      const saved = JSON.parse(raw ?? '{"nodes":[]}') as {
+        nodes: Array<{ privateKey?: { ct: string }; privateKeyHex?: string }>
+      }
+      // 明文私钥不再落盘，密文可解回原私钥。
+      expect(raw).not.toContain('0'.repeat(63) + '1')
+      expect(saved.nodes[0]?.privateKeyHex).toBeUndefined()
+      expect(atob(saved.nodes[0]!.privateKey!.ct)).toBe('0'.repeat(63) + '1')
+    })
+  })
+
+  it('returns encrypted keys to plaintext when the vault is disabled again', async () => {
+    // 关闭保险库是破坏性降级，需确认。
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true),
+    )
+    render(<App />)
+
+    // 关闭态添加节点 → 启用并加密。
+    fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /启用密钥保险库/ }))
+    fireEvent.change(await screen.findByLabelText('新保险库口令'), {
+      target: { value: 'session-passphrase' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /创建保险库/ }))
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
+        nodes: Array<{ privateKey?: { ct: string } }>
+      }
+      expect(saved.nodes[0]?.privateKey?.ct).toBeTruthy()
+    })
+
+    // 关闭保险库：内存中的私钥应以明文重新落盘，且不丢失。
+    fireEvent.click(await screen.findByRole('button', { name: /关闭保险库/ }))
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
+        nodes: Array<{ privateKey?: unknown; privateKeyHex?: string }>
+      }
+      expect(saved.nodes[0]?.privateKeyHex).toBe('0'.repeat(63) + '1')
+      expect(saved.nodes[0]?.privateKey).toBeUndefined()
+    })
+    // 关闭后重新出现“启用密钥保险库”入口。
+    expect(await screen.findByRole('button', { name: /启用密钥保险库/ })).toBeTruthy()
+  })
+
+  it('does not disable the vault when the confirmation is declined', async () => {
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => false),
+    )
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /启用密钥保险库/ }))
+    fireEvent.change(await screen.findByLabelText('新保险库口令'), {
+      target: { value: 'session-passphrase' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /创建保险库/ }))
+    await screen.findByRole('button', { name: /关闭保险库/ })
+
+    fireEvent.click(screen.getByRole('button', { name: /关闭保险库/ }))
+
+    // 取消确认：仍处于已解锁加密态，未回退到关闭。
+    expect(screen.getByRole('button', { name: /关闭保险库/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /启用密钥保险库/ })).toBeNull()
+    const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
+      nodes: Array<{ privateKey?: { ct: string } }>
+    }
+    expect(saved.nodes[0]?.privateKey?.ct).toBeTruthy()
+  })
+
+  it('abandons enabling when the setup dialog is closed without creating a passphrase', async () => {
+    render(<App />)
+
+    // 关闭态添加一个明文节点，再打开“启用”流程进入 setup。
+    fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /启用密钥保险库/ }))
+    const dialog = await screen.findByRole('dialog', { name: /创建密钥保险库/ })
+    expect(await screen.findByLabelText('新保险库口令')).toBeTruthy()
+
+    // 不创建口令直接关闭弹窗 → 放弃启用，回退到关闭态。
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText('新保险库口令')).toBeNull()
+    })
+    // 回到“启用密钥保险库”入口，且私钥仍是明文、未被加密。
+    expect(await screen.findByRole('button', { name: /启用密钥保险库/ })).toBeTruthy()
+    const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
+      nodes: Array<{ privateKey?: unknown; privateKeyHex?: string }>
+    }
+    expect(saved.nodes[0]?.privateKeyHex).toBe('0'.repeat(63) + '1')
+    expect(saved.nodes[0]?.privateKey).toBeUndefined()
+
+    // 未卡在 setup：仍可继续添加节点（明文）。
+    fireEvent.click(screen.getByRole('button', { name: /canvas add flow node/i }))
+    await waitFor(() => {
+      const after = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
+        nodes: unknown[]
+      }
+      expect(after.nodes).toHaveLength(2)
+    })
   })
 
   it('does not expose the removed consume-chain query shortcut for local flow nodes', async () => {
@@ -239,11 +364,11 @@ describe('App initial state', () => {
     await waitFor(() => {
       const raw = localStorage.getItem('nmsci.flowNodes.v1')
       const saved = JSON.parse(raw ?? '{"nodes":[]}') as {
-        nodes: Array<{ privateKey: { ct: string }; publicKeyHex: string }>
+        nodes: Array<{ privateKeyHex?: string; privateKey?: unknown; publicKeyHex: string }>
       }
-      // 导入的私钥同样以密文落盘（明文不出现在 raw），密文可解回原私钥。
-      expect(raw).not.toContain(privateKey)
-      expect(atob(saved.nodes[0]!.privateKey.ct)).toBe(privateKey)
+      // 默认保险库关闭：导入的私钥以明文 privateKeyHex 落盘，无密文字段。
+      expect(saved.nodes[0]?.privateKeyHex).toBe(privateKey)
+      expect(saved.nodes[0]?.privateKey).toBeUndefined()
       expect(saved.nodes[0]?.publicKeyHex.length).toBe(66)
     })
   })

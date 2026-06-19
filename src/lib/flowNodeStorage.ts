@@ -34,8 +34,9 @@ export interface LocalFlowNode {
   authorizations: LocalFlowNodeAuthorization[]
 }
 
-// 存储形态：私钥以密文 privateKey 落盘（pubkey/label 等元数据保持明文，便于免解锁渲染）。
-// privateKeyHex 仅为旧版明文遗留字段，加载时透传、下次保存即被加密迁移。
+// 存储形态：保险库启用时私钥以密文 privateKey 落盘（pubkey/label 等元数据保持明文，便于免解锁渲染）。
+// 保险库关闭（codec 为 null）时私钥以明文 privateKeyHex 落盘；该字段同时承担旧版明文遗留，
+// 加载时透传、启用并解锁后下次保存即被加密迁移。
 type StoredFlowNode = Omit<LocalFlowNode, 'privateKeyHex'> & {
   privateKey?: EncryptedSecret
   privateKeyHex?: string
@@ -48,9 +49,10 @@ interface FlowNodeStorageDocument {
 
 export const flowNodeStorageKey = 'nmsci.flowNodes.v1'
 
-// 解密载入：每个节点的密文私钥经 codec 解密为内存态 privateKeyHex；旧版明文节点直接透传。
+// 载入：codec 非空时密文私钥经其解密为内存态 privateKeyHex；codec 为 null（保险库关闭）
+// 或旧版明文节点直接透传 privateKeyHex。关闭态遇到仅有密文的节点（无法解密）则跳过。
 export async function loadLocalFlowNodes(
-  codec: SecretCodec,
+  codec: SecretCodec | null,
   storage: Storage = window.localStorage,
 ): Promise<LocalFlowNode[]> {
   const raw = storage.getItem(flowNodeStorageKey)
@@ -67,9 +69,8 @@ export async function loadLocalFlowNodes(
   const nodes: LocalFlowNode[] = []
   for (const stored of parsed.nodes) {
     if (!isStoredFlowNode(stored)) continue
-    const privateKeyHex = stored.privateKey
-      ? await codec.decrypt(stored.privateKey)
-      : stored.privateKeyHex
+    const privateKeyHex =
+      codec && stored.privateKey ? await codec.decrypt(stored.privateKey) : stored.privateKeyHex
     if (typeof privateKeyHex !== 'string') continue
     const { privateKey: _enc, privateKeyHex: _legacy, ...rest } = stored
     nodes.push({ ...rest, privateKeyHex })
@@ -77,16 +78,17 @@ export async function loadLocalFlowNodes(
   return nodes
 }
 
-// 加密保存：每个节点的内存态 privateKeyHex 经 codec 加密为密文 privateKey 落盘，明文不入 localStorage。
+// 保存：codec 非空时内存态 privateKeyHex 经其加密为密文 privateKey 落盘，明文不入 localStorage；
+// codec 为 null（保险库关闭）时私钥以明文 privateKeyHex 落盘。
 export async function saveLocalFlowNodes(
   nodes: LocalFlowNode[],
-  codec: SecretCodec,
+  codec: SecretCodec | null,
   storage: Storage = window.localStorage,
 ): Promise<void> {
   const stored: StoredFlowNode[] = []
   for (const node of nodes) {
     const { privateKeyHex, ...rest } = node
-    stored.push({ ...rest, privateKey: await codec.encrypt(privateKeyHex) })
+    stored.push(codec ? { ...rest, privateKey: await codec.encrypt(privateKeyHex) } : { ...rest, privateKeyHex })
   }
   const document: FlowNodeStorageDocument = { version: 1, nodes: stored }
   storage.setItem(flowNodeStorageKey, JSON.stringify(document))

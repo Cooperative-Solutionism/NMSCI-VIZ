@@ -49,6 +49,17 @@ describe('consume node storage', () => {
     expect(await loadLocalConsumeNodes(fakeCodec, storage)).toEqual([node])
   })
 
+  it('stores and reads plaintext when the vault is off (null codec)', async () => {
+    const storage = fakeStorage()
+    await saveLocalConsumeNodes([node], null, storage)
+
+    const raw = storage.getItem(consumeNodeStorageKey)
+    // 关闭态：私钥以明文 privateKeyHex 落盘，没有密文字段。
+    expect(raw).toContain(node.privateKeyHex)
+    expect(raw).not.toContain('"privateKey"')
+    expect(await loadLocalConsumeNodes(null, storage)).toEqual([node])
+  })
+
   it('returns [] for missing, malformed, or wrong-version documents', async () => {
     expect(await loadLocalConsumeNodes(fakeCodec, fakeStorage())).toEqual([])
     expect(
