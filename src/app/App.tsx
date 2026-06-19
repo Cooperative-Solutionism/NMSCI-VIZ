@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import '../App.css'
 import { defaultApiBase } from './config'
 import { LoopsPanel } from '../components'
@@ -12,18 +12,19 @@ import { useLocalKeyringController } from '../features/keyring/hooks/useLocalKey
 import { useLocalNodeActions } from '../features/keyring/hooks/useLocalNodeActions'
 import { useRegistrationController } from '../features/keyring/hooks/useRegistrationController'
 import { useVaultActionGate } from '../features/keyring/hooks/useVaultActionGate'
+import { LocalNodePanel } from '../features/keyring/components/LocalNodePanel'
 import { VaultPromptDialog } from '../features/keyring/components/VaultPromptDialog'
+import { BrowsePanel } from '../features/network-explorer/components/BrowsePanel'
 import { ExportPanelContent } from '../features/network-explorer/components/ExportPanelContent'
 import { GraphPanel } from '../features/network-explorer/components/GraphPanel'
 import { InspectorPanel } from '../features/network-explorer/components/InspectorPanel'
 import { MetricsPanelContent } from '../features/network-explorer/components/MetricsPanelContent'
-import { QueryPanel } from '../features/network-explorer/components/QueryPanel'
 import { SystemPanelContent } from '../features/network-explorer/components/SystemPanelContent'
 import { useNetworkExplorerActions } from '../features/network-explorer/hooks/useNetworkExplorerActions'
 import { useNetworkExplorerController } from '../features/network-explorer/hooks/useNetworkExplorerController'
 
 function App() {
-  const [apiBase, setApiBase] = useState(defaultApiBase)
+  const apiBase = defaultApiBase
   const explorer = useNetworkExplorerController(apiBase)
   const { flowRateView, nodeDetail, query, selection, systemStatus } = explorer
   const keyring = useLocalKeyringController({
@@ -64,8 +65,6 @@ function App() {
     selectLocalNode: selection.selectLocalNode,
     selectedLocalConsumeNode,
     selectedLocalNode,
-    setMode: query.setMode,
-    setNodeId: query.setNodeId,
     vaultStatus: keyring.vault.status,
   })
   const nodeActionsRef = useRef(nodeActions)
@@ -107,8 +106,6 @@ function App() {
     notifyError: registration.notifyError,
     notifyStatus: registration.notifyStatus,
     requestUrl: query.requestUrl,
-    setMode: query.setMode,
-    setNodeId: query.setNodeId,
   })
   const canvasGraph = useMemo(
     () => mergeLocalNodes(query.graph, keyring.localFlowNodes, keyring.localConsumeNodes),
@@ -117,38 +114,29 @@ function App() {
   const centralLocked = systemStatus.data?.currentCentralPubkeyLocked ?? false
   const politeMessage =
     registration.status ??
-    (query.origin === 'backend' ? `查询完成：当前可见 ${query.filteredRows.length} 行。` : '')
+    (query.origin === 'backend' ? `浏览完成：当前可见 ${query.filteredRows.length} 行。` : '')
   const alertMessage = query.error ?? registration.error ?? nodeDetail.nodeDetailError ?? ''
   const dashboardPanels = [
     {
       id: 'query',
-      label: '\u67e5\u8be2',
+      label: '\u6d4f\u89c8',
       icon: dashboardPanelIcons.query,
       content: (
-        <QueryPanel
-          apiBase={apiBase}
-          currencyFilter={query.currencyFilter}
-          error={query.error}
-          extended={query.extended}
-          loading={query.loading}
-          loopStatus={query.loopStatus}
-          mode={query.mode}
-          nodeId={query.nodeId}
+        <BrowsePanel apiBase={apiBase} />
+      ),
+    },
+    {
+      id: 'localNodes',
+      label: '\u672c\u5730\u8282\u70b9',
+      icon: dashboardPanelIcons.localNodes,
+      content: (
+        <LocalNodePanel
           onAddConsumeNode={handleAddConsumeNode}
           onAddFlowNode={handleAddFlowNode}
-          onApiBaseChange={setApiBase}
           onImportLocalNode={handleImportLocalNode}
           onLockVault={keyring.handleLockVault}
           onOpenVault={handleOpenVault}
-          onPickNode={networkActions.handlePickNode}
-          onRunQuery={query.runQuery}
-          onSetCurrencyFilter={query.setCurrencyFilter}
-          onSetLoopStatus={query.setLoopStatus}
-          onSetMode={query.setMode}
-          onSetNodeId={query.setNodeId}
-          requestUrl={query.requestUrl}
           vaultStatus={keyring.vault.status}
-          warning={query.warning}
         />
       ),
     },

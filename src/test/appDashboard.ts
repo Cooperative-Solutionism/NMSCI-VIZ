@@ -14,6 +14,7 @@ const allDashboardPanels: DashboardPanelId[] = [
   'metrics',
   'export',
   'system',
+  'localNodes',
 ]
 
 export function seedDashboardLayout(expandedPanels = allDashboardPanels) {

@@ -49,9 +49,10 @@ describe('web interface guideline regressions', () => {
   const uiTsx = collectTsxFiles()
 
   it('keeps non-auth form controls named with autocomplete disabled', () => {
-    const queryForm = read(
-      'src/features/network-explorer/components/query-panel/QueryFormContent.tsx',
-    )
+    const browseForms = [
+      read('src/features/network-explorer/components/browse-panel/BlockBrowser.tsx'),
+      read('src/features/network-explorer/components/browse-panel/FlowNodeBrowser.tsx'),
+    ].join('\n')
     const recordForm = read('src/components/TransactionRecordForm.tsx')
     const mountForm = read('src/components/TransactionMountForm.tsx')
     const flowPanel = [
@@ -60,11 +61,16 @@ describe('web interface guideline regressions', () => {
     ].join('\n')
     const vaultGate = read('src/components/VaultGate.tsx')
 
-    for (const name of ['apiBase', 'nodeId', 'currencyFilter']) {
-      expect(queryForm).toContain(`name="${name}"`)
+    for (const name of [
+      'blockPage',
+      'blockPageSize',
+      'flowNodePage',
+      'flowNodePageSize',
+    ]) {
+      expect(browseForms).toContain(`name="${name}"`)
     }
-    expect(queryForm).not.toContain('name="page"')
-    expect(queryForm).not.toContain('name="size"')
+    expect(browseForms).not.toContain('name="page"')
+    expect(browseForms).not.toContain('name="size"')
     for (const name of [
       'consumeNodePubkey',
       'amount',
@@ -95,7 +101,9 @@ describe('web interface guideline regressions', () => {
 
   it('marks UI identifiers as non-translatable code tokens', () => {
     const text = uiTsx.map((file) => read(file)).join('\n')
-    const nodeBrowser = read('src/components/NodeBrowser.tsx')
+    const nodeBrowser = read(
+      'src/features/network-explorer/components/browse-panel/FlowNodeBrowser.tsx',
+    )
 
     expect(text).not.toMatch(/<code>\{/)
     expect(nodeBrowser).toContain('className="node-browser-key" translate="no"')
@@ -103,30 +111,32 @@ describe('web interface guideline regressions', () => {
 
   it('keeps graph and stateful controls keyboard/deep-link friendly', () => {
     const networkGraph = read('src/components/NetworkGraph.tsx')
-    const queryPanel = read('src/features/network-explorer/components/QueryPanel.tsx')
-    const nodeBrowser = read('src/components/NodeBrowser.tsx')
+    const browsePanel = read('src/features/network-explorer/components/BrowsePanel.tsx')
+    const flowNodeBrowser = read(
+      'src/features/network-explorer/components/browse-panel/FlowNodeBrowser.tsx',
+    )
 
     expect(networkGraph).toContain('onKeyDown={handleCanvasKeyDown}')
     expect(networkGraph).not.toContain('role="menu"')
-    expect(queryPanel).toMatch(/useUrlStateParam<QueryPanelTab>\(\s*'panel'/)
-    expect(queryPanel).not.toContain("useUrlBooleanParam('panelCollapsed'")
-    expect(queryPanel).not.toContain('onKeyDown={handlePanelKeyDown}')
-    expect(queryPanel).not.toContain('useDraggable')
-    expect(queryPanel).toContain('className="query-panel-content"')
-    expect(nodeBrowser).toContain("useUrlBooleanParam('nodeBrowserOpen'")
+    expect(browsePanel).toMatch(/useUrlStateParam<BrowsePanelTab>\(\s*'panel'/)
+    expect(browsePanel).not.toContain("useUrlBooleanParam('panelCollapsed'")
+    expect(browsePanel).not.toContain('onKeyDown={handlePanelKeyDown}')
+    expect(browsePanel).not.toContain('useDraggable')
+    expect(browsePanel).toContain('className="browse-panel-content"')
+    expect(flowNodeBrowser).toContain("useUrlNumberParam('flowNodePage'")
   })
 
   it('keeps floating panel content split from fixed shells', () => {
     const graphPanel = read('src/features/network-explorer/components/GraphPanel.tsx')
     const inspectorPanel = read('src/features/network-explorer/components/InspectorPanel.tsx')
-    const queryPanel = read('src/features/network-explorer/components/QueryPanel.tsx')
+    const browsePanel = read('src/features/network-explorer/components/BrowsePanel.tsx')
     const app = read('src/app/App.tsx')
 
     expect(graphPanel).not.toContain('graph-welcome')
     expect(graphPanel).not.toContain('metrics-strip')
     expect(graphPanel).not.toContain('export-bar')
-    expect(queryPanel).not.toContain('floating-head')
-    expect(queryPanel).not.toContain('floating-reopen')
+    expect(browsePanel).not.toContain('floating-head')
+    expect(browsePanel).not.toContain('floating-reopen')
     expect(inspectorPanel).not.toContain('LoopsPanel')
     expect(inspectorPanel).toContain('className="inspector-panel-content"')
     expect(app).toContain('MetricsPanelContent')
@@ -163,10 +173,10 @@ describe('web interface guideline regressions', () => {
     }
   })
 
-  it('keeps query panel content scrollable inside the fixed shell', () => {
+  it('keeps browse panel content scrollable inside the fixed shell', () => {
     const appCss = readCssBundle()
-    const contentRule = cssRule(appCss, '.query-panel-content')
-    const bodyRule = cssRule(appCss, '.query-panel-content .floating-body')
+    const contentRule = cssRule(appCss, '.browse-panel-content')
+    const bodyRule = cssRule(appCss, '.browse-panel-content .floating-body')
 
     expect(contentRule).toContain('display: flex;')
     expect(contentRule).toContain('flex-direction: column;')
@@ -177,7 +187,7 @@ describe('web interface guideline regressions', () => {
     expect(bodyRule).toContain('overflow: auto;')
   })
 
-  it('lets shadcn tabs own query tab styling', () => {
+  it('lets shadcn tabs own browse tab styling', () => {
     const appCss = readCssBundle()
     const tabsRule = cssRule(appCss, '.floating-tabs')
 
@@ -188,14 +198,17 @@ describe('web interface guideline regressions', () => {
     expect(appCss).not.toContain('.floating-tabs button')
   })
 
-  it('uses shadcn primitives for query panel controls', () => {
-    const queryPanel = read('src/features/network-explorer/components/QueryPanel.tsx')
-    const queryTabs = read(
-      'src/features/network-explorer/components/query-panel/QueryPanelTabs.tsx',
+  it('uses shadcn primitives for browse panel controls', () => {
+    const browsePanel = read('src/features/network-explorer/components/BrowsePanel.tsx')
+    const browseTabs = read(
+      'src/features/network-explorer/components/browse-panel/BrowsePanelTabs.tsx',
     )
-    const queryForm = read(
-      'src/features/network-explorer/components/query-panel/QueryFormContent.tsx',
-    )
+    const browseControls = [
+      read('src/features/network-explorer/components/browse-panel/BlockBrowser.tsx'),
+      read('src/features/network-explorer/components/browse-panel/FlowNodeBrowser.tsx'),
+    ].join('\n')
+    const localNodePanel = read('src/features/keyring/components/LocalNodePanel.tsx')
+    const productControls = [browseControls, localNodePanel].join('\n')
 
     for (const module of [
       '../../../../components/ui/alert',
@@ -204,13 +217,12 @@ describe('web interface guideline regressions', () => {
       '../../../../components/ui/card',
       '../../../../components/ui/field',
       '../../../../components/ui/input',
-      '../../../../components/ui/select',
-      '../../../../components/ui/separator',
-      '../../../../components/ui/textarea',
-      '../../../../components/ui/toggle-group',
+      '../../../../components/ui/table',
+      '../../../../components/ui/toggle',
     ]) {
-      expect(queryForm, module).toContain(module)
+      expect(browseControls, module).toContain(module)
     }
+    expect(localNodePanel).toContain('../../../components/ui/separator')
 
     for (const token of [
       '<Alert',
@@ -220,27 +232,26 @@ describe('web interface guideline regressions', () => {
       '<Field',
       '<FieldGroup',
       '<Input',
-      '<Select',
       '<Separator',
-      '<Textarea',
-      '<ToggleGroup',
+      '<Table',
+      '<Toggle',
     ]) {
-      expect(queryForm, token).toContain(token)
+      expect(productControls, token).toContain(token)
     }
 
-    expect(queryPanel).toContain('<Tabs')
-    expect(queryPanel).toContain('<TabsContent')
-    expect(queryTabs).toContain('TabsList')
-    expect(queryTabs).toContain('TabsTrigger')
-    expect(queryTabs).not.toContain('role="tablist"')
+    expect(browsePanel).toContain('<Tabs')
+    expect(browsePanel).toContain('<TabsContent')
+    expect(browseTabs).toContain('TabsList')
+    expect(browseTabs).toContain('TabsTrigger')
+    expect(browseTabs).not.toContain('role="tablist"')
 
-    expect(queryForm).not.toContain("from '../../../../components'")
-    expect(queryForm).not.toMatch(/<input[\s>]/)
-    expect(queryForm).not.toMatch(/<textarea[\s>]/)
-    expect(queryForm).not.toMatch(/<select[\s>]/)
-    expect(queryForm).not.toContain('primary-button')
-    expect(queryForm).not.toContain('secondary-button')
-    expect(queryForm).not.toContain('segmented')
+    expect(productControls).not.toContain("from '../../../../components'")
+    expect(productControls).not.toMatch(/<input[\s>]/)
+    expect(productControls).not.toMatch(/<textarea[\s>]/)
+    expect(productControls).not.toMatch(/<select[\s>]/)
+    expect(productControls).not.toContain('primary-button')
+    expect(productControls).not.toContain('secondary-button')
+    expect(productControls).not.toContain('segmented')
   })
 
   it('uses shadcn primitives for product controls that shadcn/ui provides', () => {
@@ -275,16 +286,12 @@ describe('web interface guideline regressions', () => {
     }
   })
 
-  it('keeps page arguments out of consume-chain query APIs', () => {
-    const forbiddenDefaultSizeName = 'default' + 'PageSize'
+  it('keeps consume-chain page arguments explicit in browse APIs', () => {
     const forbiddenTargetPageName = 'target' + 'Page'
     const forbiddenNumericQueryCall = new RegExp('run' + 'Query\\(\\s*\\d')
-    const forbiddenPageProperty = 'page' + ':'
-    const forbiddenSizeProperty = 'size' + ':'
     const forbiddenSetStateName = 'set' + 'Slice'
     const forbiddenFactoryName = 'make' + 'Slice'
     const forbiddenDtoName = 'Slice' + 'ResponseDTO'
-    const forbiddenReturnEntry = 'sli' + 'ce,'
     const types = read('src/lib/types.ts')
     const chainGraph = read('src/lib/chainGraph.ts')
     const consumeQuery = read('src/hooks/useConsumeChainQuery.ts')
@@ -298,39 +305,41 @@ describe('web interface guideline regressions', () => {
       'src/app/App.tsx',
       'src/hooks/useFlowNodeRegistration.ts',
       'src/features/keyring/hooks/useRegistrationController.ts',
-      'src/features/network-explorer/components/QueryPanel.tsx',
+      'src/features/network-explorer/components/BrowsePanel.tsx',
     ]
 
     for (const file of files) {
       const text = read(file)
-      expect(text, file).not.toContain(forbiddenDefaultSizeName)
       expect(text, file).not.toContain(forbiddenTargetPageName)
       expect(text, file).not.toMatch(forbiddenNumericQueryCall)
     }
 
-    expect(queryTypeBody).not.toContain(forbiddenPageProperty)
-    expect(queryTypeBody).not.toContain(forbiddenSizeProperty)
-    expect(chainGraph).not.toContain('query' + '.page')
-    expect(chainGraph).not.toContain('query' + '.size')
-    expect(hookReturnBody).not.toContain(forbiddenPageProperty)
-    expect(hookReturnBody).not.toContain(forbiddenSizeProperty)
-    expect(hookReturnBody).not.toContain(forbiddenReturnEntry)
+    expect(queryTypeBody).toContain('page: number')
+    expect(queryTypeBody).toContain('size: number')
+    expect(chainGraph).toContain('query' + '.page')
+    expect(chainGraph).toContain('query' + '.size')
+    expect(hookReturnBody).toContain('page: queryPage')
+    expect(hookReturnBody).toContain('pageSize: queryPageSize')
+    expect(hookReturnBody).toContain('hasNextPage')
+    expect(hookReturnBody).toContain('hasPreviousPage')
     expect(consumeQuery).not.toContain(forbiddenSetStateName)
     expect(consumeQuery).not.toContain(forbiddenFactoryName)
     expect(consumeQuery).not.toContain(forbiddenDtoName)
   })
 
-  it('uses shared fixed pagination constants for consume-chain requests and previews', () => {
+  it('uses shared default pagination constants without fixed dashboard pagination', () => {
     const config = read('src/app/config.ts')
     const chainGraph = read('src/lib/chainGraph.ts')
     const consumeQuery = read('src/hooks/useConsumeChainQuery.ts')
 
-    expect(config).toContain('dashboardQueryPage')
-    expect(config).toContain('dashboardQuerySize')
-    expect(chainGraph).toContain('dashboardQueryPage')
-    expect(chainGraph).toContain('dashboardQuerySize')
-    expect(consumeQuery).toContain('dashboardQueryPage')
-    expect(consumeQuery).toContain('dashboardQuerySize')
+    expect(config).toContain('defaultConsumeChainPage')
+    expect(config).toContain('defaultConsumeChainPageSize')
+    expect(config).not.toContain('dashboardQueryPage')
+    expect(config).not.toContain('dashboardQuerySize')
+    expect(chainGraph).not.toContain('dashboardQueryPage')
+    expect(chainGraph).not.toContain('dashboardQuerySize')
+    expect(consumeQuery).toContain('defaultConsumeChainPage')
+    expect(consumeQuery).toContain('defaultConsumeChainPageSize')
     expect(chainGraph).not.toContain('const consumeChainUrlPage')
     expect(chainGraph).not.toContain('const consumeChainUrlSize')
   })
@@ -340,8 +349,6 @@ describe('web interface guideline regressions', () => {
     const forbiddenCnPageControlsLabel = '分' + '页'
 
     for (const file of [
-      'src/features/network-explorer/components/QueryPanel.tsx',
-      'src/features/network-explorer/components/query-panel/QueryFormContent.tsx',
       'src/features/network-explorer/hooks/useNetworkExplorerController.ts',
       'src/App.test.tsx',
     ]) {
@@ -364,9 +371,8 @@ describe('web interface guideline regressions', () => {
     for (const file of [
       'src/components/ReturnFlowCard.tsx',
       'src/components/TransactionEvidence.tsx',
-      'src/components/NodeBrowser.tsx',
+      'src/features/network-explorer/components/browse-panel/FlowNodeBrowser.tsx',
       'src/components/VaultGate.tsx',
-      'src/features/network-explorer/components/query-panel/QueryFormContent.tsx',
     ]) {
       const text = read(file)
       expect(text).toMatch(/aria-live="polite"|role="status"|role="alert"/)

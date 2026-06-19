@@ -2,9 +2,8 @@ import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import {
   DASHBOARD_LAYOUT_STORAGE_KEY,
+  openFlowNodesTab,
   installAppTestLifecycle,
-  openBrowseTab,
-  openQueryTab,
   readSource,
   sourceExists,
 } from './test/appTestHarness'
@@ -18,7 +17,7 @@ describe('App initial state', () => {
     const { container } = render(<App />)
 
     expect(container.querySelector('#network-graph')).toBeTruthy()
-    expect(container.querySelectorAll('.dock-icon')).toHaveLength(6)
+    expect(container.querySelectorAll('.dock-icon')).toHaveLength(7)
     expect(container.querySelector('[role="tab"]')).toBeNull()
     expect(container.querySelector('.topbar')).toBeNull()
     expect(localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY)).toBeNull()
@@ -28,8 +27,8 @@ describe('App initial state', () => {
     render(<App />)
 
     expect(screen.queryByRole('button', { name: /demo/i })).toBeNull()
-    expect((screen.getByLabelText('流转节点 ID / 公钥') as HTMLTextAreaElement).value).toBe('')
-    expect(screen.getByText('运行查询以探索消费网络。')).toBeTruthy()
+    expect(screen.queryByLabelText('流转节点 ID / 公钥')).toBeNull()
+    expect(screen.getByText('浏览消费链以探索消费网络。')).toBeTruthy()
     expect(document.querySelector('.topbar')).toBeNull()
   })
 
@@ -38,8 +37,12 @@ describe('App initial state', () => {
 
     expect(screen.getByRole('link', { name: '跳转到图谱' })).toBeTruthy()
     expect(document.querySelector('.topbar')).toBeNull()
-    expect(screen.getByRole('tab', { name: '查询' })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: '浏览' })).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: '浏览' })).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: '本地节点' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: '区块' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: '流转节点' })).toBeTruthy()
+    expect(screen.queryByRole('tab', { name: '消费链' })).toBeNull()
+    expect(screen.queryByRole('tab', { name: '查询' })).toBeNull()
     expect(screen.queryByRole('tab', { name: '密钥' })).toBeNull()
   })
 
@@ -85,9 +88,11 @@ describe('App initial state', () => {
     expect(systemPanel).toContain('SystemStatusStrip')
   })
 
-  it('does not render fixed page or size controls', () => {
+  it('renders paged browse controls for the active browser', () => {
     const { container } = render(<App />)
 
+    expect(container.querySelector('[name="blockPage"]')).toBeTruthy()
+    expect(container.querySelector('[name="blockPageSize"]')).toBeTruthy()
     expect(container.querySelector('[name="page"]')).toBeNull()
     expect(container.querySelector('[name="size"]')).toBeNull()
     expect(screen.queryByRole('button', { name: /上一页/ })).toBeNull()
@@ -108,16 +113,15 @@ describe('App initial state', () => {
     expect(screen.getByRole('button', { name: /^json$/i })).toBeDisabled()
   })
 
-  it('keeps query tabs usable without the draggable query shell', () => {
+  it('keeps browse tabs usable without the draggable shell', () => {
     render(<App />)
 
     expect(screen.queryByRole('button', { name: /拖动控制台面板/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /打开控制台面板/ })).toBeNull()
 
-    openBrowseTab()
-    expect(screen.getByRole('button', { name: /浏览节点/ })).toBeTruthy()
+    openFlowNodesTab()
+    expect(screen.getByRole('button', { name: /加载流转节点/ })).toBeTruthy()
 
-    openQueryTab()
-    expect(screen.getByLabelText('流转节点 ID / 公钥')).toBeTruthy()
+    expect(screen.queryByLabelText('流转节点 ID / 公钥')).toBeNull()
   })
 })

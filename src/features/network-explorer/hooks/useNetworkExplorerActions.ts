@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import { downloadText } from '../../../shared/utils/downloadText'
 import { edgesToCsv, rowsToJson, toCurl } from '../../../lib/exporters'
 import { errorMessage } from '../../../lib/errors'
-import type { ChainGraphEdge, ConsumeChainResponseDTO, QueryMode } from '../../../lib/types'
+import type { ChainGraphEdge, ConsumeChainResponseDTO } from '../../../lib/types'
 
 export function useNetworkExplorerActions({
   filteredRows,
@@ -10,16 +10,12 @@ export function useNetworkExplorerActions({
   notifyError,
   notifyStatus,
   requestUrl,
-  setMode,
-  setNodeId,
 }: {
   filteredRows: ConsumeChainResponseDTO[]
   graphEdges: ChainGraphEdge[]
   notifyError: (error: string | null) => void
   notifyStatus: (status: string | null) => void
   requestUrl: string
-  setMode: (mode: QueryMode) => void
-  setNodeId: (nodeId: string) => void
 }) {
   const handleExportCsv = useCallback(() => {
     downloadText('consume-chain-edges.csv', 'text/csv;charset=utf-8', edgesToCsv(graphEdges))
@@ -38,19 +34,9 @@ export function useNetworkExplorerActions({
     }
   }, [notifyError, notifyStatus, requestUrl])
 
-  const handlePickNode = useCallback(
-    (pubkey: string) => {
-      setMode('node')
-      setNodeId(pubkey)
-      notifyStatus('已将所选节点公钥填入查询，请点击加载。')
-    },
-    [notifyStatus, setMode, setNodeId],
-  )
-
   return {
     handleCopyCurl,
     handleExportCsv,
     handleExportJson,
-    handlePickNode,
   }
 }

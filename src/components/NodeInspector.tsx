@@ -78,7 +78,7 @@ export function NodeInspector({
           />
         </>
       ) : detailStatus === 'idle' ? (
-        <div className="detail-state">节点状态需要流转节点公钥（请通过公钥查询选择）。</div>
+        <div className="detail-state">节点状态需要流转节点公钥（请通过流转节点浏览选择）。</div>
       ) : null}
       <ReturnFlowCard
         data={flowRate.data}

@@ -64,7 +64,6 @@ export function InspectorPanel({
     handleDeleteLocalNode: () => void
     handleExportConsumeKey: () => Promise<void>
     handleExportPrivateKey: () => Promise<void>
-    handleQuerySelectedFlowNode: () => void
     handleRenameConsumeNode: () => void
     handleRenameLocalNode: () => void
   }
@@ -120,7 +119,6 @@ export function InspectorPanel({
               onDifficultyChange={registration.setRegisterDifficultyTarget}
               onExportPrivateKey={() => void nodeActions.handleExportPrivateKey()}
               onFetchDifficulty={() => void registration.fetchRegisterDifficulty()}
-              onQuery={nodeActions.handleQuerySelectedFlowNode}
               onRegister={() => void registration.registerFlowNode()}
               onRename={nodeActions.handleRenameLocalNode}
               registerDifficultyTarget={registration.registerDifficultyTarget}

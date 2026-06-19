@@ -37,7 +37,15 @@ describe('dashboard layout state', () => {
   })
 
   it('lists dashboard panel ids in the expected order', () => {
-    expect(dashboardPanelIds).toEqual(['query', 'details', 'loops', 'metrics', 'export', 'system'])
+    expect(dashboardPanelIds).toEqual([
+      'query',
+      'details',
+      'loops',
+      'metrics',
+      'export',
+      'system',
+      'localNodes',
+    ])
   })
 
   it('includes expected default dock positions', () => {
@@ -45,6 +53,7 @@ describe('dashboard layout state', () => {
 
     expect(layout.query.dockPosition).toEqual({ x: 16, y: 16 })
     expect(layout.system.dockPosition).toEqual({ x: 16, y: 296 })
+    expect(layout.localNodes.dockPosition).toEqual({ x: 16, y: 352 })
   })
 
   it('exports the default layout with expected query defaults', () => {

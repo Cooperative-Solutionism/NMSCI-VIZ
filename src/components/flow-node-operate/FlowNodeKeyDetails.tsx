@@ -1,5 +1,4 @@
 import type { FlowNodeStateResponseDTO } from '@nmsci/sdk'
-import { Search } from 'lucide-react'
 import { formatDateTime, maskSecret } from '../../lib/format'
 import type { LocalFlowNode } from '../../lib/flowNodeStorage'
 import { DetailRow } from '../DetailRow'
@@ -13,7 +12,6 @@ interface FlowNodeKeyDetailsProps {
   onCopy: (value: string, label: string) => void
   onDelete: () => void
   onExportPrivateKey: () => void
-  onQuery: () => void
   onRename: () => void
 }
 
@@ -24,7 +22,6 @@ export function FlowNodeKeyDetails({
   onCopy,
   onDelete,
   onExportPrivateKey,
-  onQuery,
   onRename,
 }: FlowNodeKeyDetailsProps) {
   const chainState = nodeState
@@ -78,10 +75,6 @@ export function FlowNodeKeyDetails({
       <DetailRow label="注册状态" value={formatRegistrationStatus(node.registration?.status)} />
       <DetailRow label="授权数" value={node.authorizations.length} />
       <DetailRow label="链上状态" value={chainState} />
-      <Button variant="secondary" type="button" onClick={onQuery}>
-        <Search data-icon="inline-start" />
-        查询此节点
-      </Button>
       <Button variant="secondary" type="button" onClick={onExportPrivateKey}>
         导出私钥
       </Button>

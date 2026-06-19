@@ -72,4 +72,6 @@ export interface ConsumeChainQuery {
   mode: QueryMode
   nodeId: string
   loopStatus: LoopStatus
+  page: number
+  size: number
 }

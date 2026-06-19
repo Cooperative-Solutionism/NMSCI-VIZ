@@ -6,12 +6,19 @@ import type {
   ConsumeChainResponseDTO,
   ConsumeChainResponseDTORaw,
   LoopStatus,
+  QueryMode,
 } from '../../lib/types'
 
 export type CurrencyFilter = 'all' | '1' | '0'
 export type Selection = { kind: 'node'; id: string } | { kind: 'edge'; id: string }
 export type DataOrigin = 'idle' | 'backend'
-export type RunQueryOverride = { mode: 'start' | 'end' | 'node'; nodeId: string }
+export type RunQueryOverride = {
+  mode: QueryMode
+  nodeId: string
+  loopStatus?: LoopStatus
+  page?: number
+  size?: number
+}
 
 export function filterConsumeChainRows(
   rows: ConsumeChainResponseDTO[],

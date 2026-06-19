@@ -4,14 +4,14 @@ import { DASHBOARD_LAYOUT_STORAGE_KEY, defaultDashboardLayout } from '../dashboa
 import { dashboardPanelIcons, type DashboardPanelConfig } from '../panelRegistry'
 import { DashboardWorkspace } from './DashboardWorkspace'
 
-const queryLabel = '\u67e5\u8be2'
+const queryLabel = '\u6d4f\u89c8'
 const detailsLabel = '\u8be6\u60c5'
 const graphText = '\u4ea4\u6613\u56fe\u8c31'
 const queryContent = '\u67e5\u8be2\u6761\u4ef6'
 const detailsContent = '\u8282\u70b9\u8be6\u60c5'
-const openQueryName = /\u6253\u5f00\u67e5\u8be2\u9762\u677f/
+const openQueryName = /\u6253\u5f00\u6d4f\u89c8\u9762\u677f/
 const openDetailsName = /\u6253\u5f00\u8be6\u60c5\u9762\u677f/
-const collapseQueryName = /\u6298\u53e0\u67e5\u8be2\u9762\u677f/
+const collapseQueryName = /\u6298\u53e0\u6d4f\u89c8\u9762\u677f/
 
 function panels(): DashboardPanelConfig[] {
   return [

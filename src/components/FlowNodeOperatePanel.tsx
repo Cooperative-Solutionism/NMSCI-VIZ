@@ -29,7 +29,6 @@ export function FlowNodeOperatePanel({
   onDifficultyChange,
   onExportPrivateKey,
   onFetchDifficulty,
-  onQuery,
   onRegister,
   onRename,
   registerDifficultyTarget,
@@ -53,7 +52,6 @@ export function FlowNodeOperatePanel({
   onDifficultyChange: (value: string) => void
   onExportPrivateKey: () => void
   onFetchDifficulty: () => void
-  onQuery: () => void
   onRegister: () => void
   onRename: () => void
   registerDifficultyTarget: string
@@ -69,7 +67,6 @@ export function FlowNodeOperatePanel({
         onCopy={onCopy}
         onDelete={onDelete}
         onExportPrivateKey={onExportPrivateKey}
-        onQuery={onQuery}
         onRename={onRename}
       />
       <FlowNodeRegistrationControls

@@ -1,4 +1,11 @@
-export type DashboardPanelId = 'query' | 'details' | 'loops' | 'metrics' | 'export' | 'system'
+export type DashboardPanelId =
+  | 'query'
+  | 'details'
+  | 'loops'
+  | 'metrics'
+  | 'export'
+  | 'system'
+  | 'localNodes'
 
 export type DashboardPoint = {
   x: number
@@ -27,6 +34,7 @@ export const dashboardPanelIds: DashboardPanelId[] = [
   'metrics',
   'export',
   'system',
+  'localNodes',
 ]
 
 export const defaultDashboardLayout: DashboardLayoutState = {
@@ -59,6 +67,11 @@ export const defaultDashboardLayout: DashboardLayoutState = {
     collapsed: true,
     dockPosition: { x: 16, y: 296 },
     panelPosition: { x: 72, y: 256 },
+  },
+  localNodes: {
+    collapsed: true,
+    dockPosition: { x: 16, y: 352 },
+    panelPosition: { x: 72, y: 336 },
   },
 }
 

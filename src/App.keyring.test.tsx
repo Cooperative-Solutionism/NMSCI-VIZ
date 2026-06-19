@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   installAppTestLifecycle,
   jsonResponse,
-  openQueryTab,
+  openFlowNodesTab,
   setMockVaultStatus,
   stubFetchByUrl,
 } from './test/appTestHarness'
@@ -31,16 +31,13 @@ describe('App initial state', () => {
     expect(await screen.findByRole('button', { name: /注册节点/ })).toBeTruthy()
   })
 
-  it('fills the selected flow node public key into the query field', async () => {
+  it('does not expose the removed consume-chain query shortcut for local flow nodes', async () => {
     render(<App />)
 
     fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
-    fireEvent.click(await screen.findByRole('button', { name: /查询此节点/ }))
-    openQueryTab()
 
-    expect((screen.getByLabelText('流转节点 ID / 公钥') as HTMLTextAreaElement).value).toBe(
-      '02'.padEnd(66, '1'),
-    )
+    expect(screen.queryByRole('button', { name: /浏览此节点/ })).toBeNull()
+    expect(screen.queryByLabelText('流转节点 ID / 公钥')).toBeNull()
   })
 
   it('loads a hex register difficulty target returned by the backend', async () => {
@@ -213,6 +210,7 @@ describe('App initial state', () => {
     )
     render(<App />)
 
+    openFlowNodesTab()
     fireEvent.click(await screen.findByRole('button', { name: /导入流转节点/ }))
 
     await waitFor(() => {

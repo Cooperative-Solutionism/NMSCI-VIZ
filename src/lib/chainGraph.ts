@@ -8,7 +8,6 @@ import type {
   NodeKind,
   VolumeByCurrency,
 } from './types'
-import { dashboardQueryPage, dashboardQuerySize } from '../app/config'
 import { consumeChainParamName, detectIdentityKind } from './consumeChainFilters'
 import { readGraphTokens } from './tokens'
 
@@ -72,8 +71,8 @@ export function buildConsumeChainUrl(baseUrl: string, query: ConsumeChainQuery):
     params.set('isLoop', String(query.loopStatus === 'looped'))
   }
 
-  params.set('page', String(dashboardQueryPage))
-  params.set('size', String(dashboardQuerySize))
+  params.set('page', String(query.page))
+  params.set('size', String(query.size))
 
   return `${normalizedBaseUrl}/consume-chains?${params.toString()}`
 }

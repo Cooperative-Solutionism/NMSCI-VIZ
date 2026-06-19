@@ -22,7 +22,6 @@ describe('FlowNodeKeyDetails', () => {
         onCopy={vi.fn()}
         onDelete={vi.fn()}
         onExportPrivateKey={vi.fn()}
-        onQuery={vi.fn()}
         onRename={vi.fn()}
       />,
     )
