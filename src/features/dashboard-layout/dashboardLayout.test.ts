@@ -11,13 +11,12 @@ import {
 } from './dashboardLayout'
 
 const defaultTopRowPanelPositions = [
-  { x: 84, y: 16 },
-  { x: 180, y: 16 },
-  { x: 276, y: 16 },
-  { x: 372, y: 16 },
-  { x: 468, y: 16 },
-  { x: 564, y: 16 },
-  { x: 660, y: 16 },
+  { x: 132, y: 16 },
+  { x: 228, y: 16 },
+  { x: 324, y: 16 },
+  { x: 420, y: 16 },
+  { x: 516, y: 16 },
+  { x: 612, y: 16 },
 ]
 
 function fakeStorage(initial: Record<string, string> = {}): Storage {
@@ -52,7 +51,6 @@ describe('dashboard layout state', () => {
       'details',
       'loops',
       'metrics',
-      'export',
       'system',
       'localNodes',
     ])
@@ -72,8 +70,8 @@ describe('dashboard layout state', () => {
   it('exports the default layout with expected query defaults', () => {
     expect(defaultDashboardLayout.query).toEqual({
       collapsed: true,
-      dockPosition: { x: 84, y: 16 },
-      panelPosition: { x: 84, y: 16 },
+      dockPosition: { x: 132, y: 16 },
+      panelPosition: { x: 132, y: 16 },
     })
   })
 
@@ -81,13 +79,12 @@ describe('dashboard layout state', () => {
     const layout = normalizeDashboardLayout(undefined, { width: 1440, height: 900 })
 
     expect(dashboardPanelIds.map((panelId) => layout[panelId].panelPosition)).toEqual([
-      { x: 292, y: 16 },
-      { x: 388, y: 16 },
-      { x: 484, y: 16 },
-      { x: 580, y: 16 },
-      { x: 676, y: 16 },
-      { x: 772, y: 16 },
-      { x: 868, y: 16 },
+      { x: 340, y: 16 },
+      { x: 436, y: 16 },
+      { x: 532, y: 16 },
+      { x: 628, y: 16 },
+      { x: 724, y: 16 },
+      { x: 820, y: 16 },
     ])
   })
 
@@ -108,13 +105,13 @@ describe('dashboard layout state', () => {
     expect(Object.keys(layout)).toEqual(dashboardPanelIds)
     expect(layout.query).toEqual({
       collapsed: true,
-      dockPosition: { x: 84, y: 16 },
+      dockPosition: { x: 132, y: 16 },
       panelPosition: { x: 120, y: 140 },
     })
     expect(layout.details).toEqual({
       collapsed: true,
-      dockPosition: { x: 180, y: 16 },
-      panelPosition: { x: 180, y: 16 },
+      dockPosition: { x: 228, y: 16 },
+      panelPosition: { x: 228, y: 16 },
     })
   })
 
@@ -154,7 +151,7 @@ describe('dashboard layout state', () => {
     const layout = normalizeDashboardLayout(undefined, { width: 320, height: 240 })
 
     expect(layout.query.panelPosition).toEqual({ x: 0, y: 16 })
-    expect(layout.details.panelPosition).toEqual({ x: 7, y: 16 })
+    expect(layout.details.panelPosition).toEqual({ x: 8, y: 16 })
     expect(layout.localNodes.panelPosition).toEqual({ x: 40, y: 16 })
   })
 
@@ -247,7 +244,7 @@ describe('dashboard layout state', () => {
     expect(next).not.toBe(layout)
     expect(next.query).toEqual({
       collapsed: false,
-      dockPosition: { x: 84, y: 16 },
+      dockPosition: { x: 132, y: 16 },
       panelPosition: { x: 144, y: 188 },
     })
     expect(next.details).toEqual(layout.details)

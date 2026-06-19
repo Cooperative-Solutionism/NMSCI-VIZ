@@ -17,7 +17,7 @@ describe('App initial state', () => {
     const { container } = render(<App />)
 
     expect(container.querySelector('#network-graph')).toBeTruthy()
-    expect(container.querySelectorAll('.dock-icon')).toHaveLength(7)
+    expect(container.querySelectorAll('.dock-icon')).toHaveLength(6)
     expect(container.querySelector('[role="tab"]')).toBeNull()
     expect(container.querySelector('.topbar')).toBeNull()
     expect(localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY)).toBeNull()
@@ -111,6 +111,20 @@ describe('App initial state', () => {
     })
     expect(screen.getByRole('button', { name: /^csv$/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /^json$/i })).toBeDisabled()
+  })
+
+  it('anchors export actions in a fixed bottom-right dock outside the floating panels', () => {
+    const { container } = render(<App />)
+
+    const dock = container.querySelector('.dashboard-export-dock')
+    expect(dock).toBeTruthy()
+    expect(within(dock as HTMLElement).getByRole('button', { name: /^csv$/i })).toBeTruthy()
+    expect(within(dock as HTMLElement).getByRole('button', { name: /^json$/i })).toBeTruthy()
+    expect(within(dock as HTMLElement).getByRole('button', { name: /复制 curl/ })).toBeTruthy()
+    expect(dock?.closest('.dashboard-workspace')).toBeNull()
+
+    const css = readSource('src/styles/dashboard-layout.css')
+    expect(/\.dashboard-export-dock\s*\{[^}]*position:\s*fixed/m.test(css)).toBe(true)
   })
 
   it('keeps browse tabs usable without the draggable shell', () => {

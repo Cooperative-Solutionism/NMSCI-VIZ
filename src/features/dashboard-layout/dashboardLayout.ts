@@ -3,7 +3,6 @@ export type DashboardPanelId =
   | 'details'
   | 'loops'
   | 'metrics'
-  | 'export'
   | 'system'
   | 'localNodes'
 
@@ -32,7 +31,6 @@ export const dashboardPanelIds: DashboardPanelId[] = [
   'details',
   'loops',
   'metrics',
-  'export',
   'system',
   'localNodes',
 ]

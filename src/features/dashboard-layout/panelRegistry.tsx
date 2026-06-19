@@ -1,7 +1,6 @@
 import {
   Activity,
   Database,
-  Download,
   Info,
   KeyRound,
   ListTree,
@@ -23,7 +22,6 @@ export const dashboardPanelIcons: Record<DashboardPanelId, LucideIcon> = {
   details: PanelRight,
   loops: ListTree,
   metrics: Activity,
-  export: Download,
   system: Info,
   localNodes: KeyRound,
 }

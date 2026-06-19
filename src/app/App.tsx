@@ -121,9 +121,7 @@ function App() {
       id: 'query',
       label: '\u6d4f\u89c8',
       icon: dashboardPanelIcons.query,
-      content: (
-        <BrowsePanel apiBase={apiBase} />
-      ),
+      content: <BrowsePanel apiBase={apiBase} />,
     },
     {
       id: 'localNodes',
@@ -131,11 +129,15 @@ function App() {
       icon: dashboardPanelIcons.localNodes,
       content: (
         <LocalNodePanel
+          localConsumeNodes={keyring.localConsumeNodes}
+          localFlowNodes={keyring.localFlowNodes}
           onAddConsumeNode={handleAddConsumeNode}
           onAddFlowNode={handleAddFlowNode}
           onImportLocalNode={handleImportLocalNode}
           onLockVault={keyring.handleLockVault}
           onOpenVault={handleOpenVault}
+          onSelectLocalNode={selection.selectLocalNode}
+          selectedLocalId={selection.selectedLocalId}
           vaultStatus={keyring.vault.status}
         />
       ),
@@ -188,24 +190,16 @@ function App() {
       content: <MetricsPanelContent graph={query.graph} />,
     },
     {
-      id: 'export',
-      label: '\u5bfc\u51fa',
-      icon: dashboardPanelIcons.export,
-      content: (
-        <ExportPanelContent
-          filteredRowCount={query.filteredRows.length}
-          graphEdgeCount={query.graph.edges.length}
-          onCopyCurl={networkActions.handleCopyCurl}
-          onExportCsv={networkActions.handleExportCsv}
-          onExportJson={networkActions.handleExportJson}
-        />
-      ),
-    },
-    {
       id: 'system',
       label: '\u7cfb\u7edf',
       icon: dashboardPanelIcons.system,
-      content: <SystemPanelContent status={systemStatus.data} />,
+      content: (
+        <SystemPanelContent
+          error={systemStatus.error}
+          onRefresh={() => void systemStatus.refresh()}
+          status={systemStatus.data}
+        />
+      ),
     },
   ] satisfies DashboardPanelConfig[]
 
@@ -246,6 +240,16 @@ function App() {
         }
         panels={dashboardPanels}
       />
+
+      <div className="dashboard-export-dock">
+        <ExportPanelContent
+          filteredRowCount={query.filteredRows.length}
+          graphEdgeCount={query.graph.edges.length}
+          onCopyCurl={networkActions.handleCopyCurl}
+          onExportCsv={networkActions.handleExportCsv}
+          onExportJson={networkActions.handleExportJson}
+        />
+      </div>
     </div>
   )
 }

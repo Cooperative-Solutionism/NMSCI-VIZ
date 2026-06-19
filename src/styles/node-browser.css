@@ -118,4 +118,10 @@
   opacity: 0.5;
 }
 
+/* 本地节点表格：列表过长时内部滚动，避免撑高悬浮面板。 */
+.local-node-table {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
 /* 系统状态条 */

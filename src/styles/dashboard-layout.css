@@ -180,4 +180,22 @@
   background: var(--line);
 }
 
+/* 导出操作锚定在页面右下角，常驻浮于画布之上；层级低于悬浮面板，避免遮挡展开面板的内容。 */
+.dashboard-export-dock {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 35;
+  max-width: calc(100vw - 32px);
+  padding: 6px;
+  border: 1px solid rgb(var(--teal-rgb) / 0.24);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  box-shadow:
+    0 18px 42px -20px rgba(15, 40, 50, 0.45),
+    0 2px 8px -5px rgba(15, 40, 50, 0.24);
+}
+
 /* 悬浮控制台：浮在画布上方，模块用 Tab 切换以保持轻量 */
