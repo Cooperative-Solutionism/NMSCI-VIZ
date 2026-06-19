@@ -3,6 +3,7 @@ import { patchLocalFlowNode, type LocalFlowNode } from '../../../lib/flowNodeSto
 import { errorMessage } from '../../../lib/errors'
 import type { VaultStatus } from '../../../hooks/useKeyVault'
 import { createLocalFlowNode, importLocalFlowNode } from './localNodeBuilders'
+import type { RequestUserConfirm, RequestUserText } from './useUserPromptDialogs'
 
 interface UseLocalFlowNodeActionsParams {
   clearLastRawBytes: () => void
@@ -12,6 +13,8 @@ interface UseLocalFlowNodeActionsParams {
   notifyStatus: (status: string | null) => void
   onCopyPrivateKey: (privateKeyHex: string) => Promise<void>
   persistLocalFlowNodes: (updater: (nodes: LocalFlowNode[]) => LocalFlowNode[]) => void
+  requestConfirm: RequestUserConfirm
+  requestText: RequestUserText
   selectLocalNode: (id: string) => void
   selectedLocalNode: LocalFlowNode | null
   vaultStatus: VaultStatus
@@ -25,6 +28,8 @@ export function useLocalFlowNodeActions({
   notifyStatus,
   onCopyPrivateKey,
   persistLocalFlowNodes,
+  requestConfirm,
+  requestText,
   selectLocalNode,
   selectedLocalNode,
   vaultStatus,
@@ -55,12 +60,20 @@ export function useLocalFlowNodeActions({
     ],
   )
 
-  const handleImportLocalNode = useCallback(() => {
+  const handleImportLocalNode = useCallback(async () => {
     if (vaultStatus === 'locked' || vaultStatus === 'setup') {
       notifyError('导入节点前请先解锁密钥保险库。')
       return
     }
-    const privateKeyHex = window.prompt('粘贴私钥（hex）')?.trim()
+    const privateKeyHex = (
+      await requestText({
+        title: '导入流转节点',
+        description: '粘贴本地流转节点私钥，导入后会按当前保险库状态保存。',
+        label: '私钥（hex）',
+        confirmLabel: '导入',
+        placeholder: '64 位十六进制私钥',
+      })
+    )?.trim()
     if (!privateKeyHex) return
     try {
       const node = importLocalFlowNode(privateKeyHex)
@@ -73,11 +86,16 @@ export function useLocalFlowNodeActions({
     } catch (importError) {
       notifyError(errorMessage(importError, '私钥无效'))
     }
-  }, [notifyError, notifyStatus, persistLocalFlowNodes, selectLocalNode, vaultStatus])
+  }, [notifyError, notifyStatus, persistLocalFlowNodes, requestText, selectLocalNode, vaultStatus])
 
-  const handleRenameLocalNode = useCallback(() => {
+  const handleRenameLocalNode = useCallback(async () => {
     if (!selectedLocalNode) return
-    const next = window.prompt('重命名流转节点', selectedLocalNode.label)
+    const next = await requestText({
+      title: '重命名流转节点',
+      label: '节点名称',
+      defaultValue: selectedLocalNode.label,
+      confirmLabel: '保存',
+    })
     if (next == null) return
     const label = (next.trim() || selectedLocalNode.label).slice(0, 64)
     persistLocalFlowNodes((currentNodes) =>
@@ -87,18 +105,30 @@ export function useLocalFlowNodeActions({
       }),
     )
     notifyStatus('流转节点已重命名。')
-  }, [notifyStatus, persistLocalFlowNodes, selectedLocalNode])
+  }, [notifyStatus, persistLocalFlowNodes, requestText, selectedLocalNode])
 
-  const handleDeleteLocalNode = useCallback(() => {
+  const handleDeleteLocalNode = useCallback(async () => {
     if (!selectedLocalNode) return
-    if (!window.confirm('删除此本地流转节点？对应私钥将丢失。')) return
+    const confirmed = await requestConfirm({
+      title: '删除本地流转节点',
+      description: '对应私钥将从本地存储删除，此操作无法撤销。',
+      confirmLabel: '删除',
+      destructive: true,
+    })
+    if (!confirmed) return
     const removedPubkey = selectedLocalNode.publicKeyHex
     persistLocalFlowNodes((currentNodes) =>
       currentNodes.filter((current) => current.publicKeyHex !== removedPubkey),
     )
     clearSelectedLocalNode()
     notifyStatus('流转节点已删除。')
-  }, [clearSelectedLocalNode, notifyStatus, persistLocalFlowNodes, selectedLocalNode])
+  }, [
+    clearSelectedLocalNode,
+    notifyStatus,
+    persistLocalFlowNodes,
+    requestConfirm,
+    selectedLocalNode,
+  ])
 
   const handleExportPrivateKey = useCallback(async () => {
     if (!selectedLocalNode) return
@@ -106,9 +136,15 @@ export function useLocalFlowNodeActions({
       vaultStatus === 'disabled'
         ? '从 localStorage 导出私钥？私钥当前以明文存储，将直接复制。'
         : '从 localStorage 导出私钥？解锁后私钥会以明文复制。'
-    if (!window.confirm(message)) return
+    const confirmed = await requestConfirm({
+      title: '导出私钥',
+      description: message,
+      confirmLabel: '复制私钥',
+      destructive: true,
+    })
+    if (!confirmed) return
     await onCopyPrivateKey(selectedLocalNode.privateKeyHex)
-  }, [onCopyPrivateKey, selectedLocalNode, vaultStatus])
+  }, [onCopyPrivateKey, requestConfirm, selectedLocalNode, vaultStatus])
 
   return {
     handleAddFlowNode,

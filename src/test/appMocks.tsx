@@ -28,6 +28,7 @@ vi.mock('../components/NetworkGraph', () => ({
     onAuthorizeFlowNode,
     onGenerateRecord,
     onMountRecord,
+    onLoadChain,
     onSelectEdge,
     onSelectNode,
   }: {
@@ -41,6 +42,7 @@ vi.mock('../components/NetworkGraph', () => ({
     onAuthorizeFlowNode?: (node: ChainGraphNode) => void
     onGenerateRecord?: (node: ChainGraphNode) => void
     onMountRecord?: (node: ChainGraphNode) => void
+    onLoadChain?: (node: ChainGraphNode, mode: 'start' | 'end' | 'node') => void
   }) => (
     <div data-testid="network-graph">
       <button type="button" onClick={() => onAddFlowNode?.({ x: 12, y: 34 })}>
@@ -74,6 +76,16 @@ vi.mock('../components/NetworkGraph', () => ({
               </button>
             </>
           ) : null}
+          {/* 加载消费链对本地与链节点都可用。 */}
+          <button type="button" onClick={() => onLoadChain?.(node, 'end')}>
+            context load preceding {node.id}
+          </button>
+          <button type="button" onClick={() => onLoadChain?.(node, 'start')}>
+            context load following {node.id}
+          </button>
+          <button type="button" onClick={() => onLoadChain?.(node, 'node')}>
+            context load all {node.id}
+          </button>
         </div>
       ))}
       {graph.edges.map((edge) => (

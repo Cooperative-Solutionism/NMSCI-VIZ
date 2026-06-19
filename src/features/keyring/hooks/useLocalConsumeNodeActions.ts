@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { patchLocalConsumeNode, type LocalConsumeNode } from '../../../lib/consumeNodeStorage'
 import type { VaultStatus } from '../../../hooks/useKeyVault'
 import { createLocalConsumeNode } from './localNodeBuilders'
+import type { RequestUserConfirm, RequestUserText } from './useUserPromptDialogs'
 
 interface UseLocalConsumeNodeActionsParams {
   clearSelectedLocalNode: () => void
@@ -10,6 +11,8 @@ interface UseLocalConsumeNodeActionsParams {
   notifyStatus: (status: string | null) => void
   onCopyPrivateKey: (privateKeyHex: string) => Promise<void>
   persistLocalConsumeNodes: (updater: (nodes: LocalConsumeNode[]) => LocalConsumeNode[]) => void
+  requestConfirm: RequestUserConfirm
+  requestText: RequestUserText
   selectLocalNode: (id: string) => void
   selectedLocalConsumeNode: LocalConsumeNode | null
   vaultStatus: VaultStatus
@@ -22,6 +25,8 @@ export function useLocalConsumeNodeActions({
   notifyStatus,
   onCopyPrivateKey,
   persistLocalConsumeNodes,
+  requestConfirm,
+  requestText,
   selectLocalNode,
   selectedLocalConsumeNode,
   vaultStatus,
@@ -50,9 +55,14 @@ export function useLocalConsumeNodeActions({
     ],
   )
 
-  const handleRenameConsumeNode = useCallback(() => {
+  const handleRenameConsumeNode = useCallback(async () => {
     if (!selectedLocalConsumeNode) return
-    const next = window.prompt('重命名消费节点', selectedLocalConsumeNode.label)
+    const next = await requestText({
+      title: '重命名消费节点',
+      label: '节点名称',
+      defaultValue: selectedLocalConsumeNode.label,
+      confirmLabel: '保存',
+    })
     if (next == null) return
     const label = (next.trim() || selectedLocalConsumeNode.label).slice(0, 64)
     persistLocalConsumeNodes((currentNodes) =>
@@ -62,18 +72,30 @@ export function useLocalConsumeNodeActions({
       }),
     )
     notifyStatus('消费节点已重命名。')
-  }, [notifyStatus, persistLocalConsumeNodes, selectedLocalConsumeNode])
+  }, [notifyStatus, persistLocalConsumeNodes, requestText, selectedLocalConsumeNode])
 
-  const handleDeleteConsumeNode = useCallback(() => {
+  const handleDeleteConsumeNode = useCallback(async () => {
     if (!selectedLocalConsumeNode) return
-    if (!window.confirm('删除此消费节点？对应私钥将丢失。')) return
+    const confirmed = await requestConfirm({
+      title: '删除消费节点',
+      description: '对应私钥将从本地存储删除，此操作无法撤销。',
+      confirmLabel: '删除',
+      destructive: true,
+    })
+    if (!confirmed) return
     const removedPubkey = selectedLocalConsumeNode.publicKeyHex
     persistLocalConsumeNodes((currentNodes) =>
       currentNodes.filter((current) => current.publicKeyHex !== removedPubkey),
     )
     clearSelectedLocalNode()
     notifyStatus('消费节点已删除。')
-  }, [clearSelectedLocalNode, notifyStatus, persistLocalConsumeNodes, selectedLocalConsumeNode])
+  }, [
+    clearSelectedLocalNode,
+    notifyStatus,
+    persistLocalConsumeNodes,
+    requestConfirm,
+    selectedLocalConsumeNode,
+  ])
 
   const handleExportConsumeKey = useCallback(async () => {
     if (!selectedLocalConsumeNode) return
@@ -81,9 +103,15 @@ export function useLocalConsumeNodeActions({
       vaultStatus === 'disabled'
         ? '从 localStorage 导出私钥？私钥当前以明文存储，将直接复制。'
         : '从 localStorage 导出私钥？解锁后私钥会以明文复制。'
-    if (!window.confirm(message)) return
+    const confirmed = await requestConfirm({
+      title: '导出私钥',
+      description: message,
+      confirmLabel: '复制私钥',
+      destructive: true,
+    })
+    if (!confirmed) return
     await onCopyPrivateKey(selectedLocalConsumeNode.privateKeyHex)
-  }, [onCopyPrivateKey, selectedLocalConsumeNode, vaultStatus])
+  }, [onCopyPrivateKey, requestConfirm, selectedLocalConsumeNode, vaultStatus])
 
   return {
     handleAddConsumeNode,

@@ -85,11 +85,27 @@ export async function saveLocalFlowNodes(
   codec: SecretCodec | null,
   storage: Storage = window.localStorage,
 ): Promise<void> {
+  if (!codec) {
+    saveLocalFlowNodesPlaintext(nodes, storage)
+    return
+  }
   const stored: StoredFlowNode[] = []
   for (const node of nodes) {
     const { privateKeyHex, ...rest } = node
-    stored.push(codec ? { ...rest, privateKey: await codec.encrypt(privateKeyHex) } : { ...rest, privateKeyHex })
+    stored.push({ ...rest, privateKey: await codec.encrypt(privateKeyHex) })
   }
+  const document: FlowNodeStorageDocument = { version: 1, nodes: stored }
+  storage.setItem(flowNodeStorageKey, JSON.stringify(document))
+}
+
+export function saveLocalFlowNodesPlaintext(
+  nodes: LocalFlowNode[],
+  storage: Storage = window.localStorage,
+): void {
+  const stored: StoredFlowNode[] = nodes.map((node) => {
+    const { privateKeyHex, ...rest } = node
+    return { ...rest, privateKeyHex }
+  })
   const document: FlowNodeStorageDocument = { version: 1, nodes: stored }
   storage.setItem(flowNodeStorageKey, JSON.stringify(document))
 }

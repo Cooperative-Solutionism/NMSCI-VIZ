@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { ErrorBoundary } from '../../../components'
-import type { ChainGraph, ChainGraphEdge, ChainGraphNode } from '../../../lib/types'
+import type { ChainGraph, ChainGraphEdge, ChainGraphNode, QueryMode } from '../../../lib/types'
 
 const NetworkGraph = lazy(() =>
   import('../../../components/NetworkGraph').then((module) => ({ default: module.NetworkGraph })),
@@ -15,6 +15,7 @@ export function GraphPanel({
   onAuthorizeFlowNode,
   onGenerateRecord,
   onMountRecord,
+  onLoadChain,
   onSelectEdge,
   onSelectNode,
   selectedId,
@@ -27,6 +28,7 @@ export function GraphPanel({
   onAuthorizeFlowNode: (node: ChainGraphNode) => void
   onGenerateRecord: (node: ChainGraphNode) => void
   onMountRecord: (node: ChainGraphNode) => void
+  onLoadChain: (node: ChainGraphNode, mode: QueryMode) => void
   onSelectEdge: (edge: ChainGraphEdge) => void
   onSelectNode: (node: ChainGraphNode) => void
   selectedId: string | null
@@ -50,6 +52,7 @@ export function GraphPanel({
               onAuthorizeFlowNode={onAuthorizeFlowNode}
               onGenerateRecord={onGenerateRecord}
               onMountRecord={onMountRecord}
+              onLoadChain={onLoadChain}
             />
           </Suspense>
         </ErrorBoundary>

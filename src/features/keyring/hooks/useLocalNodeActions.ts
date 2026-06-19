@@ -5,6 +5,7 @@ import type { LocalFlowNode } from '../../../lib/flowNodeStorage'
 import type { VaultStatus } from '../../../hooks/useKeyVault'
 import { useLocalConsumeNodeActions } from './useLocalConsumeNodeActions'
 import { useLocalFlowNodeActions } from './useLocalFlowNodeActions'
+import type { RequestUserConfirm, RequestUserText } from './useUserPromptDialogs'
 
 export function useLocalNodeActions({
   clearLastRawBytes,
@@ -14,6 +15,8 @@ export function useLocalNodeActions({
   notifyStatus,
   persistLocalConsumeNodes,
   persistLocalFlowNodes,
+  requestConfirm,
+  requestText,
   selectLocalNode,
   selectedLocalConsumeNode,
   selectedLocalNode,
@@ -26,6 +29,8 @@ export function useLocalNodeActions({
   notifyStatus: (status: string | null) => void
   persistLocalConsumeNodes: (updater: (nodes: LocalConsumeNode[]) => LocalConsumeNode[]) => void
   persistLocalFlowNodes: (updater: (nodes: LocalFlowNode[]) => LocalFlowNode[]) => void
+  requestConfirm: RequestUserConfirm
+  requestText: RequestUserText
   selectLocalNode: (id: string) => void
   selectedLocalConsumeNode: LocalConsumeNode | null
   selectedLocalNode: LocalFlowNode | null
@@ -51,6 +56,8 @@ export function useLocalNodeActions({
     notifyStatus,
     onCopyPrivateKey: (privateKeyHex) => handleCopyText(privateKeyHex, '私钥'),
     persistLocalFlowNodes,
+    requestConfirm,
+    requestText,
     selectLocalNode,
     selectedLocalNode,
     vaultStatus,
@@ -62,6 +69,8 @@ export function useLocalNodeActions({
     notifyStatus,
     onCopyPrivateKey: (privateKeyHex) => handleCopyText(privateKeyHex, '私钥'),
     persistLocalConsumeNodes,
+    requestConfirm,
+    requestText,
     selectLocalNode,
     selectedLocalConsumeNode,
     vaultStatus,

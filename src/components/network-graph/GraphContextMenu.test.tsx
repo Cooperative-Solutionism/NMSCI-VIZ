@@ -29,6 +29,8 @@ describe('GraphContextMenu', () => {
     expect(screen.getByRole('menuitem', { name: '添加流转节点' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '添加消费节点' })).toBeTruthy()
     expect(screen.queryByRole('menuitem', { name: '注册' })).toBeNull()
+    // 空白画布不提供加载消费链。
+    expect(screen.queryByRole('menuitem', { name: '加载全部消费链' })).toBeNull()
   })
 
   it('offers register/authorize/record/mount for a local flow node', () => {
@@ -47,6 +49,10 @@ describe('GraphContextMenu', () => {
     expect(screen.getByRole('menuitem', { name: '授权' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '生成消费记录' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '挂载消费记录' })).toBeTruthy()
+    // 本地流转节点同样提供加载消费链。
+    expect(screen.getByRole('menuitem', { name: '加载前消费链' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: '加载后消费链' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: '加载全部消费链' })).toBeTruthy()
     expect(screen.queryByRole('menuitem', { name: '添加流转节点' })).toBeNull()
 
     fireEvent.click(screen.getByRole('menuitem', { name: '注册' }))
@@ -54,7 +60,32 @@ describe('GraphContextMenu', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('offers only record/mount for a local consume node', () => {
+  it('offers only load-chain actions for a non-local chain node', () => {
+    const onLoadChain = vi.fn()
+    const onClose = vi.fn()
+    const chainNode = node('chain')
+    render(
+      <GraphContextMenu menu={menu({ node: chainNode })} onLoadChain={onLoadChain} onClose={onClose} />,
+    )
+
+    expect(screen.getByRole('menuitem', { name: '加载前消费链' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: '加载后消费链' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: '加载全部消费链' })).toBeTruthy()
+    // 非本地节点不提供任何操作选项。
+    expect(screen.queryByRole('menuitem', { name: '注册' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: '生成消费记录' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: '添加流转节点' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('menuitem', { name: '加载前消费链' }))
+    expect(onLoadChain).toHaveBeenCalledWith(chainNode, 'end')
+    fireEvent.click(screen.getByRole('menuitem', { name: '加载后消费链' }))
+    expect(onLoadChain).toHaveBeenCalledWith(chainNode, 'start')
+    fireEvent.click(screen.getByRole('menuitem', { name: '加载全部消费链' }))
+    expect(onLoadChain).toHaveBeenCalledWith(chainNode, 'node')
+    expect(onClose).toHaveBeenCalledTimes(3)
+  })
+
+  it('offers local consume actions plus load-chain actions', () => {
     const onGenerateRecord = vi.fn()
     const consumeNode = node('local-consume')
     render(
@@ -67,6 +98,9 @@ describe('GraphContextMenu', () => {
 
     expect(screen.getByRole('menuitem', { name: '生成消费记录' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '挂载消费记录' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: '加载前消费链' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: '加载后消费链' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: '加载全部消费链' })).toBeTruthy()
     expect(screen.queryByRole('menuitem', { name: '注册' })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: '授权' })).toBeNull()
 

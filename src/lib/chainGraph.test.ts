@@ -155,14 +155,199 @@ describe('chain graph mapping', () => {
     expect(consume?.kind).toBe('local-consume')
     expect(consume?.label).toBe('BRAVO-')
 
-    // 已存在的 id 不重复叠加
-    const dup = mergeLocalNodes(
+    // 命中已有链节点 id 的本地节点 → 原地升级为本地节点（不新增、保留链上吞吐/计数）。
+    const chainNode = graph.nodes[0]!
+    const upgraded = mergeLocalNodes(
       graph,
-      [{ id: 'duplicate-flow-node', publicKeyHex: graph.nodes[0]!.id, label: 'X' }],
+      [{ id: 'duplicate-flow-node', publicKeyHex: chainNode.id, label: 'X', position: { x: 7, y: 9 } }],
       [],
     )
-    expect(dup.nodes.length).toBe(before)
-    expect(dup).toBe(graph)
+    expect(upgraded.nodes.length).toBe(before)
+    const upgradedNode = upgraded.nodes.find((node) => node.id === chainNode.id)
+    expect(upgradedNode?.kind).toBe('local-flow')
+    expect(upgradedNode?.label).toBe('未注册1')
+    // 链上吞吐与计数从被升级的链节点保留下来。
+    expect(upgradedNode?.chainCount).toBe(chainNode.chainCount)
+    expect(upgradedNode?.volumeByCurrency).toEqual(chainNode.volumeByCurrency)
+    // 被升级的链节点本身无落点，应回退到本地 ref 的画布落点。
+    expect(upgradedNode?.position).toEqual({ x: 7, y: 9 })
+  })
+
+  it('upgrades both endpoints when one chain links two local pubkeys', () => {
+    const pkA = `02${'a'.repeat(64)}`
+    const pkB = `03${'b'.repeat(64)}`
+    const graph = buildGraphFromConsumeChains([
+      normalizeConsumeChainResponseDTO({
+        consumeChain: {
+          id: 'chain-x',
+          start: pkA,
+          end: pkB,
+          amount: 4000,
+          currencyType: 1,
+          isLoop: false,
+          tailMountTimestamp: 1,
+        },
+        consumeChainEdges: [
+          {
+            id: 'e1',
+            source: pkA,
+            target: pkB,
+            amount: 4000,
+            currencyType: 1,
+            chain: 'chain-x',
+            relatedTransactionRecord: 'r',
+            relatedTransactionMount: 'm',
+            relatedTransactionMountTimestamp: 1,
+            isLoop: false,
+          },
+        ],
+      }),
+    ])
+    const before = graph.nodes.length
+
+    const merged = mergeLocalNodes(
+      graph,
+      [{ id: 'flow-a', publicKeyHex: pkA, registration: { id: 'reg-a', status: 'sent' } }],
+      [{ id: 'consume-b', publicKeyHex: pkB }],
+    )
+
+    // 两个端点都被原地升级：不新增节点，各自带上正确的本地类型与链上计数。
+    expect(merged.nodes.length).toBe(before)
+    expect(merged.nodes.filter((node) => node.id === pkA)).toHaveLength(1)
+    expect(merged.nodes.filter((node) => node.id === pkB)).toHaveLength(1)
+    expect(merged.nodes.find((node) => node.id === pkA)?.kind).toBe('local-flow')
+    expect(merged.nodes.find((node) => node.id === pkB)?.kind).toBe('local-consume')
+    expect(merged.nodes.find((node) => node.id === pkA)?.chainCount).toBeGreaterThan(0)
+    expect(merged.nodes.find((node) => node.id === pkB)?.chainCount).toBeGreaterThan(0)
+  })
+
+  it('appends only the flow node when a standalone flow and consume share a pubkey (flow priority)', () => {
+    const graph = buildGraphFromConsumeChains([])
+    const shared = 'pk-shared'
+
+    const merged = mergeLocalNodes(
+      graph,
+      [{ id: 'shared-flow', publicKeyHex: shared, registration: { id: 'reg-s', status: 'sent' } }],
+      [{ id: 'shared-consume', publicKeyHex: shared }],
+    )
+
+    // 同一身份只入图一次，且为流转节点（流转优先）。
+    const matches = merged.nodes.filter((node) => node.id === shared)
+    expect(matches).toHaveLength(1)
+    expect(matches[0]!.kind).toBe('local-flow')
+    expect(matches[0]!.flowStatus).toBe('registered')
+  })
+
+  it('upgrades a chain node that shares a local pubkey instead of drawing a second node', () => {
+    const pubkey = `02${'a'.repeat(64)}`
+    const graph = buildGraphFromConsumeChains([
+      normalizeConsumeChainResponseDTO({
+        consumeChain: {
+          id: 'chain-x',
+          start: pubkey,
+          end: '99999999-9999-4999-8999-999999999999',
+          amount: 4000,
+          currencyType: 1,
+          isLoop: false,
+          tailMountTimestamp: 1,
+        },
+        consumeChainEdges: [
+          {
+            id: 'edge-x1',
+            source: pubkey,
+            target: '99999999-9999-4999-8999-999999999999',
+            amount: 4000,
+            currencyType: 1,
+            chain: 'chain-x',
+            relatedTransactionRecord: 'r',
+            relatedTransactionMount: 'm',
+            relatedTransactionMountTimestamp: 1,
+            isLoop: false,
+          },
+        ],
+      }),
+    ])
+    const before = graph.nodes.length
+
+    const merged = mergeLocalNodes(
+      graph,
+      [{ id: 'local-flow-node', publicKeyHex: pubkey, registration: { id: 'reg-1', status: 'sent' } }],
+      [],
+    )
+
+    // 同一节点：不新增；链节点升级为本地流转节点并带上状态。
+    expect(merged.nodes.length).toBe(before)
+    const node = merged.nodes.find((item) => item.id === pubkey)
+    expect(node?.kind).toBe('local-flow')
+    expect(node?.flowStatus).toBe('registered')
+    expect(node?.chainCount).toBeGreaterThan(0)
+  })
+
+  it('rewrites a chain node that uses the local flow registration id onto the local pubkey node', () => {
+    const pubkey = `02${'a'.repeat(64)}`
+    const registrationId = 'f25682aa-1111-4111-8111-111111111111'
+    const otherNodeId = '99999999-9999-4999-8999-999999999999'
+    const graph = buildGraphFromConsumeChains([
+      normalizeConsumeChainResponseDTO({
+        consumeChain: {
+          id: 'chain-reg',
+          start: otherNodeId,
+          end: registrationId,
+          amount: 4000,
+          currencyType: 1,
+          isLoop: false,
+          tailMountTimestamp: 1,
+        },
+        consumeChainEdges: [
+          {
+            id: 'edge-reg',
+            source: otherNodeId,
+            target: registrationId,
+            amount: 4000,
+            currencyType: 1,
+            chain: 'chain-reg',
+            relatedTransactionRecord: 'r',
+            relatedTransactionMount: 'm',
+            relatedTransactionMountTimestamp: 1,
+            isLoop: false,
+          },
+        ],
+      }),
+    ])
+
+    const merged = mergeLocalNodes(
+      graph,
+      [
+        {
+          id: 'local-flow-node',
+          publicKeyHex: pubkey,
+          registration: { id: registrationId, status: 'sent' },
+          authorizations: [{ status: 'sent' }],
+        },
+      ],
+      [],
+    )
+
+    expect(merged.nodes.map((node) => node.id).sort()).toEqual([otherNodeId, pubkey].sort())
+    expect(merged.nodes.find((node) => node.id === registrationId)).toBeUndefined()
+    const localNode = merged.nodes.find((node) => node.id === pubkey)
+    expect(localNode?.kind).toBe('local-flow')
+    expect(localNode?.label).toBe('F25682')
+    expect(localNode?.flowStatus).toBe('authorized')
+    expect(localNode?.chainCount).toBeGreaterThan(0)
+    expect(merged.edges[0]).toMatchObject({ source: otherNodeId, target: pubkey })
+  })
+
+  it('only appends standalone local nodes that are explicitly added to the canvas', () => {
+    const graph = buildGraphFromConsumeChains([])
+    const flowRefs = [
+      { id: 'on-canvas', publicKeyHex: 'pk-on-canvas', label: 'On' },
+      { id: 'off-canvas', publicKeyHex: 'pk-off-canvas', label: 'Off' },
+    ]
+
+    const merged = mergeLocalNodes(graph, flowRefs, [], new Set(['pk-on-canvas']))
+
+    expect(merged.nodes.map((node) => node.id)).toEqual(['pk-on-canvas'])
   })
 
   it('derives flow-node canvas status from registration and authorizations', () => {

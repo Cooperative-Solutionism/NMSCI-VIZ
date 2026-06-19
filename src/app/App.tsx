@@ -8,10 +8,11 @@ import {
   type DashboardPanelConfig,
 } from '../features/dashboard-layout/panelRegistry'
 import { mergeLocalNodes } from '../lib/chainGraph'
-import type { ChainGraphNode } from '../lib/types'
+import type { ChainGraphNode, QueryMode } from '../lib/types'
 import { useLocalKeyringController } from '../features/keyring/hooks/useLocalKeyringController'
 import { useLocalNodeActions } from '../features/keyring/hooks/useLocalNodeActions'
 import { useRegistrationController } from '../features/keyring/hooks/useRegistrationController'
+import { useUserPromptDialogs } from '../features/keyring/hooks/useUserPromptDialogs'
 import { useVaultActionGate } from '../features/keyring/hooks/useVaultActionGate'
 import { LocalNodePanel } from '../features/keyring/components/LocalNodePanel'
 import { VaultPromptDialog } from '../features/keyring/components/VaultPromptDialog'
@@ -33,6 +34,11 @@ function App() {
   const keyring = useLocalKeyringController({
     clearSelectedLocalNode: selection.clearSelectedLocalNode,
   })
+  const {
+    dialogs: userPromptDialogs,
+    requestConfirm,
+    requestText,
+  } = useUserPromptDialogs()
   // 哪些本地节点已被绘制到画布（按公钥）。默认空：本地节点不再自动铺到画布。
   const [canvasNodeIds, setCanvasNodeIds] = useState<ReadonlySet<string>>(() => new Set())
   const markNodeOnCanvas = useCallback((publicKeyHex: string) => {
@@ -84,6 +90,8 @@ function App() {
     notifyStatus: registration.notifyStatus,
     persistLocalConsumeNodes: keyring.persistLocalConsumeNodes,
     persistLocalFlowNodes: keyring.persistLocalFlowNodes,
+    requestConfirm,
+    requestText,
     selectLocalNode: selection.selectLocalNode,
     selectedLocalConsumeNode,
     selectedLocalNode,
@@ -116,13 +124,15 @@ function App() {
   // 关闭保险库会解除加密并把私钥明文落盘，是降级安全的破坏性操作——与删除/导出一致，先确认。
   // 注意：放弃“启用”的弹窗关闭路径直接调用 keyring.handleDisableVault（此时尚未加密，无需确认）。
   const handleDisableVault = useCallback(() => {
-    if (
-      !window.confirm('关闭密钥保险库将解除 AES-GCM 加密，并把所有本地私钥以明文写入浏览器存储。确定继续？')
-    ) {
-      return
-    }
-    keyring.handleDisableVault()
-  }, [keyring])
+    void requestConfirm({
+      title: '关闭密钥保险库',
+      description: '将解除 AES-GCM 加密，并把所有本地私钥以明文写入浏览器存储。',
+      confirmLabel: '关闭保险库',
+      destructive: true,
+    }).then((confirmed) => {
+      if (confirmed) keyring.handleDisableVault()
+    })
+  }, [keyring, requestConfirm])
   const handleAddFlowNode = useCallback(
     (position?: { x: number; y: number }) => {
       requestVault('添加流转节点', () => nodeActionsRef.current.handleAddFlowNode(position))
@@ -136,7 +146,7 @@ function App() {
     [requestVault],
   )
   const handleImportLocalNode = useCallback(() => {
-    requestVault('导入流转节点', () => nodeActionsRef.current.handleImportLocalNode())
+    requestVault('导入流转节点', () => void nodeActionsRef.current.handleImportLocalNode())
   }, [requestVault])
   const networkActions = useNetworkExplorerActions({
     filteredRows: query.filteredRows,
@@ -193,14 +203,23 @@ function App() {
     },
     [registration],
   )
+  // 右键加载消费链：以该节点为端点查询并并入当前画布（mergeConsumeChains 去重累积，实现延展）。
+  const handleLoadChain = useCallback(
+    (node: ChainGraphNode, mode: QueryMode) => {
+      void query.extendFromNode(node, mode)
+    },
+    [query],
+  )
 
-  // 仅把用户显式"添加到画布"的本地节点合并进图谱。
+  // 合并本地节点与消费链：链中命中本地 pubkey 的节点原地升级为本地节点（同一节点，不另画）；
+  // 零散本地节点仅当显式“添加到画布”（canvasNodeIds）时追加。
   const canvasGraph = useMemo(
     () =>
       mergeLocalNodes(
         query.graph,
-        keyring.localFlowNodes.filter((node) => canvasNodeIds.has(node.publicKeyHex)),
-        keyring.localConsumeNodes.filter((node) => canvasNodeIds.has(node.publicKeyHex)),
+        keyring.localFlowNodes,
+        keyring.localConsumeNodes,
+        canvasNodeIds,
       ),
     [canvasNodeIds, keyring.localConsumeNodes, keyring.localFlowNodes, query.graph],
   )
@@ -317,6 +336,7 @@ function App() {
         onUnlock={(passphrase) => void keyring.vault.unlock(passphrase)}
         onLock={keyring.handleLockVault}
       />
+      {userPromptDialogs}
 
       <DashboardWorkspace
         graph={
@@ -329,6 +349,7 @@ function App() {
             onAuthorizeFlowNode={handleAuthorizeFlowNode}
             onGenerateRecord={handleGenerateRecord}
             onMountRecord={handleMountRecord}
+            onLoadChain={handleLoadChain}
             onSelectEdge={selection.onCanvasSelectEdge}
             onSelectNode={selection.onCanvasSelectNode}
             selectedId={selection.selectedLocalId ?? query.effectiveSelection?.id ?? null}

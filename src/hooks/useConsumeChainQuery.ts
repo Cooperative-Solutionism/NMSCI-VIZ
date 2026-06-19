@@ -61,6 +61,7 @@ export function useConsumeChainQuery(apiBase: string) {
   const [warning, setWarning] = useState<string | null>(null)
   const client = useMemo(() => new ApiClient({ baseUrl: apiBase }), [apiBase])
   const graphRequestGenerationRef = useRef(0)
+  const graphResetGenerationRef = useRef(0)
 
   const changeMode = useCallback((next: QueryMode) => {
     setMode(next)
@@ -128,6 +129,7 @@ export function useConsumeChainQuery(apiBase: string) {
       const effectiveSize = normalizePageSize(queryOverride?.size ?? queryPageSize)
 
       setLoading(true)
+      setExtendLoading(null)
       setError(null)
       setWarning(null)
       if (queryOverride) {
@@ -149,6 +151,7 @@ export function useConsumeChainQuery(apiBase: string) {
         )
         if (generation !== graphRequestGenerationRef.current) return
         const { content, skipped } = normalizeRowsSafely(result.data.content)
+        graphResetGenerationRef.current += 1
         setRows(content)
         setQueryPage(result.data.page)
         setQueryPageSize(result.data.size)
@@ -174,12 +177,12 @@ export function useConsumeChainQuery(apiBase: string) {
     async (node: ChainGraphNode, targetMode: QueryMode) => {
       const generation = graphRequestGenerationRef.current + 1
       graphRequestGenerationRef.current = generation
+      const graphResetGeneration = graphResetGenerationRef.current
       setLoading(true)
       setExtendLoading(targetMode)
       setError(null)
-      setMode(targetMode)
-      setNodeId(node.id)
-      setQueryPage(defaultConsumeChainPage)
+      // 加载消费链是加法/延展语义：只标记选中右键来源节点，不改写浏览查询的 mode/nodeId/page
+      // （那些驱动 requestUrl / 复制 curl，属于上一次 runQuery 的语义）。
       setSelection({ kind: 'node', id: node.id })
 
       try {
@@ -191,14 +194,17 @@ export function useConsumeChainQuery(apiBase: string) {
             size: queryPageSize,
           },
         )
-        if (generation !== graphRequestGenerationRef.current) return
         const { content, skipped } = normalizeRowsSafely(result.data.content)
+        if (graphResetGeneration !== graphResetGenerationRef.current) return
+        // 同一图谱上的延展请求始终并入：合并按 chain id 去重且与顺序无关；
+        // 若期间完整浏览查询已替换图谱，则丢弃旧延展响应，避免污染新结果。
         setRows((currentRows) => mergeConsumeChains(currentRows, content))
-        setHasNextPage(result.data.hasNext)
-        setHasPreviousPage(result.data.hasPrevious)
-        setOrigin('backend')
-        setExtended(true)
-        setWarning(skipWarning(skipped))
+        // 仅最新一次加载负责瞬时 UI 状态（来源/已延展/告警）。
+        if (generation === graphRequestGenerationRef.current) {
+          setOrigin('backend')
+          setExtended(true)
+          setWarning(skipWarning(skipped))
+        }
       } catch (queryError) {
         if (generation !== graphRequestGenerationRef.current) return
         setError(errorMessage(queryError, '未知请求错误'))

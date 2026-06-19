@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 import {
   installAppTestLifecycle,
   jsonResponse,
@@ -64,11 +64,6 @@ describe('App initial state', () => {
   })
 
   it('returns encrypted keys to plaintext when the vault is disabled again', async () => {
-    // 关闭保险库是破坏性降级，需确认。
-    vi.stubGlobal(
-      'confirm',
-      vi.fn(() => true),
-    )
     render(<App />)
 
     // 关闭态添加节点 → 启用并加密。
@@ -87,6 +82,8 @@ describe('App initial state', () => {
 
     // 关闭保险库：内存中的私钥应以明文重新落盘，且不丢失。
     fireEvent.click(await screen.findByRole('button', { name: /关闭保险库/ }))
+    const confirmDialog = await screen.findByRole('alertdialog', { name: /关闭密钥保险库/ })
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '关闭保险库' }))
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
         nodes: Array<{ privateKey?: unknown; privateKeyHex?: string }>
@@ -99,10 +96,6 @@ describe('App initial state', () => {
   })
 
   it('does not disable the vault when the confirmation is declined', async () => {
-    vi.stubGlobal(
-      'confirm',
-      vi.fn(() => false),
-    )
     render(<App />)
 
     fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
@@ -114,6 +107,8 @@ describe('App initial state', () => {
     await screen.findByRole('button', { name: /关闭保险库/ })
 
     fireEvent.click(screen.getByRole('button', { name: /关闭保险库/ }))
+    const confirmDialog = await screen.findByRole('alertdialog', { name: /关闭密钥保险库/ })
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '取消' }))
 
     // 取消确认：仍处于已解锁加密态，未回退到关闭。
     expect(screen.getByRole('button', { name: /关闭保险库/ })).toBeTruthy()
@@ -282,11 +277,12 @@ describe('App initial state', () => {
     fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
     await screen.findByRole('button', { name: /导出私钥/ })
 
-    vi.stubGlobal(
-      'prompt',
-      vi.fn(() => 'Renamed node'),
-    )
     fireEvent.click(screen.getByRole('button', { name: /^重命名$/ }))
+    const renameDialog = await screen.findByRole('dialog', { name: /重命名流转节点/ })
+    fireEvent.change(within(renameDialog).getByLabelText('节点名称'), {
+      target: { value: 'Renamed node' },
+    })
+    fireEvent.click(within(renameDialog).getByRole('button', { name: '保存' }))
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
         nodes: Array<{ label: string }>
@@ -294,11 +290,9 @@ describe('App initial state', () => {
       expect(saved.nodes[0]?.label).toBe('Renamed node')
     })
 
-    vi.stubGlobal(
-      'confirm',
-      vi.fn(() => true),
-    )
     fireEvent.click(screen.getByRole('button', { name: /^删除$/ }))
+    const deleteDialog = await screen.findByRole('alertdialog', { name: /删除本地流转节点/ })
+    fireEvent.click(within(deleteDialog).getByRole('button', { name: '删除' }))
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
         nodes: unknown[]
@@ -352,14 +346,15 @@ describe('App initial state', () => {
 
   it('imports a flow node from a pasted private key', async () => {
     const privateKey = '01'.padStart(64, '0')
-    vi.stubGlobal(
-      'prompt',
-      vi.fn(() => privateKey),
-    )
     render(<App />)
 
     openFlowNodesTab()
     fireEvent.click(await screen.findByRole('button', { name: /导入流转节点/ }))
+    const importDialog = await screen.findByRole('dialog', { name: /导入流转节点/ })
+    fireEvent.change(within(importDialog).getByLabelText('私钥（hex）'), {
+      target: { value: privateKey },
+    })
+    fireEvent.click(within(importDialog).getByRole('button', { name: '导入' }))
 
     await waitFor(() => {
       const raw = localStorage.getItem('nmsci.flowNodes.v1')

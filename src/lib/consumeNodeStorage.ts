@@ -58,11 +58,27 @@ export async function saveLocalConsumeNodes(
   codec: SecretCodec | null,
   storage: Storage = window.localStorage,
 ): Promise<void> {
+  if (!codec) {
+    saveLocalConsumeNodesPlaintext(nodes, storage)
+    return
+  }
   const stored: StoredConsumeNode[] = []
   for (const node of nodes) {
     const { privateKeyHex, ...rest } = node
-    stored.push(codec ? { ...rest, privateKey: await codec.encrypt(privateKeyHex) } : { ...rest, privateKeyHex })
+    stored.push({ ...rest, privateKey: await codec.encrypt(privateKeyHex) })
   }
+  const document: ConsumeNodeStorageDocument = { version: 1, nodes: stored }
+  storage.setItem(consumeNodeStorageKey, JSON.stringify(document))
+}
+
+export function saveLocalConsumeNodesPlaintext(
+  nodes: LocalConsumeNode[],
+  storage: Storage = window.localStorage,
+): void {
+  const stored: StoredConsumeNode[] = nodes.map((node) => {
+    const { privateKeyHex, ...rest } = node
+    return { ...rest, privateKeyHex }
+  })
   const document: ConsumeNodeStorageDocument = { version: 1, nodes: stored }
   storage.setItem(consumeNodeStorageKey, JSON.stringify(document))
 }

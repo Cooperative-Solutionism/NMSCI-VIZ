@@ -23,6 +23,7 @@ export function NetworkGraph({
   onAuthorizeFlowNode,
   onGenerateRecord,
   onMountRecord,
+  onLoadChain,
 }: NetworkGraphProps) {
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
   const selectedChainId = useMemo(
@@ -136,6 +137,7 @@ export function NetworkGraph({
           onAuthorizeFlowNode={onAuthorizeFlowNode}
           onGenerateRecord={onGenerateRecord}
           onMountRecord={onMountRecord}
+          onLoadChain={onLoadChain}
           onClose={closeMenu}
         />
       ) : null}

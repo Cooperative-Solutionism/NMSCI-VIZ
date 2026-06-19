@@ -6,7 +6,6 @@ import type {
   ConsumeChainQuery,
   ConsumeChainResponseDTO,
   FlowNodeCanvasStatus,
-  NodeKind,
   VolumeByCurrency,
 } from './types'
 import { consumeChainParamName, detectIdentityKind } from './consumeChainFilters'
@@ -192,37 +191,125 @@ export const flowNodeStatusLabels: Record<FlowNodeCanvasStatus, string> = {
   failed: '注册失败',
 }
 
-// 把本地密钥节点（流转/消费）叠加到查询得到的链图上，使其直接显示在画布、可在无查询结果时先建后查。
-// 以 pubkey 为 id；与链节点的 UUID id 不会冲突。
+// Local nodes can match chain nodes by pubkey or by a backend node id, such as a flow
+// registration id. Normalize those aliases to the local pubkey before Cytoscape sees the graph,
+// so nodes and edges are drawn on the same canvas node instead of as duplicate lookalikes.
+// Standalone local nodes are appended only when explicitly added to the canvas; omitting
+// canvasNodeIds keeps the old unrestricted behavior for tests and non-gated callers.
 export function mergeLocalNodes(
   graph: ChainGraph,
   flowNodes: LocalNodeRef[],
   consumeNodes: LocalNodeRef[],
+  canvasNodeIds?: ReadonlySet<string>,
 ): ChainGraph {
-  const seen = new Set(graph.nodes.map((node) => node.id))
-  const extra: ChainGraphNode[] = []
-  const append = (
-    refs: LocalNodeRef[],
-    kind: NodeKind,
-    labelForNode: (node: LocalNodeRef, index: number) => string,
-    statusForNode?: (node: LocalNodeRef) => FlowNodeCanvasStatus,
-  ): void => {
-    refs.forEach((ref, index) => {
-      if (seen.has(ref.publicKeyHex)) return
-      seen.add(ref.publicKeyHex)
-      extra.push({
-        id: ref.publicKeyHex,
-        label: labelForNode(ref, index),
-        chainCount: 0,
-        volumeByCurrency: new Map(),
-        kind,
-        position: ref.position,
-        flowStatus: statusForNode?.(ref),
-      })
-    })
+  const localByPubkey = new Map<
+    string,
+    { kind: 'flow'; ref: LocalNodeRef; index: number } | { kind: 'consume'; ref: LocalNodeRef }
+  >()
+  const aliases = new Map<string, string>()
+  const addAlias = (alias: string | undefined, pubkey: string): void => {
+    const trimmed = alias?.trim()
+    if (trimmed && !aliases.has(trimmed)) aliases.set(trimmed, pubkey)
   }
-  append(flowNodes, 'local-flow', flowNodeDisplayName, flowNodeCanvasStatus)
-  append(consumeNodes, 'local-consume', (ref) => shortId(ref.id))
-  if (extra.length === 0) return graph
-  return { ...graph, nodes: [...graph.nodes, ...extra] }
+
+  flowNodes.forEach((ref, index) => {
+    localByPubkey.set(ref.publicKeyHex, { kind: 'flow', ref, index })
+    addAlias(ref.publicKeyHex, ref.publicKeyHex)
+    addAlias(ref.registration?.id, ref.publicKeyHex)
+  })
+  consumeNodes.forEach((ref) => {
+    if (!localByPubkey.has(ref.publicKeyHex)) {
+      localByPubkey.set(ref.publicKeyHex, { kind: 'consume', ref })
+    }
+    addAlias(ref.publicKeyHex, ref.publicKeyHex)
+  })
+
+  const canonicalId = (id: string): string => aliases.get(id) ?? id
+  const baseById = new Map<string, ChainGraphNode>()
+  let changed = false
+  for (const node of graph.nodes) {
+    const id = canonicalId(node.id)
+    if (id !== node.id) changed = true
+    const normalized = id === node.id ? node : { ...node, id }
+    const existing = baseById.get(id)
+    baseById.set(id, existing ? mergeBaseNode(existing, normalized) : normalized)
+  }
+
+  const nodes = Array.from(baseById.values()).map((node) => {
+    const local = localByPubkey.get(node.id)
+    if (!local) return node
+    changed = true
+    return local.kind === 'flow'
+      ? localFlowGraphNode(local.ref, local.index, node)
+      : localConsumeGraphNode(local.ref, node)
+  })
+
+  const edges = graph.edges.map((edge) => {
+    const source = canonicalId(edge.source)
+    const target = canonicalId(edge.target)
+    if (source === edge.source && target === edge.target) return edge
+    changed = true
+    return { ...edge, source, target }
+  })
+
+  // Append standalone local nodes only when they were explicitly added to the canvas.
+  const seen = new Set(nodes.map((node) => node.id))
+  const shouldAppend = (pubkey: string): boolean =>
+    !seen.has(pubkey) && (canvasNodeIds === undefined || canvasNodeIds.has(pubkey))
+  const extra: ChainGraphNode[] = []
+  flowNodes.forEach((ref, index) => {
+    if (!shouldAppend(ref.publicKeyHex)) return
+    seen.add(ref.publicKeyHex)
+    extra.push(localFlowGraphNode(ref, index))
+  })
+  consumeNodes.forEach((ref) => {
+    if (!shouldAppend(ref.publicKeyHex)) return
+    seen.add(ref.publicKeyHex)
+    extra.push(localConsumeGraphNode(ref))
+  })
+
+  if (!changed && extra.length === 0) return graph
+  return { ...graph, nodes: [...nodes, ...extra], edges }
+}
+
+function mergeBaseNode(left: ChainGraphNode, right: ChainGraphNode): ChainGraphNode {
+  const volumeByCurrency = new Map(left.volumeByCurrency)
+  for (const [currencyType, amount] of right.volumeByCurrency) {
+    addAmount(volumeByCurrency, currencyType, amount)
+  }
+  return {
+    ...left,
+    chainCount: left.chainCount + right.chainCount,
+    position: left.position ?? right.position,
+    volumeByCurrency,
+  }
+}
+
+// Build a local flow canvas node; when base exists, keep its chain metrics and position.
+function localFlowGraphNode(
+  ref: LocalNodeRef,
+  index: number,
+  base?: ChainGraphNode,
+): ChainGraphNode {
+  return {
+    id: ref.publicKeyHex,
+    label: flowNodeDisplayName(ref, index),
+    chainCount: base?.chainCount ?? 0,
+    // Copy the base map so the upgraded local node does not share mutable graph state.
+    volumeByCurrency: new Map<number, bigint>(base?.volumeByCurrency),
+    kind: 'local-flow',
+    position: base?.position ?? ref.position,
+    flowStatus: flowNodeCanvasStatus(ref),
+  }
+}
+
+function localConsumeGraphNode(ref: LocalNodeRef, base?: ChainGraphNode): ChainGraphNode {
+  return {
+    id: ref.publicKeyHex,
+    label: shortId(ref.id),
+    chainCount: base?.chainCount ?? 0,
+    volumeByCurrency: new Map<number, bigint>(base?.volumeByCurrency),
+    kind: 'local-consume',
+    position: base?.position ?? ref.position,
+  }
 }
