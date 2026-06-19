@@ -20,6 +20,9 @@ export type IdentityKind = 'id' | 'pubkey'
 // 画布节点来源：来自查询的链节点，或本地密钥（流转/消费）叠加层。
 export type NodeKind = 'chain' | 'local-flow' | 'local-consume'
 
+// 本地流转节点在画布上的注册/授权状态标签。
+export type FlowNodeCanvasStatus = 'unregistered' | 'registered' | 'authorized' | 'failed'
+
 export interface CanvasPosition {
   x: number
   y: number
@@ -37,6 +40,8 @@ export interface ChainGraphNode {
   kind: NodeKind
   // 本地节点的画布落点（右键添加时记录）；链节点无此字段，由布局算法定位。
   position?: CanvasPosition
+  // 本地流转节点的注册/授权状态，用于画布上的状态标签；其他节点无此字段。
+  flowStatus?: FlowNodeCanvasStatus
 }
 
 export interface ChainGraphEdge {

@@ -18,6 +18,8 @@ export function createGraphStyle(tokens: GraphTokens): GraphStyle {
         'overlay-opacity': 0,
         'text-halign': 'center',
         'text-valign': 'center',
+        'text-wrap': 'wrap',
+        'text-max-width': '76px',
         width: 48,
       },
     },
@@ -27,6 +29,25 @@ export function createGraphStyle(tokens: GraphTokens): GraphStyle {
         'background-color': tokens.localFlowBackground,
         'border-color': tokens.localFlowBorder,
         'border-width': 3,
+      },
+    },
+    // 注册/授权状态以边框颜色作为画布标签：已授权=琥珀，已注册=绿，注册失败=红，未注册沿用默认描边。
+    {
+      selector: 'node[flowStatus = "registered"]',
+      style: {
+        'border-color': '#15803d',
+      },
+    },
+    {
+      selector: 'node[flowStatus = "authorized"]',
+      style: {
+        'border-color': '#b45309',
+      },
+    },
+    {
+      selector: 'node[flowStatus = "failed"]',
+      style: {
+        'border-color': '#b91c1c',
       },
     },
     {

@@ -4,6 +4,7 @@ import {
   buildConsumeChainUrl,
   buildGraphFromConsumeChains,
   chainColor,
+  flowNodeCanvasStatus,
   formatAmount,
   formatVolumeByCurrency,
   mergeConsumeChains,
@@ -147,7 +148,9 @@ describe('chain graph mapping', () => {
     expect(flow?.kind).toBe('local-flow')
     expect(flow?.label).toBe('未注册1')
     expect(flow?.position).toEqual({ x: 1, y: 2 })
+    expect(flow?.flowStatus).toBe('unregistered')
     expect(merged.nodes.find((node) => node.id === 'pk-registered-flow')?.label).toBe('REGIST')
+    expect(merged.nodes.find((node) => node.id === 'pk-consume')?.flowStatus).toBeUndefined()
     const consume = merged.nodes.find((node) => node.id === 'pk-consume')
     expect(consume?.kind).toBe('local-consume')
     expect(consume?.label).toBe('BRAVO-')
@@ -160,6 +163,49 @@ describe('chain graph mapping', () => {
     )
     expect(dup.nodes.length).toBe(before)
     expect(dup).toBe(graph)
+  })
+
+  it('derives flow-node canvas status from registration and authorizations', () => {
+    expect(flowNodeCanvasStatus({ id: 'a', publicKeyHex: 'pk-a' })).toBe('unregistered')
+    expect(
+      flowNodeCanvasStatus({
+        id: 'b',
+        publicKeyHex: 'pk-b',
+        registration: { id: 'reg-b', status: 'failed' },
+      }),
+    ).toBe('failed')
+    expect(
+      flowNodeCanvasStatus({
+        id: 'c',
+        publicKeyHex: 'pk-c',
+        registration: { id: 'reg-c', status: 'sent' },
+      }),
+    ).toBe('registered')
+    expect(
+      flowNodeCanvasStatus({
+        id: 'd',
+        publicKeyHex: 'pk-d',
+        registration: { id: 'reg-d', status: 'sent' },
+        authorizations: [{ status: 'sent' }],
+      }),
+    ).toBe('authorized')
+  })
+
+  it('tags merged local flow nodes with their canvas status', () => {
+    const graph = buildGraphFromConsumeChains([])
+    const merged = mergeLocalNodes(
+      graph,
+      [
+        {
+          id: 'authorized-flow',
+          publicKeyHex: 'pk-authorized',
+          registration: { id: 'reg-x', status: 'sent' },
+          authorizations: [{ status: 'sent' }],
+        },
+      ],
+      [],
+    )
+    expect(merged.nodes.find((node) => node.id === 'pk-authorized')?.flowStatus).toBe('authorized')
   })
 
   it('aggregates volume per currency and never sums across currencies', () => {

@@ -5,6 +5,7 @@ import type {
   ChainGraphNode,
   ConsumeChainQuery,
   ConsumeChainResponseDTO,
+  FlowNodeCanvasStatus,
   NodeKind,
   VolumeByCurrency,
 } from './types'
@@ -164,11 +165,31 @@ export interface LocalNodeRef {
   position?: CanvasPosition
   registration?: {
     id: string
+    status?: 'sent' | 'failed'
   }
+  authorizations?: Array<{ status: 'sent' | 'failed' }>
 }
 
 export function flowNodeDisplayName(node: LocalNodeRef, index: number): string {
   return node.registration?.id ? shortId(node.registration.id) : `未注册${index + 1}`
+}
+
+// 由本地注册/授权记录推断画布状态标签（与本地节点表格的状态列保持一致）。
+export function flowNodeCanvasStatus(node: LocalNodeRef): FlowNodeCanvasStatus {
+  if (node.registration?.status === 'failed') return 'failed'
+  if (node.registration?.status === 'sent') {
+    return node.authorizations?.some((authorization) => authorization.status === 'sent')
+      ? 'authorized'
+      : 'registered'
+  }
+  return 'unregistered'
+}
+
+export const flowNodeStatusLabels: Record<FlowNodeCanvasStatus, string> = {
+  unregistered: '未注册',
+  registered: '已注册',
+  authorized: '已授权',
+  failed: '注册失败',
 }
 
 // 把本地密钥节点（流转/消费）叠加到查询得到的链图上，使其直接显示在画布、可在无查询结果时先建后查。
@@ -184,6 +205,7 @@ export function mergeLocalNodes(
     refs: LocalNodeRef[],
     kind: NodeKind,
     labelForNode: (node: LocalNodeRef, index: number) => string,
+    statusForNode?: (node: LocalNodeRef) => FlowNodeCanvasStatus,
   ): void => {
     refs.forEach((ref, index) => {
       if (seen.has(ref.publicKeyHex)) return
@@ -195,10 +217,11 @@ export function mergeLocalNodes(
         volumeByCurrency: new Map(),
         kind,
         position: ref.position,
+        flowStatus: statusForNode?.(ref),
       })
     })
   }
-  append(flowNodes, 'local-flow', flowNodeDisplayName)
+  append(flowNodes, 'local-flow', flowNodeDisplayName, flowNodeCanvasStatus)
   append(consumeNodes, 'local-consume', (ref) => shortId(ref.id))
   if (extra.length === 0) return graph
   return { ...graph, nodes: [...graph.nodes, ...extra] }

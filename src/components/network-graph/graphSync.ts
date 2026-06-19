@@ -1,7 +1,15 @@
 import type { Core, NodeSingular } from 'cytoscape'
-import { formatAmount } from '../../lib/chainGraph'
+import { flowNodeStatusLabels, formatAmount } from '../../lib/chainGraph'
 import { deterministicOffset, type Point } from '../../lib/graphLayout'
 import type { ChainGraphEdge, ChainGraphNode } from '../../lib/types'
+
+// 本地流转节点在画布上展示两行：名称 + 状态标签，使状态随时可见。
+function nodeCanvasLabel(node: ChainGraphNode): string {
+  if (node.kind === 'local-flow' && node.flowStatus) {
+    return `${node.label}\n${flowNodeStatusLabels[node.flowStatus]}`
+  }
+  return node.label
+}
 
 export function syncGraphElements(
   cy: Core,
@@ -23,8 +31,9 @@ function syncNodes(cy: Core, nodes: ChainGraphNode[], edges: ChainGraphEdge[]): 
     if (existingNode.nonempty()) {
       existingNode.data({
         ...existingNode.data(),
-        label: node.label,
+        label: nodeCanvasLabel(node),
         kind: node.kind,
+        flowStatus: node.flowStatus ?? null,
       })
       continue
     }
@@ -32,8 +41,9 @@ function syncNodes(cy: Core, nodes: ChainGraphNode[], edges: ChainGraphEdge[]): 
     cy.add({
       data: {
         id: node.id,
-        label: node.label,
+        label: nodeCanvasLabel(node),
         kind: node.kind,
+        flowStatus: node.flowStatus ?? null,
       },
       group: 'nodes',
       position: node.position ?? positionForNewNode(cy, node.id, edges),
