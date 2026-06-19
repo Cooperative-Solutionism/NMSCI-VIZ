@@ -10,6 +10,7 @@ import { formatAmount } from '../lib/chainGraph'
 import { errorMessage } from '../lib/errors'
 import { formatMicros } from '../lib/format'
 import { DetailRow } from './DetailRow'
+import { Button } from './ui/button'
 
 export function TransactionEvidence({
   apiBase,
@@ -47,9 +48,9 @@ export function TransactionEvidence({
     <div className="evidence-block">
       <div className="section-title">交易证据</div>
       {!record && status === 'idle' ? (
-        <button className="secondary-button" type="button" onClick={() => void loadEvidence()}>
+        <Button variant="secondary" type="button" onClick={() => void loadEvidence()}>
           打开交易
-        </button>
+        </Button>
       ) : null}
       {status === 'loading' ? (
         <div className="detail-state" role="status">

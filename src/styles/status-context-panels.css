@@ -6,22 +6,6 @@
   color: var(--muted);
 }
 
-.frozen-badge {
-  border-radius: 4px;
-  background: var(--red-soft);
-  color: var(--red);
-  font-weight: 600;
-  padding: 2px 8px;
-}
-
-.secondary-button.danger {
-  color: var(--red);
-}
-
-.secondary-button.danger:hover {
-  border-color: var(--red);
-}
-
 /* 交易记录表单 / 列表 */
 .record-form,
 .record-list {

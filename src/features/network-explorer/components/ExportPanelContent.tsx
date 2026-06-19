@@ -1,3 +1,5 @@
+import { Button } from '@/components/ui/button'
+
 export function ExportPanelContent({
   filteredRowCount,
   graphEdgeCount,
@@ -13,25 +15,20 @@ export function ExportPanelContent({
 }) {
   return (
     <div className="export-bar" role="group" aria-label="导出">
-      <button
-        className="ghost-button"
-        type="button"
-        disabled={graphEdgeCount === 0}
-        onClick={onExportCsv}
-      >
+      <Button variant="ghost" type="button" disabled={graphEdgeCount === 0} onClick={onExportCsv}>
         CSV
-      </button>
-      <button
-        className="ghost-button"
+      </Button>
+      <Button
+        variant="ghost"
         type="button"
         disabled={filteredRowCount === 0}
         onClick={onExportJson}
       >
         JSON
-      </button>
-      <button className="ghost-button" type="button" onClick={() => void onCopyCurl()}>
+      </Button>
+      <Button variant="ghost" type="button" onClick={() => void onCopyCurl()}>
         复制 curl
-      </button>
+      </Button>
     </div>
   )
 }

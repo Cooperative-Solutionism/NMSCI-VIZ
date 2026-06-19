@@ -3,6 +3,7 @@ import { formatDateTime, maskSecret } from '../lib/format'
 import type { LocalConsumeNode } from '../lib/consumeNodeStorage'
 import { DetailRow } from './DetailRow'
 import { PanelHeader } from './PanelHeader'
+import { Button } from './ui/button'
 
 export function ConsumeNodeOperatePanel({
   error,
@@ -31,9 +32,14 @@ export function ConsumeNodeOperatePanel({
           value={
             <span className="copyable-value">
               <code translate="no">{node.publicKeyHex}</code>
-              <button type="button" onClick={() => onCopy(node.publicKeyHex, '公钥')}>
+              <Button
+                variant="ghost"
+                size="xs"
+                type="button"
+                onClick={() => onCopy(node.publicKeyHex, '公钥')}
+              >
                 复制
-              </button>
+              </Button>
             </span>
           }
         />
@@ -42,15 +48,15 @@ export function ConsumeNodeOperatePanel({
           value={<code translate="no">{maskSecret(node.privateKeyHex)}</code>}
         />
         <DetailRow label="保存时间" value={formatDateTime(node.createdAt)} />
-        <button className="secondary-button" type="button" onClick={onExportPrivateKey}>
+        <Button variant="secondary" type="button" onClick={onExportPrivateKey}>
           导出私钥
-        </button>
-        <button className="secondary-button" type="button" onClick={onRename}>
+        </Button>
+        <Button variant="secondary" type="button" onClick={onRename}>
           重命名
-        </button>
-        <button className="secondary-button danger" type="button" onClick={onDelete}>
+        </Button>
+        <Button variant="destructive" type="button" onClick={onDelete}>
           删除
-        </button>
+        </Button>
       </div>
       <p className="field-hint">创建交易记录时可将此消费节点作为来源。</p>
       {status ? (

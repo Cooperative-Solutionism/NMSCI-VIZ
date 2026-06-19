@@ -2,7 +2,10 @@ import { Repeat } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { formatAmount, shortId } from '../lib/chainGraph'
 import { sortLoops, type LoopSort, type LoopSummary } from '../lib/loops'
+import { cn } from '../lib/utils'
 import { PanelHeader } from './PanelHeader'
+import { Button } from './ui/button'
+import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 
 export function LoopsPanel({
   loops,
@@ -20,18 +23,23 @@ export function LoopsPanel({
     <section className="loops-panel" aria-label="循环交易链">
       <div className="loops-head">
         <PanelHeader icon={<Repeat size={16} />} title={`循环 (${loops.length})`} />
-        <div className="segmented compact" role="group" aria-label="循环排序">
+        <ToggleGroup
+          type="single"
+          value={sort}
+          onValueChange={(value) => {
+            if (value) setSort(value as LoopSort)
+          }}
+          variant="outline"
+          size="sm"
+          spacing={1}
+          aria-label="循环排序"
+        >
           {(['amount', 'length', 'recency'] as const).map((option) => (
-            <button
-              key={option}
-              type="button"
-              className={sort === option ? 'active' : ''}
-              onClick={() => setSort(option)}
-            >
+            <ToggleGroupItem key={option} value={option}>
               {sortLabel(option)}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
       </div>
       {sorted.length === 0 ? (
         <p className="empty-state small">当前过滤条件下无成环链路。</p>
@@ -39,9 +47,10 @@ export function LoopsPanel({
         <ul className="loops-list">
           {sorted.map((loop) => (
             <li key={loop.chainId}>
-              <button
+              <Button
+                variant="ghost"
                 type="button"
-                className={`loop-row ${loop.chainId === selectedChainId ? 'active' : ''}`}
+                className={cn('loop-row', loop.chainId === selectedChainId && 'active')}
                 aria-pressed={loop.chainId === selectedChainId}
                 onClick={() => onSelectLoop(loop.chainId)}
               >
@@ -50,7 +59,7 @@ export function LoopsPanel({
                 </span>
                 <span className="loop-amount">{formatAmount(loop.amount, loop.currencyType)}</span>
                 <span className="loop-len">{loop.length} 跳</span>
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

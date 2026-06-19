@@ -1,7 +1,18 @@
 import { useRef, useState } from 'react'
 import { shortId } from '../lib/chainGraph'
 import { formatInteger } from '../lib/format'
-import { Field } from './Field'
+import { Button } from './ui/button'
+import { Field, FieldError, FieldGroup, FieldLabel } from './ui/field'
+import { Input } from './ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select'
+import { Textarea } from './ui/textarea'
 
 export interface TransactionRecordDraft {
   consumeNodePubkey: string
@@ -54,7 +65,7 @@ export function TransactionRecordForm({
   const [difficultyHex, setDifficultyHex] = useState(defaultDifficulty)
   const [amountTouched, setAmountTouched] = useState(false)
   const [centralTouched, setCentralTouched] = useState(false)
-  const consumeNodeRef = useRef<HTMLSelectElement | null>(null)
+  const consumeNodeRef = useRef<HTMLButtonElement | null>(null)
   const amountRef = useRef<HTMLInputElement | null>(null)
   const difficultyRef = useRef<HTMLInputElement | null>(null)
   const centralRef = useRef<HTMLTextAreaElement | null>(null)
@@ -93,91 +104,103 @@ export function TransactionRecordForm({
   return (
     <div className="record-form">
       <div className="section-title">新建交易记录</div>
-      <Field label="消费节点">
-        <select
-          ref={consumeNodeRef}
-          name="consumeNodePubkey"
-          autoComplete="off"
-          value={consumeNodePubkey}
-          onChange={(event) => setConsumeNodePubkey(event.currentTarget.value)}
-        >
-          {consumeNodes.length === 0 ? <option value="">暂无消费节点，请先添加</option> : null}
-          {consumeNodes.map((node) => (
-            <option key={node.publicKeyHex} value={node.publicKeyHex}>
-              {shortId(node.id)}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <div className="form-grid">
-        <Field label="金额">
-          <input
-            ref={amountRef}
-            name="amount"
-            autoComplete="off"
-            value={amount}
-            inputMode="numeric"
-            onChange={(event) => setAmount(event.currentTarget.value)}
-            onBlur={() => setAmountTouched(true)}
-            aria-invalid={amountTouched && amountError ? true : undefined}
-            placeholder="例如 5000…"
-          />
-          {amountTouched && amountError ? (
-            <span className="field-error" role="alert">
-              {amountError}
-            </span>
-          ) : null}
-        </Field>
-        <Field label="记录币种">
-          <select
-            name="currencyType"
-            autoComplete="off"
-            value={currencyType}
-            onChange={(event) => setCurrencyType(event.currentTarget.value)}
+      <FieldGroup>
+        <Field>
+          <FieldLabel htmlFor="record-consume-node">消费节点</FieldLabel>
+          <Select
+            name="consumeNodePubkey"
+            value={consumeNodePubkey}
+            onValueChange={setConsumeNodePubkey}
           >
-            <option value="1">CNY（分）</option>
-            <option value="0">Au（微克）</option>
-          </select>
+            <SelectTrigger ref={consumeNodeRef} id="record-consume-node" className="w-full">
+              <SelectValue placeholder="暂无消费节点，请先添加" />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              <SelectGroup>
+                {consumeNodes.map((node) => (
+                  <SelectItem key={node.publicKeyHex} value={node.publicKeyHex}>
+                    {shortId(node.id)}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </Field>
-      </div>
-      <Field label="交易难度">
-        <input
-          ref={difficultyRef}
-          name="difficultyHex"
-          autoComplete="off"
-          inputMode="text"
-          spellCheck={false}
-          value={difficultyHex}
-          onChange={(event) => setDifficultyHex(event.currentTarget.value)}
-          placeholder="例如 1d00ffff…"
-        />
-      </Field>
-      <Field label="记录中心公钥">
-        <textarea
-          ref={centralRef}
-          name="centralPubkey"
-          autoComplete="off"
-          rows={2}
-          value={centralPubkey}
-          spellCheck={false}
-          onChange={(event) => setCentralPubkey(event.currentTarget.value)}
-          onBlur={() => setCentralTouched(true)}
-          aria-invalid={centralTouched && centralError ? true : undefined}
-          placeholder="例如 02 后接 64 位 hex…"
-        />
-        {centralTouched && centralError ? (
-          <span className="field-error" role="alert">
-            {centralError}
-          </span>
-        ) : null}
-      </Field>
-      <button className="primary-button" type="button" disabled={busy} onClick={handleSubmit}>
+
+        <div className="form-grid">
+          <Field data-invalid={amountTouched && amountError ? true : undefined}>
+            <FieldLabel htmlFor="record-amount">金额</FieldLabel>
+            <Input
+              ref={amountRef}
+              id="record-amount"
+              name="amount"
+              autoComplete="off"
+              value={amount}
+              inputMode="numeric"
+              onChange={(event) => setAmount(event.currentTarget.value)}
+              onBlur={() => setAmountTouched(true)}
+              aria-invalid={amountTouched && amountError ? true : undefined}
+              placeholder="例如 5000…"
+            />
+            {amountTouched && amountError ? <FieldError>{amountError}</FieldError> : null}
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="record-currency-type">记录币种</FieldLabel>
+            <Select name="currencyType" value={currencyType} onValueChange={setCurrencyType}>
+              <SelectTrigger id="record-currency-type" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper">
+                <SelectGroup>
+                  <SelectItem value="1">CNY（分）</SelectItem>
+                  <SelectItem value="0">Au（微克）</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+
+        <Field>
+          <FieldLabel htmlFor="record-difficulty">交易难度</FieldLabel>
+          <Input
+            ref={difficultyRef}
+            id="record-difficulty"
+            name="difficultyHex"
+            autoComplete="off"
+            inputMode="text"
+            spellCheck={false}
+            value={difficultyHex}
+            onChange={(event) => setDifficultyHex(event.currentTarget.value)}
+            placeholder="例如 1d00ffff…"
+          />
+        </Field>
+
+        <Field data-invalid={centralTouched && centralError ? true : undefined}>
+          <FieldLabel htmlFor="record-central-pubkey">记录中心公钥</FieldLabel>
+          <Textarea
+            ref={centralRef}
+            id="record-central-pubkey"
+            name="centralPubkey"
+            autoComplete="off"
+            rows={2}
+            value={centralPubkey}
+            spellCheck={false}
+            onChange={(event) => setCentralPubkey(event.currentTarget.value)}
+            onBlur={() => setCentralTouched(true)}
+            aria-invalid={centralTouched && centralError ? true : undefined}
+            placeholder="例如 02 后接 64 位 hex…"
+          />
+          {centralTouched && centralError ? <FieldError>{centralError}</FieldError> : null}
+        </Field>
+      </FieldGroup>
+
+      <Button type="button" disabled={busy} onClick={handleSubmit}>
         {busy
           ? miningAttempts != null
             ? `挖矿 ${formatInteger(miningAttempts)}…`
             : '提交中…'
           : '创建记录'}
-      </button>
+      </Button>
       {status ? (
         <p className="operation-message" aria-live="polite">
           {status}

@@ -3,6 +3,7 @@ import { Search } from 'lucide-react'
 import { formatDateTime, maskSecret } from '../../lib/format'
 import type { LocalFlowNode } from '../../lib/flowNodeStorage'
 import { DetailRow } from '../DetailRow'
+import { Button } from '../ui/button'
 import { formatRegistrationStatus } from './formatRegistrationStatus'
 
 interface FlowNodeKeyDetailsProps {
@@ -38,9 +39,14 @@ export function FlowNodeKeyDetails({
         value={
           <span className="copyable-value">
             <code translate="no">{node.publicKeyHex}</code>
-            <button type="button" onClick={() => onCopy(node.publicKeyHex, '公钥')}>
+            <Button
+              variant="ghost"
+              size="xs"
+              type="button"
+              onClick={() => onCopy(node.publicKeyHex, '公钥')}
+            >
               复制
-            </button>
+            </Button>
           </span>
         }
       />
@@ -50,9 +56,14 @@ export function FlowNodeKeyDetails({
           node.registration?.id ? (
             <span className="copyable-value">
               <code translate="no">{node.registration.id}</code>
-              <button type="button" onClick={() => onCopy(node.registration?.id ?? '', '注册 ID')}>
+              <Button
+                variant="ghost"
+                size="xs"
+                type="button"
+                onClick={() => onCopy(node.registration?.id ?? '', '注册 ID')}
+              >
                 复制
-              </button>
+              </Button>
             </span>
           ) : (
             '-'
@@ -67,19 +78,19 @@ export function FlowNodeKeyDetails({
       <DetailRow label="注册状态" value={formatRegistrationStatus(node.registration?.status)} />
       <DetailRow label="授权数" value={node.authorizations.length} />
       <DetailRow label="链上状态" value={chainState} />
-      <button className="secondary-button" type="button" onClick={onQuery}>
-        <Search size={15} />
+      <Button variant="secondary" type="button" onClick={onQuery}>
+        <Search data-icon="inline-start" />
         查询此节点
-      </button>
-      <button className="secondary-button" type="button" onClick={onExportPrivateKey}>
+      </Button>
+      <Button variant="secondary" type="button" onClick={onExportPrivateKey}>
         导出私钥
-      </button>
-      <button className="secondary-button" type="button" onClick={onRename}>
+      </Button>
+      <Button variant="secondary" type="button" onClick={onRename}>
         重命名
-      </button>
-      <button className="secondary-button danger" type="button" onClick={onDelete}>
+      </Button>
+      <Button variant="destructive" type="button" onClick={onDelete}>
         删除
-      </button>
+      </Button>
     </div>
   )
 }

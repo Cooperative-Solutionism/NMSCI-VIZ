@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { TransactionRecordForm } from './TransactionRecordForm'
 
@@ -16,7 +16,7 @@ const consumeNodes = [
 ]
 
 describe('TransactionRecordForm', () => {
-  it('renders consume node choices by local node id instead of label or pubkey', () => {
+  it('renders consume node choices by local node id instead of label or pubkey', async () => {
     render(
       <TransactionRecordForm
         busy={false}
@@ -30,7 +30,13 @@ describe('TransactionRecordForm', () => {
       />,
     )
 
-    expect(screen.getByRole('option', { name: 'BRAVO-' })).toBeTruthy()
+    fireEvent.pointerDown(screen.getByRole('combobox', { name: '消费节点' }), {
+      button: 0,
+      ctrlKey: false,
+      pointerType: 'mouse',
+    })
+
+    expect(await screen.findByRole('option', { name: 'BRAVO-' })).toBeTruthy()
     expect(screen.queryByRole('option', { name: /消费节点 B|032222/ })).toBeNull()
   })
 })

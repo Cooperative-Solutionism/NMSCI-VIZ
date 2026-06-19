@@ -1,4 +1,5 @@
 import type { CanvasPosition } from '../../lib/types'
+import { Button } from '../ui/button'
 import type { ContextMenuState } from './types'
 
 interface GraphContextMenuProps {
@@ -16,7 +17,8 @@ export function GraphContextMenu({
 }: GraphContextMenuProps) {
   return (
     <div className="graph-context-menu" aria-label="添加节点" style={{ left: menu.x, top: menu.y }}>
-      <button
+      <Button
+        variant="ghost"
         type="button"
         onClick={() => {
           onAddFlowNode?.(menu.position)
@@ -24,8 +26,9 @@ export function GraphContextMenu({
         }}
       >
         添加流转节点
-      </button>
-      <button
+      </Button>
+      <Button
+        variant="ghost"
         type="button"
         onClick={() => {
           onAddConsumeNode?.(menu.position)
@@ -33,7 +36,7 @@ export function GraphContextMenu({
         }}
       >
         添加消费节点
-      </button>
+      </Button>
     </div>
   )
 }

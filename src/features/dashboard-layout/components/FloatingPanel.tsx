@@ -1,4 +1,5 @@
 import { ChevronLeft } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { useDraggable } from '../../../shared/hooks/useDraggable'
 import type { DashboardPoint } from '../dashboardLayout'
@@ -92,14 +93,16 @@ export function FloatingPanel({
         onKeyDown={handleHeaderKeyDown}
         onPointerDown={onPointerDown}
       >
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           type="button"
-          className="icon-button"
+          className="floating-panel__collapse"
           aria-label={`折叠${title}面板`}
           onClick={onCollapse}
         >
-          <ChevronLeft size={18} aria-hidden="true" />
-        </button>
+          <ChevronLeft aria-hidden="true" />
+        </Button>
         <h2 id={titleId}>{title}</h2>
       </div>
       <div className="floating-panel__body">{children}</div>

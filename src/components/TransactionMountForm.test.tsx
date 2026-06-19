@@ -42,7 +42,7 @@ const flowNodes: LocalFlowNode[] = [
 ]
 
 describe('TransactionMountForm', () => {
-  it('lets users choose which flow node receives an existing consume record mount', () => {
+  it('lets users choose which flow node receives an existing consume record mount', async () => {
     const onMount = vi.fn()
     const TestMountForm = TransactionMountForm as ComponentType<Record<string, unknown>>
 
@@ -62,18 +62,20 @@ describe('TransactionMountForm', () => {
       }),
     )
 
-    expect(screen.getByRole('option', { name: '未注册2' })).toBeTruthy()
+    fireEvent.pointerDown(screen.getByRole('combobox', { name: '挂载流转节点' }), {
+      button: 0,
+      ctrlKey: false,
+      pointerType: 'mouse',
+    })
+
+    const targetFlowNode = await screen.findByRole('option', { name: '未注册2' })
+
+    expect(targetFlowNode).toBeTruthy()
     expect(screen.queryByRole('option', { name: /BRAVO-|流转节点 B|022222/ })).toBeNull()
 
-    fireEvent.change(screen.getByLabelText('挂载流转节点'), {
-      target: { value: flowNodes[1]?.publicKeyHex },
-    })
+    fireEvent.click(targetFlowNode)
     fireEvent.click(screen.getByRole('button', { name: '提交挂载' }))
 
-    expect(onMount).toHaveBeenCalledWith(
-      records[0]?.id,
-      flowNodes[1]?.publicKeyHex,
-      '1d00ffff',
-    )
+    expect(onMount).toHaveBeenCalledWith(records[0]?.id, flowNodes[1]?.publicKeyHex, '1d00ffff')
   })
 })

@@ -3,6 +3,9 @@ import { useCallback } from 'react'
 import { useFlowNodeDirectory } from '../hooks/useFlowNodeDirectory'
 import { shortId } from '../lib/chainGraph'
 import { useUrlBooleanParam, useUrlNumberParam } from '../shared/hooks/useUrlQueryParam'
+import { Badge } from './ui/badge'
+import { Button } from './ui/button'
+import { Toggle } from './ui/toggle'
 
 const PAGE_SIZE = 10
 
@@ -45,14 +48,15 @@ export function NodeBrowser({
 
   return (
     <section className="node-browser">
-      <button
+      <Button
+        variant="outline"
         type="button"
         className="node-browser-toggle"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
         浏览节点
-      </button>
+      </Button>
       {open ? (
         <div className="node-browser-body">
           <div className="filter-chips" role="group" aria-label="节点过滤">
@@ -72,15 +76,15 @@ export function NodeBrowser({
               onToggle={() => setLocked((value) => !value)}
             />
           </div>
-          <button
-            className="secondary-button"
+          <Button
+            variant="secondary"
             type="button"
             disabled={directory.loading}
             onClick={() => browse(0)}
           >
-            <Search size={15} />
+            <Search data-icon="inline-start" />
             {directory.loading ? '加载中…' : '浏览'}
-          </button>
+          </Button>
           {directory.error ? (
             <p className="operation-message error" role="alert">
               {directory.error}
@@ -90,7 +94,8 @@ export function NodeBrowser({
             <ul className="node-browser-list">
               {directory.items.map((item) => (
                 <li key={item.id}>
-                  <button
+                  <Button
+                    variant="ghost"
                     type="button"
                     className="node-browser-row"
                     onClick={() => onPick(item.flowNodePubkey)}
@@ -99,32 +104,36 @@ export function NodeBrowser({
                       {shortId(item.id)}
                     </span>
                     <span className="node-browser-badges">
-                      {item.registered ? <em className="badge reg">注册</em> : null}
-                      {item.authorized ? <em className="badge auth">授权</em> : null}
-                      {item.locked ? <em className="badge lock">锁定</em> : null}
+                      {item.registered ? <Badge>注册</Badge> : null}
+                      {item.authorized ? <Badge variant="secondary">授权</Badge> : null}
+                      {item.locked ? <Badge variant="destructive">锁定</Badge> : null}
                     </span>
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
           ) : null}
           {directory.items.length > 0 ? (
             <div className="node-browser-pager">
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 disabled={!directory.hasPrevious || directory.loading}
                 onClick={() => browse(nodeBrowserPage - 1)}
               >
                 上一页
-              </button>
+              </Button>
               <span>第 {directory.page + 1} 页</span>
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 disabled={!directory.hasNext || directory.loading}
                 onClick={() => browse(nodeBrowserPage + 1)}
               >
                 下一页
-              </button>
+              </Button>
             </div>
           ) : null}
         </div>
@@ -143,13 +152,8 @@ function ChipToggle({
   onToggle: () => void
 }) {
   return (
-    <button
-      type="button"
-      className={`chip ${active ? 'active' : ''}`}
-      aria-pressed={active}
-      onClick={onToggle}
-    >
+    <Toggle variant="outline" size="sm" pressed={active} onPressedChange={onToggle}>
       {label}
-    </button>
+    </Toggle>
   )
 }

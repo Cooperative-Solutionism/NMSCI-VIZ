@@ -1,7 +1,9 @@
 import { BadgeCheck, RefreshCw } from 'lucide-react'
 import { formatInteger } from '../../lib/format'
-import { Field } from '../Field'
 import type { FlowNodeBusyState } from '../FlowNodeOperatePanel'
+import { Button } from '../ui/button'
+import { Field, FieldLabel } from '../ui/field'
+import { Input } from '../ui/input'
 
 interface FlowNodeRegistrationControlsProps {
   busy: FlowNodeBusyState
@@ -28,8 +30,10 @@ export function FlowNodeRegistrationControls({
   return (
     <>
       <div className="section-title">注册</div>
-      <Field label="注册难度目标">
-        <input
+      <Field>
+        <FieldLabel htmlFor="register-difficulty-target">注册难度目标</FieldLabel>
+        <Input
+          id="register-difficulty-target"
           name="registerDifficultyTarget"
           autoComplete="off"
           value={registerDifficultyTarget}
@@ -39,33 +43,28 @@ export function FlowNodeRegistrationControls({
           placeholder="例如 1d00ffff…"
         />
       </Field>
-      <button
-        className="secondary-button"
+      <Button
+        variant="secondary"
         type="button"
         disabled={busy === 'difficulty'}
         onClick={onFetchDifficulty}
       >
-        <RefreshCw size={15} />
+        <RefreshCw data-icon="inline-start" />
         {busy === 'difficulty' ? '加载中…' : '使用最新难度'}
-      </button>
+      </Button>
       {centralLocked ? (
         <p className="operation-message error" role="alert">
           中心公钥已冻结，注册和授权已禁用。
         </p>
       ) : null}
-      <button
-        className="primary-button"
-        type="button"
-        disabled={registerDisabled}
-        onClick={onRegister}
-      >
-        <BadgeCheck size={16} />
+      <Button type="button" disabled={registerDisabled} onClick={onRegister}>
+        <BadgeCheck data-icon="inline-start" />
         {busy === 'register'
           ? miningAttempts != null
             ? `挖矿 ${formatInteger(miningAttempts)}…`
             : '注册中…'
           : '注册节点'}
-      </button>
+      </Button>
     </>
   )
 }

@@ -1,6 +1,8 @@
 import { ShieldCheck } from 'lucide-react'
-import { Field } from '../Field'
 import type { FlowNodeBusyState } from '../FlowNodeOperatePanel'
+import { Button } from '../ui/button'
+import { Field, FieldLabel } from '../ui/field'
+import { Textarea } from '../ui/textarea'
 
 interface FlowNodeAuthorizationControlsProps {
   busy: FlowNodeBusyState
@@ -20,8 +22,10 @@ export function FlowNodeAuthorizationControls({
   return (
     <>
       <div className="section-title">授权中心公钥</div>
-      <Field label="中心公钥">
-        <textarea
+      <Field>
+        <FieldLabel htmlFor="authorization-central-pubkey">中心公钥</FieldLabel>
+        <Textarea
+          id="authorization-central-pubkey"
           name="authorizationCentralPubkey"
           autoComplete="off"
           rows={3}
@@ -31,15 +35,14 @@ export function FlowNodeAuthorizationControls({
           placeholder="例如 02 后接 64 位 hex…"
         />
       </Field>
-      <button
-        className="primary-button"
+      <Button
         type="button"
         disabled={centralPubkey.trim().length === 0 || busy !== null || centralLocked}
         onClick={onAuthorize}
       >
-        <ShieldCheck size={16} />
+        <ShieldCheck data-icon="inline-start" />
         {busy === 'authorize' ? '授权中…' : '授权中心'}
-      </button>
+      </Button>
     </>
   )
 }

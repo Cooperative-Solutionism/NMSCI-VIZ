@@ -24,6 +24,12 @@ function collectTsxFiles(dir = join(root, 'src')): string[] {
   })
 }
 
+function collectProductTsxFiles(): string[] {
+  return collectTsxFiles().filter(
+    (file) => !file.startsWith('src/components/ui/') && !file.startsWith('src/test/'),
+  )
+}
+
 function collectCssFiles(dir = join(root, 'src')): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name)
@@ -235,6 +241,38 @@ describe('web interface guideline regressions', () => {
     expect(queryForm).not.toContain('primary-button')
     expect(queryForm).not.toContain('secondary-button')
     expect(queryForm).not.toContain('segmented')
+  })
+
+  it('uses shadcn primitives for product controls that shadcn/ui provides', () => {
+    const productSources = collectProductTsxFiles().map((file) => [file, read(file)] as const)
+    const nativeControlPatterns = [
+      /<button[\s>]/,
+      /<input[\s>]/,
+      /<select[\s>]/,
+      /<textarea[\s>]/,
+      /<label[\s>]/,
+      /<hr[\s>]/,
+    ]
+    const legacyTokens = [
+      "from './Field'",
+      "from '../Field'",
+      "export * from './Field'",
+      'primary-button',
+      'secondary-button',
+      'ghost-button',
+      'icon-button',
+      'className="segmented',
+      '<em className="badge',
+    ]
+
+    for (const [file, source] of productSources) {
+      for (const pattern of nativeControlPatterns) {
+        expect(source, `${file} should use shadcn/ui instead of ${pattern}`).not.toMatch(pattern)
+      }
+      for (const token of legacyTokens) {
+        expect(source, `${file} should not use legacy token ${token}`).not.toContain(token)
+      }
+    }
   })
 
   it('keeps page arguments out of consume-chain query APIs', () => {
