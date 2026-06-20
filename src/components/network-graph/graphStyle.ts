@@ -122,6 +122,23 @@ export function createGraphStyle(tokens: GraphTokens): GraphStyle {
       },
     },
     {
+      selector: 'edge.cycle-highlight',
+      style: {
+        opacity: 1,
+        'line-color': '#b45309',
+        'target-arrow-color': '#b45309',
+        width: 5.5,
+        'z-index': 24,
+      },
+    },
+    {
+      selector: 'node.cycle-endpoint',
+      style: {
+        'border-color': '#b45309',
+        'border-width': 4,
+      },
+    },
+    {
       selector: 'edge:selected',
       style: {
         width: 6,

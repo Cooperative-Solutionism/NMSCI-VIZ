@@ -1,29 +1,41 @@
 import cytoscape, { type Core, type EdgeSingular, type NodeSingular } from 'cytoscape'
-import { useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { readGraphTokens } from '../../lib/tokens'
 import type { ChainGraph, ChainGraphEdge, ChainGraphNode } from '../../lib/types'
+import { cycleEndpointIds, highlightedChainsForMode } from './graphHighlight'
 import { createGraphStyle } from './graphStyle'
 import { syncGraphElements } from './graphSync'
+import type { GraphHighlightMode, GraphViewState } from './graphViewState'
 import type { ContextMenuState } from './types'
 
 interface UseCytoscapeGraphParams {
   graph: ChainGraph
   selectedId: string | null
   selectedChainIds: ReadonlySet<string>
+  cycleChainIds?: ReadonlySet<string>
+  highlightMode?: GraphHighlightMode
+  initialViewState?: GraphViewState
   onSelectNode: (node: ChainGraphNode) => void
   onSelectEdge: (edge: ChainGraphEdge) => void
   onOpenMenu: (menu: ContextMenuState) => void
   onCloseMenu: () => void
+  onViewChange?: (view: Pick<GraphViewState, 'zoom' | 'pan'>) => void
 }
+
+const emptyChainIds: ReadonlySet<string> = new Set()
 
 export function useCytoscapeGraph({
   graph,
   selectedId,
   selectedChainIds,
+  cycleChainIds = emptyChainIds,
+  highlightMode = 'related',
+  initialViewState,
   onSelectNode,
   onSelectEdge,
   onOpenMenu,
   onCloseMenu,
+  onViewChange,
 }: UseCytoscapeGraphParams) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const cyRef = useRef<Core | null>(null)
@@ -33,6 +45,8 @@ export function useCytoscapeGraph({
   const onSelectEdgeRef = useRef(onSelectEdge)
   const onOpenMenuRef = useRef(onOpenMenu)
   const onCloseMenuRef = useRef(onCloseMenu)
+  const onViewChangeRef = useRef(onViewChange)
+  const initialViewAppliedRef = useRef(false)
 
   const nodeMap = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node])), [graph.nodes])
   const edgeMap = useMemo(() => new Map(graph.edges.map((edge) => [edge.id, edge])), [graph.edges])
@@ -60,6 +74,10 @@ export function useCytoscapeGraph({
   useEffect(() => {
     onCloseMenuRef.current = onCloseMenu
   }, [onCloseMenu])
+
+  useEffect(() => {
+    onViewChangeRef.current = onViewChange
+  }, [onViewChange])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -142,22 +160,84 @@ export function useCytoscapeGraph({
 
   useEffect(() => {
     const cy = cyRef.current
+    if (!cy || !initialViewState || initialViewAppliedRef.current) return
+    initialViewAppliedRef.current = true
+    cy.zoom(initialViewState.zoom)
+    cy.pan(initialViewState.pan)
+  }, [graph.edges.length, graph.nodes.length, initialViewState])
+
+  useEffect(() => {
+    const cy = cyRef.current
+    if (!cy) return
+
+    let timeoutId: number | undefined
+    const reportView = () => {
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId)
+      timeoutId = window.setTimeout(() => {
+        onViewChangeRef.current?.({
+          zoom: cy.zoom(),
+          pan: cy.pan(),
+        })
+      }, 120)
+    }
+
+    cy.on('pan zoom', reportView)
+    return () => {
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId)
+      cy.off('pan zoom', reportView)
+    }
+  }, [])
+
+  useEffect(() => {
+    const cy = cyRef.current
     if (!cy) return
 
     cy.elements().unselect()
-    cy.edges().removeClass('chain-highlight chain-dimmed')
+    cy.edges().removeClass('chain-highlight chain-dimmed cycle-highlight')
+    cy.nodes().removeClass('cycle-endpoint')
 
-    if (selectedChainIds.size > 0) {
+    const activeChainIds = highlightedChainsForMode(
+      highlightMode,
+      selectedChainIds,
+      cycleChainIds,
+    )
+
+    if (activeChainIds.size > 0) {
       cy.edges().forEach((edge) => {
         const { chainId } = edge.data() as { chainId?: unknown }
-        const selected = typeof chainId === 'string' && selectedChainIds.has(chainId)
-        edge.toggleClass('chain-highlight', selected)
-        edge.toggleClass('chain-dimmed', !selected)
+        const highlighted = typeof chainId === 'string' && activeChainIds.has(chainId)
+        edge.toggleClass('chain-highlight', highlighted)
+        edge.toggleClass('chain-dimmed', !highlighted)
+        edge.toggleClass('cycle-highlight', highlightMode === 'cycles' && highlighted)
+      })
+    }
+
+    if (highlightMode === 'cycles') {
+      const endpointIds = cycleEndpointIds(graph.edges, cycleChainIds)
+      endpointIds.forEach((nodeId) => {
+        cy.getElementById(nodeId).addClass('cycle-endpoint')
       })
     }
 
     if (selectedId) cy.getElementById(selectedId).select()
-  }, [selectedChainIds, selectedId])
+  }, [cycleChainIds, graph.edges, highlightMode, selectedChainIds, selectedId])
 
-  return { containerRef, cyRef }
+  const focusNode = useCallback((nodeId: string) => {
+    const cy = cyRef.current
+    if (!cy) return
+    const target = cy.getElementById(nodeId)
+    if (target.empty()) return
+
+    cy.animate(
+      {
+        center: { eles: target },
+        zoom: Math.max(cy.zoom(), 1.1),
+      },
+      {
+        duration: 220,
+      },
+    )
+  }, [])
+
+  return { containerRef, cyRef, focusNode }
 }
