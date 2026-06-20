@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 import { Plus, Workflow } from 'lucide-react'
@@ -26,6 +27,12 @@ import type { ContextMenuState, NetworkGraphProps } from './network-graph/types'
 import { useCytoscapeGraph } from './network-graph/useCytoscapeGraph'
 
 const emptyCanvasPosition = { x: 0, y: 0 }
+
+interface GraphViewStateStore {
+  getSnapshot: () => GraphViewState
+  set: (next: GraphViewState) => void
+  subscribe: (listener: () => void) => () => void
+}
 
 export function NetworkGraph({
   graph,
@@ -74,19 +81,23 @@ export function NetworkGraph({
     [graph.edges],
   )
   const [savedInitialViewState] = useState<GraphViewState | null>(() => readSavedGraphViewState())
-  const initialViewState = useMemo(
-    () =>
-      savedInitialViewState
-        ? normalizeGraphViewState(savedInitialViewState, graphViewStateOptions)
-        : undefined,
-    [graphViewStateOptions, savedInitialViewState],
+  const [graphViewStateStore] = useState(() =>
+    createGraphViewStateStore(savedInitialViewState ?? normalizeGraphViewState(null)),
   )
-  const [graphViewState, setGraphViewState] = useState<GraphViewState>(() =>
-    savedInitialViewState ?? normalizeGraphViewState(null),
+  const graphViewState = useSyncExternalStore(
+    graphViewStateStore.subscribe,
+    graphViewStateStore.getSnapshot,
+    graphViewStateStore.getSnapshot,
   )
+  const controlledDeselectedRef = useRef(false)
+  const previousSelectedIdRef = useRef<string | null>(selectedId)
   const normalizedGraphViewState = useMemo(
     () => normalizeGraphViewState(graphViewState, graphViewStateOptions),
     [graphViewState, graphViewStateOptions],
+  )
+  const initialViewState = useMemo(
+    () => (savedInitialViewState ? normalizedGraphViewState : undefined),
+    [normalizedGraphViewState, savedInitialViewState],
   )
   const restoredSelectionRef = useRef<string | null>(null)
   const highlightMode: GraphHighlightMode = normalizedGraphViewState.highlightMode
@@ -94,24 +105,28 @@ export function NetworkGraph({
   const closeMenu = useCallback(() => setMenu(null), [])
   const persistGraphViewState = useCallback(
     (patch: Partial<GraphViewState>) => {
-      setGraphViewState((current) => {
-        const next = normalizeGraphViewState(
-          {
-            ...current,
-            ...patch,
-            pan: patch.pan ?? current.pan,
-            selectedId:
-              patch.selectedId !== undefined
-                ? patch.selectedId
+      const current = graphViewStateStore.getSnapshot()
+      const next = normalizeGraphViewState(
+        {
+          ...current,
+          ...patch,
+          pan: patch.pan ?? current.pan,
+          selectedId:
+            patch.selectedId !== undefined
+              ? patch.selectedId
+              : controlledDeselectedRef.current
+                ? null
                 : (controlledSelectedId ?? current.selectedId),
-          },
-          graphViewStatePersistenceOptions,
-        )
-        saveGraphViewState(next, undefined, graphViewStatePersistenceOptions)
-        return next
-      })
+        },
+        graphViewStatePersistenceOptions,
+      )
+      if (patch.selectedId !== undefined) {
+        controlledDeselectedRef.current = patch.selectedId === null
+      }
+      graphViewStateStore.set(next)
+      saveGraphViewState(next, undefined, graphViewStatePersistenceOptions)
     },
-    [controlledSelectedId, graphViewStatePersistenceOptions],
+    [controlledSelectedId, graphViewStatePersistenceOptions, graphViewStateStore],
   )
   const handleSelectNode = useCallback(
     (node: ChainGraphNode) => {
@@ -152,18 +167,66 @@ export function NetworkGraph({
       return
     }
 
+    graphViewStateStore.set(normalizedGraphViewState)
     saveGraphViewState(normalizedGraphViewState, undefined, graphViewStateOptions)
-  }, [graphViewState, graphViewStateOptions, hasGraphElements, normalizedGraphViewState])
+  }, [
+    graphViewState,
+    graphViewStateOptions,
+    graphViewStateStore,
+    hasGraphElements,
+    normalizedGraphViewState,
+  ])
 
   useEffect(() => {
-    if (!controlledSelectedId) return
+    if (!hasGraphElements) {
+      previousSelectedIdRef.current = selectedId
+      return
+    }
 
+    const previousSelectedId = previousSelectedIdRef.current
+    previousSelectedIdRef.current = selectedId
+
+    if (controlledSelectedId) {
+      controlledDeselectedRef.current = false
+      const next = normalizeGraphViewState(
+        {
+          ...normalizedGraphViewState,
+          selectedId: controlledSelectedId,
+        },
+        graphViewStateOptions,
+      )
+      if (!graphViewStatesEqual(normalizedGraphViewState, next)) {
+        graphViewStateStore.set(next)
+      }
+      saveGraphViewState(next, undefined, graphViewStateOptions)
+      return
+    }
+
+    if (selectedId !== null || !previousSelectedId || !graphElementIds.has(previousSelectedId)) {
+      return
+    }
+
+    controlledDeselectedRef.current = true
     const next = normalizeGraphViewState(
-      { ...graphViewState, selectedId: controlledSelectedId },
+      {
+        ...normalizedGraphViewState,
+        selectedId: null,
+      },
       graphViewStateOptions,
     )
+    if (!graphViewStatesEqual(normalizedGraphViewState, next)) {
+      graphViewStateStore.set(next)
+    }
     saveGraphViewState(next, undefined, graphViewStateOptions)
-  }, [controlledSelectedId, graphViewState, graphViewStateOptions])
+  }, [
+    controlledSelectedId,
+    graphElementIds,
+    graphViewStateOptions,
+    graphViewStateStore,
+    hasGraphElements,
+    normalizedGraphViewState,
+    selectedId,
+  ])
 
   useEffect(() => {
     const restoredSelectedId = initialViewState?.selectedId
@@ -407,6 +470,27 @@ function graphViewStatesEqual(left: GraphViewState, right: GraphViewState): bool
     left.selectedId === right.selectedId &&
     left.highlightMode === right.highlightMode
   )
+}
+
+function createGraphViewStateStore(initial: GraphViewState): GraphViewStateStore {
+  let current = initial
+  const listeners = new Set<() => void>()
+
+  return {
+    getSnapshot: () => current,
+    set: (next) => {
+      if (graphViewStatesEqual(current, next)) return
+
+      current = next
+      listeners.forEach((listener) => listener())
+    },
+    subscribe: (listener) => {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
+  }
 }
 
 function readSavedGraphViewState(): GraphViewState | null {

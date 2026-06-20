@@ -341,6 +341,98 @@ describe('NetworkGraph selection highlighting', () => {
     )
   })
 
+  it('keeps repaired cycle fallback after rerendering with cycle edges', () => {
+    writeSavedView({
+      zoom: 1.2,
+      pan: { x: 5, y: 6 },
+      selectedId: null,
+      highlightMode: 'cycles',
+    })
+    const graphWithoutCycles: ChainGraph = {
+      ...baseGraph,
+      edges: baseGraph.edges.map((item) => ({ ...item, status: 'open' as const })),
+    }
+
+    const { rerender } = render(
+      <NetworkGraph
+        graph={graphWithoutCycles}
+        selectedId={null}
+        onSelectEdge={vi.fn()}
+        onSelectNode={vi.fn()}
+      />,
+    )
+
+    expect(readSavedView()).toEqual({
+      zoom: 1.2,
+      pan: { x: 5, y: 6 },
+      selectedId: null,
+      highlightMode: 'related',
+    })
+
+    rerender(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId={null}
+        onSelectEdge={vi.fn()}
+        onSelectNode={vi.fn()}
+      />,
+    )
+
+    const params = latestHookParams<{
+      highlightMode?: string
+      initialViewState?: GraphViewState
+    }>()
+
+    expect(params?.highlightMode).toBe('related')
+    expect(params?.initialViewState?.highlightMode).toBe('related')
+    expect(readSavedView()).toEqual({
+      zoom: 1.2,
+      pan: { x: 5, y: 6 },
+      selectedId: null,
+      highlightMode: 'related',
+    })
+  })
+
+  it('clears persisted selection after controlled deselection before saving view changes', () => {
+    writeSavedView({
+      zoom: 1.1,
+      pan: { x: 2, y: 3 },
+      selectedId: 'node-d',
+      highlightMode: 'related',
+    })
+    const { rerender } = render(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId="node-d"
+        onSelectEdge={vi.fn()}
+        onSelectNode={vi.fn()}
+      />,
+    )
+
+    rerender(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId={null}
+        onSelectEdge={vi.fn()}
+        onSelectNode={vi.fn()}
+      />,
+    )
+
+    const params = latestHookParams<{
+      onViewChange?: (view: Pick<GraphViewState, 'zoom' | 'pan'>) => void
+    }>()
+    act(() => {
+      params?.onViewChange?.({ zoom: 1.7, pan: { x: 10, y: 20 } })
+    })
+
+    expect(readSavedView()).toEqual({
+      zoom: 1.7,
+      pan: { x: 10, y: 20 },
+      selectedId: null,
+      highlightMode: 'related',
+    })
+  })
+
   it('ignores invalid saved selection and persists cycle fallback for graphs without cycles', () => {
     writeSavedView({
       zoom: 1.2,
