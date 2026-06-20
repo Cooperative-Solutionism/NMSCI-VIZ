@@ -176,6 +176,66 @@ describe('NetworkGraph selection highlighting', () => {
     })
   })
 
+  it('keeps a saved node selection and cycle mode through an initial empty graph render', () => {
+    const savedView: GraphViewState = {
+      zoom: 1.6,
+      pan: { x: 22, y: -14 },
+      selectedId: 'node-d',
+      highlightMode: 'cycles',
+    }
+    writeSavedView(savedView)
+    const onSelectNode = vi.fn()
+    const onSelectEdge = vi.fn()
+    const emptyGraph: ChainGraph = { ...baseGraph, nodes: [], edges: [] }
+
+    const { rerender } = render(
+      <NetworkGraph
+        graph={emptyGraph}
+        selectedId={null}
+        onSelectEdge={onSelectEdge}
+        onSelectNode={onSelectNode}
+      />,
+    )
+
+    expect(readSavedView()).toEqual(savedView)
+    expect(onSelectNode).not.toHaveBeenCalled()
+    expect(onSelectEdge).not.toHaveBeenCalled()
+
+    rerender(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId={null}
+        onSelectEdge={onSelectEdge}
+        onSelectNode={onSelectNode}
+      />,
+    )
+
+    const params = latestHookParams<{
+      highlightMode?: string
+      initialViewState?: GraphViewState
+    }>()
+
+    expect(onSelectNode).toHaveBeenCalledWith(baseGraph.nodes[3])
+    expect(params?.highlightMode).toBe('cycles')
+    expect(params?.initialViewState).toEqual(savedView)
+    expect(readSavedView()).toEqual(savedView)
+  })
+
+  it('does not pass an initial view state when no graph view state is saved', () => {
+    render(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId={null}
+        onSelectEdge={vi.fn()}
+        onSelectNode={vi.fn()}
+      />,
+    )
+
+    const params = latestHookParams<{ initialViewState?: GraphViewState }>()
+
+    expect(params?.initialViewState).toBeUndefined()
+  })
+
   it('restores a saved edge selection when the edge exists in the current graph', () => {
     writeSavedView({
       zoom: 1,
@@ -242,6 +302,41 @@ describe('NetworkGraph selection highlighting', () => {
       expect.objectContaining({
         zoom: 1.8,
         pan: { x: 40, y: -10 },
+      }),
+    )
+  })
+
+  it('uses the latest controlled selected id when saving later pan and zoom changes', () => {
+    const { rerender } = render(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId={null}
+        onSelectEdge={vi.fn()}
+        onSelectNode={vi.fn()}
+      />,
+    )
+
+    rerender(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId="node-c"
+        onSelectEdge={vi.fn()}
+        onSelectNode={vi.fn()}
+      />,
+    )
+
+    const params = latestHookParams<{
+      onViewChange?: (view: Pick<GraphViewState, 'zoom' | 'pan'>) => void
+    }>()
+    act(() => {
+      params?.onViewChange?.({ zoom: 1.9, pan: { x: -8, y: 12 } })
+    })
+
+    expect(readSavedView()).toEqual(
+      expect.objectContaining({
+        zoom: 1.9,
+        pan: { x: -8, y: 12 },
+        selectedId: 'node-c',
       }),
     )
   })

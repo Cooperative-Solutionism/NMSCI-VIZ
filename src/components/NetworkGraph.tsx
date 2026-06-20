@@ -16,7 +16,7 @@ import { GraphLegend } from './network-graph/GraphLegend'
 import { GraphSearch } from './network-graph/GraphSearch'
 import { GraphTools } from './network-graph/GraphTools'
 import {
-  loadGraphViewState,
+  GRAPH_VIEW_STORAGE_KEY,
   normalizeGraphViewState,
   saveGraphViewState,
   type GraphHighlightMode,
@@ -61,6 +61,10 @@ export function NetworkGraph({
     () => ({ elementIds: graphElementIds, hasCycles }),
     [graphElementIds, hasCycles],
   )
+  const hasGraphElements = graphElementIds.size > 0
+  const graphViewStatePersistenceOptions = hasGraphElements ? graphViewStateOptions : undefined
+  const controlledSelectedId =
+    selectedId && graphElementIds.has(selectedId) ? selectedId : null
   const nodeById = useMemo(
     () => new Map(graph.nodes.map((node) => [node.id, node])),
     [graph.nodes],
@@ -69,11 +73,17 @@ export function NetworkGraph({
     () => new Map(graph.edges.map((edge) => [edge.id, edge])),
     [graph.edges],
   )
+  const [savedInitialViewState] = useState<GraphViewState | null>(() => readSavedGraphViewState())
   const initialViewState = useMemo(
-    () => loadGraphViewState(undefined, graphViewStateOptions),
-    [graphViewStateOptions],
+    () =>
+      savedInitialViewState
+        ? normalizeGraphViewState(savedInitialViewState, graphViewStateOptions)
+        : undefined,
+    [graphViewStateOptions, savedInitialViewState],
   )
-  const [graphViewState, setGraphViewState] = useState<GraphViewState>(() => initialViewState)
+  const [graphViewState, setGraphViewState] = useState<GraphViewState>(() =>
+    savedInitialViewState ?? normalizeGraphViewState(null),
+  )
   const normalizedGraphViewState = useMemo(
     () => normalizeGraphViewState(graphViewState, graphViewStateOptions),
     [graphViewState, graphViewStateOptions],
@@ -84,18 +94,24 @@ export function NetworkGraph({
   const closeMenu = useCallback(() => setMenu(null), [])
   const persistGraphViewState = useCallback(
     (patch: Partial<GraphViewState>) => {
-      setGraphViewState((current) =>
-        normalizeGraphViewState(
+      setGraphViewState((current) => {
+        const next = normalizeGraphViewState(
           {
             ...current,
             ...patch,
             pan: patch.pan ?? current.pan,
+            selectedId:
+              patch.selectedId !== undefined
+                ? patch.selectedId
+                : (controlledSelectedId ?? current.selectedId),
           },
-          graphViewStateOptions,
-        ),
-      )
+          graphViewStatePersistenceOptions,
+        )
+        saveGraphViewState(next, undefined, graphViewStatePersistenceOptions)
+        return next
+      })
     },
-    [graphViewStateOptions],
+    [controlledSelectedId, graphViewStatePersistenceOptions],
   )
   const handleSelectNode = useCallback(
     (node: ChainGraphNode) => {
@@ -132,11 +148,25 @@ export function NetworkGraph({
   })
 
   useEffect(() => {
+    if (graphViewStatesEqual(graphViewState, normalizedGraphViewState) || !hasGraphElements) {
+      return
+    }
+
     saveGraphViewState(normalizedGraphViewState, undefined, graphViewStateOptions)
-  }, [normalizedGraphViewState, graphViewStateOptions])
+  }, [graphViewState, graphViewStateOptions, hasGraphElements, normalizedGraphViewState])
 
   useEffect(() => {
-    const restoredSelectedId = initialViewState.selectedId
+    if (!controlledSelectedId) return
+
+    const next = normalizeGraphViewState(
+      { ...graphViewState, selectedId: controlledSelectedId },
+      graphViewStateOptions,
+    )
+    saveGraphViewState(next, undefined, graphViewStateOptions)
+  }, [controlledSelectedId, graphViewState, graphViewStateOptions])
+
+  useEffect(() => {
+    const restoredSelectedId = initialViewState?.selectedId
     if (
       !restoredSelectedId ||
       selectedId === restoredSelectedId ||
@@ -159,7 +189,7 @@ export function NetworkGraph({
     }
   }, [
     edgeById,
-    initialViewState.selectedId,
+    initialViewState?.selectedId,
     nodeById,
     onSelectEdge,
     onSelectNode,
@@ -367,4 +397,25 @@ function chainsForSelection(
     }
   }
   return chainIds
+}
+
+function graphViewStatesEqual(left: GraphViewState, right: GraphViewState): boolean {
+  return (
+    left.zoom === right.zoom &&
+    left.pan.x === right.pan.x &&
+    left.pan.y === right.pan.y &&
+    left.selectedId === right.selectedId &&
+    left.highlightMode === right.highlightMode
+  )
+}
+
+function readSavedGraphViewState(): GraphViewState | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const raw = window.localStorage.getItem(GRAPH_VIEW_STORAGE_KEY)
+    return raw ? normalizeGraphViewState(JSON.parse(raw)) : null
+  } catch {
+    return null
+  }
 }
