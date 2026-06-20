@@ -114,7 +114,7 @@ export function FlowNodeBrowser({
                 />
               </Field>
               <Field>
-                <FieldLabel htmlFor="flow-node-page-size">流转节点每页数量</FieldLabel>
+                <FieldLabel htmlFor="flow-node-page-size">流转节点数量</FieldLabel>
                 <Input
                   id="flow-node-page-size"
                   name="flowNodePageSize"
