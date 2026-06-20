@@ -11,20 +11,16 @@ import {
 } from './dashboardLayout'
 
 const defaultTopRowPanelPositions = [
-  { x: 132, y: 16 },
   { x: 228, y: 16 },
   { x: 324, y: 16 },
   { x: 420, y: 16 },
   { x: 516, y: 16 },
-  { x: 612, y: 16 },
 ]
 const defaultLeftRailDockPositions = [
   { x: 16, y: 84 },
   { x: 16, y: 138 },
   { x: 16, y: 192 },
   { x: 16, y: 246 },
-  { x: 16, y: 300 },
-  { x: 16, y: 354 },
 ]
 
 function fakeStorage(initial: Record<string, string> = {}): Storage {
@@ -57,8 +53,6 @@ describe('dashboard layout state', () => {
     expect(dashboardPanelIds).toEqual([
       'query',
       'details',
-      'loops',
-      'metrics',
       'system',
       'localNodes',
     ])
@@ -79,7 +73,7 @@ describe('dashboard layout state', () => {
     expect(defaultDashboardLayout.query).toEqual({
       collapsed: true,
       dockPosition: { x: 16, y: 84 },
-      panelPosition: { x: 132, y: 16 },
+      panelPosition: { x: 228, y: 16 },
     })
   })
 
@@ -87,12 +81,10 @@ describe('dashboard layout state', () => {
     const layout = normalizeDashboardLayout(undefined, { width: 1440, height: 900 })
 
     expect(dashboardPanelIds.map((panelId) => layout[panelId].panelPosition)).toEqual([
-      { x: 340, y: 16 },
       { x: 436, y: 16 },
       { x: 532, y: 16 },
       { x: 628, y: 16 },
       { x: 724, y: 16 },
-      { x: 820, y: 16 },
     ])
   })
 
@@ -119,7 +111,7 @@ describe('dashboard layout state', () => {
     expect(layout.details).toEqual({
       collapsed: true,
       dockPosition: { x: 16, y: 138 },
-      panelPosition: { x: 228, y: 16 },
+      panelPosition: { x: 324, y: 16 },
     })
   })
 
@@ -159,7 +151,7 @@ describe('dashboard layout state', () => {
     const layout = normalizeDashboardLayout(undefined, { width: 320, height: 240 })
 
     expect(layout.query.panelPosition).toEqual({ x: 0, y: 16 })
-    expect(layout.details.panelPosition).toEqual({ x: 8, y: 16 })
+    expect(layout.details.panelPosition).toEqual({ x: 13, y: 16 })
     expect(layout.localNodes.panelPosition).toEqual({ x: 40, y: 16 })
   })
 

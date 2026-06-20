@@ -17,7 +17,7 @@ describe('App initial state', () => {
     const { container } = render(<App />)
 
     expect(container.querySelector('#network-graph')).toBeTruthy()
-    expect(container.querySelectorAll('.dock-icon')).toHaveLength(6)
+    expect(container.querySelectorAll('.dock-icon')).toHaveLength(4)
     expect(container.querySelector('[role="tab"]')).toBeNull()
     expect(container.querySelector('.topbar')).toBeNull()
     expect(localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY)).toBeNull()
@@ -54,8 +54,9 @@ describe('App initial state', () => {
     expect(graphPanel).not.toContain('探索消费网络')
 
     expect(sourceExists('src/features/network-explorer/components/MetricsPanelContent.tsx')).toBe(
-      true,
+      false,
     )
+    expect(sourceExists('src/components/LoopsPanel.tsx')).toBe(false)
     expect(sourceExists('src/features/network-explorer/components/ExportPanelContent.tsx')).toBe(
       true,
     )
@@ -63,11 +64,6 @@ describe('App initial state', () => {
       true,
     )
 
-    const metricsPanel = sourceExists(
-      'src/features/network-explorer/components/MetricsPanelContent.tsx',
-    )
-      ? readSource('src/features/network-explorer/components/MetricsPanelContent.tsx')
-      : ''
     const exportPanel = sourceExists(
       'src/features/network-explorer/components/ExportPanelContent.tsx',
     )
@@ -79,9 +75,6 @@ describe('App initial state', () => {
       ? readSource('src/features/network-explorer/components/SystemPanelContent.tsx')
       : ''
 
-    expect(metricsPanel).toContain('@/components/ui/card')
-    expect(metricsPanel).toContain('CardHeader')
-    expect(metricsPanel).toContain('formatVolumeByCurrency')
     expect(exportPanel).toContain('graphEdgeCount === 0')
     expect(exportPanel).toContain('filteredRowCount === 0')
     expect(exportPanel).toContain('void onCopyCurl()')

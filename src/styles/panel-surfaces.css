@@ -116,3 +116,15 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+.export-bar {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.evidence-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}

@@ -1,5 +1,4 @@
-import { useCallback, useMemo } from 'react'
-import { extractLoops } from '../../../lib/loops'
+import { useMemo } from 'react'
 import { useCanvasSelection } from '../../../hooks/useCanvasSelection'
 import { useConsumeChainQuery } from '../../../hooks/useConsumeChainQuery'
 import { useNodeDetail } from '../../../hooks/useNodeDetail'
@@ -14,8 +13,6 @@ export function useNetworkExplorerController(apiBase: string) {
   })
   const nodeDetail = useNodeDetail(apiBase, null)
   const systemStatus = useSystemStatus(apiBase)
-  const loops = useMemo(() => extractLoops(query.filteredRows), [query.filteredRows])
-  const selectedChainId = query.selectedEdge?.chainId ?? null
   const returningFlow = useReturningFlowRate(
     apiBase,
     query.selectedNode?.id ?? query.selectedEdge?.target ?? null,
@@ -30,14 +27,6 @@ export function useNetworkExplorerController(apiBase: string) {
     [returningFlow.data, returningFlow.error, returningFlow.status],
   )
 
-  const handleSelectLoop = useCallback(
-    (chainId: string) => {
-      const edge = query.graph.edges.find((candidate) => candidate.chainId === chainId)
-      if (edge) query.selectEdge(edge)
-    },
-    [query],
-  )
-
   const inspectorEmptyMessage =
     query.origin === 'idle'
       ? '浏览消费链以探索消费网络。'
@@ -47,12 +36,9 @@ export function useNetworkExplorerController(apiBase: string) {
 
   return {
     flowRateView,
-    handleSelectLoop,
     inspectorEmptyMessage,
-    loops,
     nodeDetail,
     query,
-    selectedChainId,
     selection,
     systemStatus,
   }

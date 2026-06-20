@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import '../App.css'
 import { defaultApiBase } from './config'
-import { LoopsPanel, OperationStatusToast } from '../components'
+import { OperationStatusToast } from '../components'
 import { DashboardWorkspace } from '../features/dashboard-layout/components/DashboardWorkspace'
 import {
   dashboardPanelIcons,
@@ -20,7 +20,6 @@ import { BrowsePanel } from '../features/network-explorer/components/BrowsePanel
 import { ExportPanelContent } from '../features/network-explorer/components/ExportPanelContent'
 import { GraphPanel } from '../features/network-explorer/components/GraphPanel'
 import { InspectorPanel } from '../features/network-explorer/components/InspectorPanel'
-import { MetricsPanelContent } from '../features/network-explorer/components/MetricsPanelContent'
 import { SystemPanelContent } from '../features/network-explorer/components/SystemPanelContent'
 import { TransactionRecordDialog } from '../features/network-explorer/components/TransactionRecordDialog'
 import { TransactionMountDialog } from '../features/network-explorer/components/TransactionMountDialog'
@@ -328,24 +327,6 @@ function App() {
           selectedNode={query.selectedNode}
         />
       ),
-    },
-    {
-      id: 'loops',
-      label: '\u5faa\u73af',
-      icon: dashboardPanelIcons.loops,
-      content: (
-        <LoopsPanel
-          loops={explorer.loops}
-          onSelectLoop={explorer.handleSelectLoop}
-          selectedChainId={explorer.selectedChainId}
-        />
-      ),
-    },
-    {
-      id: 'metrics',
-      label: '\u6307\u6807',
-      icon: dashboardPanelIcons.metrics,
-      content: <MetricsPanelContent graph={query.graph} />,
     },
     {
       id: 'system',

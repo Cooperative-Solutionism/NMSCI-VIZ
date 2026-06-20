@@ -1,8 +1,6 @@
 export type DashboardPanelId =
   | 'query'
   | 'details'
-  | 'loops'
-  | 'metrics'
   | 'system'
   | 'localNodes'
 
@@ -29,8 +27,6 @@ export const DASHBOARD_LAYOUT_STORAGE_KEY = 'nmsci.dashboard.layout.v1'
 export const dashboardPanelIds: DashboardPanelId[] = [
   'query',
   'details',
-  'loops',
-  'metrics',
   'system',
   'localNodes',
 ]

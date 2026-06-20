@@ -121,9 +121,9 @@ describe('web interface guideline regressions', () => {
     expect(browsePanel).not.toContain('floating-reopen')
     expect(inspectorPanel).not.toContain('LoopsPanel')
     expect(inspectorPanel).toContain('className="inspector-panel-content"')
-    expect(app).toContain('MetricsPanelContent')
+    expect(app).not.toContain('MetricsPanelContent')
     expect(app).toContain('ExportPanelContent')
-    expect(app).toContain('LoopsPanel')
+    expect(app).not.toContain('LoopsPanel')
   })
 
   it('uses the floating dashboard shell instead of fixed page chrome', () => {
