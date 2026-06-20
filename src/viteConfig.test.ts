@@ -24,4 +24,10 @@ describe('Vite React dependency config', () => {
       expect.arrayContaining(['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime', 'react/jsx-dev-runtime']),
     )
   })
+
+  test('excludes local worktree copies from Vitest discovery', () => {
+    const config = resolveConfig()
+
+    expect(config.test?.exclude).toEqual(expect.arrayContaining(['.worktrees/**']))
+  })
 })
