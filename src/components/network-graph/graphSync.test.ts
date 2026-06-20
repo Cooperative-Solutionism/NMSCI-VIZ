@@ -1,10 +1,11 @@
 import type { Core } from 'cytoscape'
 import { describe, expect, it, vi } from 'vitest'
 import type { ChainGraphEdge, ChainGraphNode } from '../../lib/types'
+import { graphNodeIconUrls } from './graphIcons'
 import { syncGraphElements } from './graphSync'
 
 describe('syncGraphElements', () => {
-  it('maps every graph node state to a semantic PNG icon URL', () => {
+  it('maps every graph node state to a semantic inline-SVG icon URL', () => {
     const add = vi.fn()
     const cy = {
       add,
@@ -42,19 +43,19 @@ describe('syncGraphElements', () => {
     expect(add).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
-        data: expect.objectContaining({ icon: 'url("/graph-icons/node-chain.png")' }),
+        data: expect.objectContaining({ icon: graphNodeIconUrls.chain }),
       }),
     )
     expect(add).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        data: expect.objectContaining({ icon: 'url("/graph-icons/node-flow-authorized.png")' }),
+        data: expect.objectContaining({ icon: graphNodeIconUrls.flowAuthorized }),
       }),
     )
     expect(add).toHaveBeenNthCalledWith(
       3,
       expect.objectContaining({
-        data: expect.objectContaining({ icon: 'url("/graph-icons/node-local-consume.png")' }),
+        data: expect.objectContaining({ icon: graphNodeIconUrls.localConsume }),
       }),
     )
   })

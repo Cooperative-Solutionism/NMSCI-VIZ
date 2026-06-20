@@ -523,13 +523,14 @@ describe('chain graph mapping', () => {
 
   it('derives flow-node canvas status from registration and authorizations', () => {
     expect(flowNodeCanvasStatus({ id: 'a', publicKeyHex: 'pk-a' })).toBe('unregistered')
+    // 注册失败回退为“未注册”，而非独立的失败状态。
     expect(
       flowNodeCanvasStatus({
         id: 'b',
         publicKeyHex: 'pk-b',
         registration: { id: 'reg-b', status: 'failed' },
       }),
-    ).toBe('failed')
+    ).toBe('unregistered')
     expect(
       flowNodeCanvasStatus({
         id: 'c',

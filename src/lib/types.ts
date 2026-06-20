@@ -21,7 +21,8 @@ export type IdentityKind = 'id' | 'pubkey'
 export type NodeKind = 'chain' | 'local-flow' | 'local-consume'
 
 // 本地流转节点在画布上的注册/授权状态标签。
-export type FlowNodeCanvasStatus = 'unregistered' | 'registered' | 'authorized' | 'failed'
+// 后端没有“注册失败”这一节点状态：注册失败的节点回退为未注册（见 flowNodeCanvasStatus）。
+export type FlowNodeCanvasStatus = 'unregistered' | 'registered' | 'authorized'
 
 export interface CanvasPosition {
   x: number

@@ -39,14 +39,15 @@ export function createGraphStyle(tokens: GraphTokens): GraphStyle {
       },
     },
     {
+      // 选中用节点外侧描边（outline），不叠加图标、不遮挡原节点图标。
       selector: 'node:selected',
       style: {
-        'background-height': ['74%', '118%'],
-        'background-image': ['data(icon)', graphNodeIconUrls.selected],
-        'background-position-x': ['50%', '50%'],
-        'background-position-y': ['50%', '50%'],
-        'background-width': ['74%', '118%'],
         'font-weight': 700,
+        'outline-color': tokens.nodeSelectedBorder,
+        'outline-offset': 3,
+        'outline-opacity': 1,
+        'outline-style': 'solid',
+        'outline-width': 5,
         'text-background-color': tokens.nodeSelectedBackground,
         'text-background-opacity': 0.86,
         'z-index': 32,

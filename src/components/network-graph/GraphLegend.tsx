@@ -6,8 +6,7 @@ const legendItems = [
   { icon: graphNodeIconPaths.flowUnregistered, label: '流转未注册' },
   { icon: graphNodeIconPaths.flowRegistered, label: '流转已注册' },
   { icon: graphNodeIconPaths.flowAuthorized, label: '流转已授权' },
-  { icon: graphNodeIconPaths.flowFailed, label: '流转失败' },
-  { icon: graphNodeIconPaths.selected, label: '准星 = 选中' },
+  { icon: graphNodeIconPaths.selected, label: '外框 = 选中' },
   { icon: graphNodeIconPaths.cycleEndpoint, label: '循环端点' },
 ] as const
 

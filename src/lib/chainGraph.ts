@@ -188,8 +188,8 @@ export function flowNodeDisplayName(node: LocalNodeRef, index: number): string {
 }
 
 // 由本地注册/授权记录推断画布状态标签（与本地节点表格的状态列保持一致）。
+// 注册失败不是独立的画布状态：未成功注册（含失败）一律回退为“未注册”。
 export function flowNodeCanvasStatus(node: LocalNodeRef): FlowNodeCanvasStatus {
-  if (node.registration?.status === 'failed') return 'failed'
   if (node.registration?.status === 'sent') {
     return node.authorizations?.some((authorization) => authorization.status === 'sent')
       ? 'authorized'
@@ -202,7 +202,6 @@ export const flowNodeStatusLabels: Record<FlowNodeCanvasStatus, string> = {
   unregistered: '未注册',
   registered: '已注册',
   authorized: '已授权',
-  failed: '注册失败',
 }
 
 // Local nodes can match chain nodes by pubkey or by a backend node id, such as a flow

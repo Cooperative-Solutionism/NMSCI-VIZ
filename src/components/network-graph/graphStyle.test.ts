@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { graphTokenDefaults } from '../../lib/tokens'
+import { graphNodeIconUrls } from './graphIcons'
 import { createGraphStyle } from './graphStyle'
 
 type StyleRule = { selector: string; style: Record<string, unknown> }
@@ -16,7 +17,7 @@ function selectors() {
 }
 
 describe('createGraphStyle', () => {
-  it('distinguishes node state with PNG icon layers instead of native shapes or line styles', () => {
+  it('distinguishes node state with inline-SVG icon layers instead of native shapes or line styles', () => {
     expect(rule('node')).toEqual(
       expect.objectContaining({
         'background-image': 'data(icon)',
@@ -37,20 +38,21 @@ describe('createGraphStyle', () => {
     )
 
     const selected = rule('node:selected')
+    // 选中用节点外侧描边（outline），不叠加图标层、不改底色或边框，避免遮挡原节点图标。
     expect(selected).toEqual(
       expect.objectContaining({
-        'background-image': ['data(icon)', 'url("/graph-icons/node-selected.png")'],
+        'outline-color': graphTokenDefaults.nodeSelectedBorder,
+        'outline-opacity': 1,
+        'outline-width': 5,
       }),
     )
+    expect(selected).not.toHaveProperty('background-image')
     expect(selected).not.toHaveProperty('border-color')
     expect(selected).not.toHaveProperty('background-color')
 
     expect(rule('node.cycle-endpoint')).toEqual(
       expect.objectContaining({
-        'background-image': [
-          'data(icon)',
-          'url("/graph-icons/node-cycle-endpoint.png")',
-        ],
+        'background-image': ['data(icon)', graphNodeIconUrls.cycleEndpoint],
       }),
     )
   })
