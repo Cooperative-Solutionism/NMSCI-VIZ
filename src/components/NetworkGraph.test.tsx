@@ -72,12 +72,9 @@ describe('NetworkGraph selection highlighting', () => {
     expect(screen.getByText('选中 NODE-B')).toBeInTheDocument()
   })
 
-  it('offers direct add actions on an empty canvas', () => {
+  it('does not render an empty-canvas prompt block', () => {
     const onAddFlowNode = vi.fn()
     const onAddConsumeNode = vi.fn()
-    hookMocks.cyRef.current = {
-      extent: () => ({ x1: -120, y1: 40, x2: 520, y2: 360 }),
-    }
 
     render(
       <NetworkGraph
@@ -90,12 +87,12 @@ describe('NetworkGraph selection highlighting', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: '添加流转节点' }))
-    fireEvent.click(screen.getByRole('button', { name: '添加消费节点' }))
-
-    expect(screen.getByText('空白交易画布')).toBeInTheDocument()
-    expect(onAddFlowNode).toHaveBeenCalledWith({ x: 200, y: 200 })
-    expect(onAddConsumeNode).toHaveBeenCalledWith({ x: 200, y: 200 })
+    expect(screen.queryByLabelText('空画布')).not.toBeInTheDocument()
+    expect(screen.queryByText('空白交易画布')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '添加流转节点' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '添加消费节点' })).not.toBeInTheDocument()
+    expect(onAddFlowNode).not.toHaveBeenCalled()
+    expect(onAddConsumeNode).not.toHaveBeenCalled()
   })
 
   it('syncs a newly added selected local node without recursively updating the view store', () => {

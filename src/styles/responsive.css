@@ -12,7 +12,6 @@
     max-width: calc(100vw - 104px);
   }
 }
-
 @media (max-width: 520px) {
   .floating-panel__body {
     padding: 12px;
@@ -81,23 +80,8 @@
     border-bottom: 1px solid rgb(217 222 232 / 0.9);
   }
 
-  .graph-empty-state {
-    width: calc(100vw - 32px);
-    padding: 18px;
-  }
-
-  .graph-empty-state__actions {
-    width: 100%;
-  }
-
-  .graph-empty-state__actions button {
-    flex: 1 1 100%;
-  }
-
   .detail-row {
     grid-template-columns: 1fr;
     gap: 4px;
   }
 }
-
-/* 循环交易（Loops）面板 */

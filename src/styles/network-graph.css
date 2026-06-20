@@ -97,63 +97,6 @@
   white-space: nowrap;
 }
 
-.graph-empty-state {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  z-index: 11;
-  display: flex;
-  transform: translate(-50%, -50%);
-  align-items: center;
-  flex-direction: column;
-  gap: 14px;
-  width: min(360px, calc(100vw - 48px));
-  border: 1px solid rgb(198 207 220 / 0.78);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(18px) saturate(150%);
-  -webkit-backdrop-filter: blur(18px) saturate(150%);
-  box-shadow: 0 24px 72px -36px rgba(30, 42, 62, 0.5);
-  padding: 22px;
-  text-align: center;
-}
-
-.graph-empty-state__mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 42px;
-  border: 1px solid rgb(var(--teal-rgb) / 0.2);
-  border-radius: 8px;
-  background: var(--teal-soft);
-  color: var(--teal);
-}
-
-.graph-empty-state__mark svg {
-  width: 22px;
-  height: 22px;
-}
-
-.graph-empty-state h2 {
-  margin: 0;
-  color: var(--text);
-  font-size: 17px;
-  font-weight: 820;
-  line-height: 1.2;
-}
-
-.graph-empty-state__actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-}
-
-.graph-empty-state__actions button {
-  min-width: 132px;
-}
-
 .graph-tools {
   position: absolute;
   top: 16px;

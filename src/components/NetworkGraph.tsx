@@ -7,10 +7,9 @@ import {
   useSyncExternalStore,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
-import { Plus, Workflow } from 'lucide-react'
+import { Workflow } from 'lucide-react'
 import { shortId } from '../lib/chainGraph'
 import type { ChainGraphEdge, ChainGraphNode } from '../lib/types'
-import { Button } from './ui/button'
 import { GraphAccessList } from './network-graph/GraphAccessList'
 import { GraphContextMenu } from './network-graph/GraphContextMenu'
 import { GraphLegend } from './network-graph/GraphLegend'
@@ -25,8 +24,6 @@ import {
 } from './network-graph/graphViewState'
 import type { ContextMenuState, NetworkGraphProps } from './network-graph/types'
 import { useCytoscapeGraph } from './network-graph/useCytoscapeGraph'
-
-const emptyCanvasPosition = { x: 0, y: 0 }
 
 interface GraphViewStateStore {
   getSnapshot: () => GraphViewState
@@ -294,17 +291,6 @@ export function NetworkGraph({
     [focusNode, handleSelectNode],
   )
 
-  const currentCanvasCenter = useCallback(() => {
-    const cy = cyRef.current
-    if (!cy) return emptyCanvasPosition
-
-    const extent = cy.extent()
-    return {
-      x: (extent.x1 + extent.x2) / 2,
-      y: (extent.y1 + extent.y2) / 2,
-    }
-  }, [cyRef])
-
   const handleHighlightModeChange = useCallback(
     (mode: GraphHighlightMode) => {
       persistGraphViewState({ highlightMode: mode })
@@ -397,33 +383,6 @@ export function NetworkGraph({
       />
       {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
       <GraphSearch nodes={graph.nodes} onSelectNode={handleSearchSelect} />
-
-      {graph.nodes.length === 0 ? (
-        <div className="graph-empty-state" aria-label="空画布">
-          <div className="graph-empty-state__mark">
-            <Workflow aria-hidden="true" />
-          </div>
-          <h2>空白交易画布</h2>
-          <div className="graph-empty-state__actions">
-            <Button
-              type="button"
-              variant="default"
-              onClick={() => onAddFlowNode?.(currentCanvasCenter())}
-            >
-              <Plus aria-hidden="true" />
-              添加流转节点
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => onAddConsumeNode?.(currentCanvasCenter())}
-            >
-              <Plus aria-hidden="true" />
-              添加消费节点
-            </Button>
-          </div>
-        </div>
-      ) : null}
 
       {menu ? (
         <GraphContextMenu
