@@ -35,18 +35,50 @@
     gap: 7px;
   }
 
+  .graph-statusbar,
+  .graph-search,
+  .graph-tools {
+    position: relative;
+    top: auto;
+    right: auto;
+    left: auto;
+  }
+
   .graph-statusbar {
     align-items: flex-start;
     flex-direction: column;
     gap: 6px;
-    max-width: calc(100vw - 24px);
+    width: auto;
+    max-width: none;
+    margin: 12px 12px 0;
+  }
+
+  .graph-statusbar__meta {
+    justify-content: flex-start;
+  }
+
+  .graph-search {
+    width: auto;
+    margin: 0 12px;
+    margin-top: 8px;
   }
 
   .graph-tools {
-    top: 116px;
-    right: 12px;
     bottom: auto;
+    align-items: center;
     flex-direction: column;
+    width: max-content;
+    margin: 0 12px 0 auto;
+    margin-top: 8px;
+  }
+
+  .graph-tools__mode {
+    margin-right: 0;
+    margin-bottom: 4px;
+    padding-right: 0;
+    padding-bottom: 4px;
+    border-right: 0;
+    border-bottom: 1px solid rgb(217 222 232 / 0.9);
   }
 
   .graph-empty-state {

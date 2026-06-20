@@ -1,4 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ChainGraph } from '../lib/types'
 import { NetworkGraph } from './NetworkGraph'
@@ -174,6 +176,20 @@ describe('NetworkGraph selection highlighting', () => {
 
     expect(screen.getByText('选中 NODE-1')).toBeInTheDocument()
     expect(screen.getByText('节点较多，建议使用搜索定位')).toBeInTheDocument()
+  })
+
+  it('stacks graph overlays in the narrow viewport responsive rules', () => {
+    const css = readFileSync(join(process.cwd(), 'src/styles/responsive.css'), 'utf8')
+    const mobileCss = css.slice(css.indexOf('@media (max-width: 520px)'))
+
+    expect(mobileCss).toMatch(
+      /\.graph-statusbar,\s*\.graph-search,\s*\.graph-tools\s*\{[^}]*position:\s*relative;/s,
+    )
+    expect(mobileCss).toMatch(
+      /\.graph-statusbar,\s*\.graph-search,\s*\.graph-tools\s*\{[^}]*top:\s*auto;/s,
+    )
+    expect(mobileCss).toMatch(/\.graph-search\s*\{[^}]*margin-top:\s*8px;/s)
+    expect(mobileCss).toMatch(/\.graph-tools\s*\{[^}]*width:\s*max-content;/s)
   })
 })
 
