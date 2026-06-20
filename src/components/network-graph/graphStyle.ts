@@ -1,4 +1,5 @@
 import type { GraphTokens } from '../../lib/tokens'
+import { graphNodeIconUrls } from './graphIcons'
 
 type GraphStyle = NonNullable<cytoscape.CytoscapeOptions['style']>
 
@@ -10,64 +11,45 @@ export function createGraphStyle(tokens: GraphTokens): GraphStyle {
     {
       selector: 'node',
       style: {
+        'background-clip': 'none',
         'background-color': tokens.nodeBackground,
+        'background-fit': 'contain',
+        'background-height': '74%',
+        'background-image': 'data(icon)',
+        'background-image-containment': 'over',
+        'background-image-smoothing': 'yes',
+        'background-width': '74%',
         'border-color': tokens.nodeBorder,
         'border-width': 1.4,
+        'bounds-expansion': 16,
         color: tokens.nodeText,
         content: 'data(label)',
         'font-family': graphFontFamily,
         'font-size': 11,
-        height: 48,
+        height: 58,
         'overlay-opacity': 0,
+        'outline-opacity': 0,
+        'outline-width': 0,
         'text-halign': 'center',
-        'text-valign': 'center',
-        'text-wrap': 'wrap',
+        'text-margin-y': 8,
         'text-max-width': '76px',
-        width: 48,
-      },
-    },
-    {
-      selector: 'node[kind = "local-flow"]',
-      style: {
-        'background-color': tokens.localFlowBackground,
-        'border-color': tokens.localFlowBorder,
-        'border-width': 3,
-      },
-    },
-    // 注册/授权状态以边框颜色作为画布标签：已授权=琥珀，已注册=绿，注册失败=红，未注册沿用默认描边。
-    {
-      selector: 'node[flowStatus = "registered"]',
-      style: {
-        'border-color': '#15803d',
-      },
-    },
-    {
-      selector: 'node[flowStatus = "authorized"]',
-      style: {
-        'border-color': '#b45309',
-      },
-    },
-    {
-      selector: 'node[flowStatus = "failed"]',
-      style: {
-        'border-color': '#b91c1c',
-      },
-    },
-    {
-      selector: 'node[kind = "local-consume"]',
-      style: {
-        'background-color': tokens.localConsumeBackground,
-        'border-color': tokens.localConsumeBorder,
-        'border-width': 3,
-        shape: 'round-rectangle',
+        'text-valign': 'bottom',
+        'text-wrap': 'wrap',
+        width: 58,
       },
     },
     {
       selector: 'node:selected',
       style: {
-        'background-color': tokens.nodeSelectedBackground,
-        'border-color': tokens.nodeSelectedBorder,
-        'border-width': 3,
+        'background-height': ['74%', '118%'],
+        'background-image': ['data(icon)', graphNodeIconUrls.selected],
+        'background-position-x': ['50%', '50%'],
+        'background-position-y': ['50%', '50%'],
+        'background-width': ['74%', '118%'],
+        'font-weight': 700,
+        'text-background-color': tokens.nodeSelectedBackground,
+        'text-background-opacity': 0.86,
+        'z-index': 32,
       },
     },
     {
@@ -134,8 +116,11 @@ export function createGraphStyle(tokens: GraphTokens): GraphStyle {
     {
       selector: 'node.cycle-endpoint',
       style: {
-        'border-color': '#b45309',
-        'border-width': 4,
+        'background-height': ['74%', '112%'],
+        'background-image': ['data(icon)', graphNodeIconUrls.cycleEndpoint],
+        'background-position-x': ['50%', '50%'],
+        'background-position-y': ['50%', '50%'],
+        'background-width': ['74%', '112%'],
       },
     },
     {
