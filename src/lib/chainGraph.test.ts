@@ -9,6 +9,7 @@ import {
   formatVolumeByCurrency,
   mergeConsumeChains,
   mergeLocalNodes,
+  refreshConsumeChains,
   shortId,
 } from './chainGraph'
 import { queryNodeId } from '../test/appFixtures'
@@ -694,5 +695,25 @@ describe('chain graph mapping', () => {
 
     expect(merged.map((row) => row.consumeChain.id)).toEqual(['chain-a', 'chain-b', 'chain-c'])
     expect(merged[0]!.consumeChain.amount).toBe(12500n)
+  })
+
+  it('refreshes consume chains by replacing matching chain id rows', () => {
+    const refreshed = normalizeConsumeChainResponseDTO({
+      ...rawChainRows[0]!,
+      consumeChain: {
+        ...rawChainRows[0]!.consumeChain,
+        amount: 999999,
+      },
+      consumeChainEdges: rawChainRows[0]!.consumeChainEdges.map((edge) => ({
+        ...edge,
+        id: 'edge-a-refreshed',
+      })),
+    })
+
+    const refreshedRows = refreshConsumeChains(chainRows, [refreshed])
+
+    expect(refreshedRows.map((row) => row.consumeChain.id)).toEqual(['chain-a', 'chain-b'])
+    expect(refreshedRows[0]!.consumeChain.amount).toBe(999999n)
+    expect(refreshedRows[0]!.consumeChainEdges[0]!.id).toBe('edge-a-refreshed')
   })
 })

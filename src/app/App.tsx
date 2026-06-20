@@ -31,7 +31,7 @@ function App() {
   const apiBase = defaultApiBase
   const explorer = useNetworkExplorerController(apiBase)
   const { flowRateView, nodeDetail, query, selection, systemStatus } = explorer
-  const { extendFromNode } = query
+  const { extendFromNode, refreshFromNodeIds } = query
   const keyring = useLocalKeyringController({
     clearSelectedLocalNode: selection.clearSelectedLocalNode,
   })
@@ -72,23 +72,26 @@ function App() {
       ) ?? null,
     [keyring.localConsumeNodes, selection.selectedLocalId],
   )
+  // 合并本地节点与消费链：链中命中本地 pubkey 的节点原地升级为本地节点（同一节点，不另画）；
+  // 零散本地节点仅当显式“添加到画布”（canvasNodeIds）时追加。
+  const canvasGraph = useMemo(
+    () =>
+      mergeLocalNodes(
+        query.graph,
+        keyring.localFlowNodes,
+        keyring.localConsumeNodes,
+        canvasNodeIds,
+      ),
+    [canvasNodeIds, keyring.localConsumeNodes, keyring.localFlowNodes, query.graph],
+  )
   const loadMountedConsumeChain = useCallback(
     async (nodePubkey: string) => {
-      const localNode = keyring.localFlowNodes.find((node) => node.publicKeyHex === nodePubkey)
-
-      await extendFromNode(
-        {
-          id: nodePubkey,
-          label: localNode?.label ?? nodePubkey,
-          chainCount: 0,
-          volumeByCurrency: new Map<number, bigint>(),
-          kind: 'local-flow',
-          position: localNode?.position,
-        },
-        'node',
+      await refreshFromNodeIds(
+        canvasGraph.nodes.map((node) => node.id),
+        nodePubkey,
       )
     },
-    [extendFromNode, keyring.localFlowNodes],
+    [canvasGraph.nodes, refreshFromNodeIds],
   )
   const { localNodeState, registration } = useRegistrationController({
     apiBase,
@@ -225,23 +228,11 @@ function App() {
   // 右键加载消费链：以该节点为端点查询并并入当前画布（mergeConsumeChains 去重累积，实现延展）。
   const handleLoadChain = useCallback(
     (node: ChainGraphNode, mode: QueryMode) => {
-      void query.extendFromNode(node, mode)
+      void extendFromNode(node, mode)
     },
-    [query],
+    [extendFromNode],
   )
 
-  // 合并本地节点与消费链：链中命中本地 pubkey 的节点原地升级为本地节点（同一节点，不另画）；
-  // 零散本地节点仅当显式“添加到画布”（canvasNodeIds）时追加。
-  const canvasGraph = useMemo(
-    () =>
-      mergeLocalNodes(
-        query.graph,
-        keyring.localFlowNodes,
-        keyring.localConsumeNodes,
-        canvasNodeIds,
-      ),
-    [canvasNodeIds, keyring.localConsumeNodes, keyring.localFlowNodes, query.graph],
-  )
   const politeMessage =
     registration.status ??
     (query.origin === 'backend' ? `浏览完成：当前可见 ${query.filteredRows.length} 行。` : '')
@@ -284,7 +275,7 @@ function App() {
         <InspectorPanel
           apiBase={apiBase}
           effectiveSelection={query.effectiveSelection}
-          extendFromNode={query.extendFromNode}
+          extendFromNode={extendFromNode}
           extendLoading={query.extendLoading}
           flowRateView={flowRateView}
           inspectorEmptyMessage={explorer.inspectorEmptyMessage}

@@ -97,6 +97,20 @@ export function mergeConsumeChains(
   return Array.from(rowsByChainId.values())
 }
 
+export function refreshConsumeChains(
+  currentRows: ConsumeChainResponseDTO[],
+  nextRows: ConsumeChainResponseDTO[],
+): ConsumeChainResponseDTO[] {
+  const rowsByChainId = new Map<string, ConsumeChainResponseDTO>()
+  for (const row of currentRows) {
+    rowsByChainId.set(row.consumeChain.id, row)
+  }
+  for (const row of nextRows) {
+    rowsByChainId.set(row.consumeChain.id, row)
+  }
+  return Array.from(rowsByChainId.values())
+}
+
 export function formatAmount(amount: number | bigint, currencyType: number): string {
   const normalizedAmount = typeof amount === 'bigint' ? amount : BigInt(Math.trunc(amount))
   if (currencyType === 1) {

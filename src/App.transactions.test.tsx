@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   chainRow,
   graphNodeAId,
+  graphNodeBId,
   graphNodeCId,
   installAppTestLifecycle,
   jsonResponse,
@@ -28,6 +29,20 @@ function latestBlock() {
       centralPubkey,
     },
   }
+}
+
+function refreshedExistingChainRow() {
+  const row = chainRow('chain-existing', 1, generatedConsumePubkey, graphNodeBId)
+  row.consumeChain.amount = 2400
+  row.consumeChain.tailMountTimestamp = 1_700_000_000_000_100
+  row.consumeChainEdges = row.consumeChainEdges.map((edge) => ({
+    ...edge,
+    id: 'chain-existing-refreshed-edge',
+    amount: 2400,
+    target: graphNodeBId,
+    relatedTransactionMountTimestamp: 1_700_000_000_000_101,
+  }))
+  return row
 }
 
 describe('App initial state', () => {
@@ -76,7 +91,7 @@ describe('App initial state', () => {
     expect(recordPost).toBeTruthy()
   })
 
-  it('mounts a created record and views the resulting consume chain by pubkey', async () => {
+  it('mounts a created record and refreshes every visible consume chain by node identifier', async () => {
     const fetchMock = stubFetchByUrl((url, init) => {
       if (url.pathname === '/blocks/latest') {
         return jsonResponse(latestBlock())
@@ -101,6 +116,12 @@ describe('App initial state', () => {
             sliceResponse([chainRow('chain-existing', 1, generatedConsumePubkey, graphNodeAId)]),
           )
         }
+        if (url.searchParams.get('nodePubkey') === generatedConsumePubkey) {
+          return jsonResponse(sliceResponse([refreshedExistingChainRow()]))
+        }
+        if (url.searchParams.get('nodeId') === graphNodeAId) {
+          return jsonResponse(sliceResponse([refreshedExistingChainRow()]))
+        }
         if (url.searchParams.get('nodePubkey') === generatedFlowPubkey) {
           return jsonResponse(
             sliceResponse([chainRow('chain-mounted', 1, generatedFlowPubkey, graphNodeCId)]),
@@ -120,6 +141,7 @@ describe('App initial state', () => {
       }),
     )
     await screen.findByRole('button', { name: `Select node ${graphNodeAId}` })
+    await screen.findByRole('button', { name: 'Select edge chain-existing-edge' })
 
     // create a record first
     fireEvent.click(
@@ -153,31 +175,25 @@ describe('App initial state', () => {
       ).toBe(true)
     })
 
-    // view the resulting consume chain — queries by pubkey
+    const callsBeforeView = fetchMock.mock.calls.length
+
+    // view the resulting consume chain: refresh every visible node, not only the mounted node
     fireEvent.click(await screen.findByRole('button', { name: /查看消费链/ }))
-    expect(
-      fetchMock.mock.calls.some(([input]) => {
-        const url = new URL(requestInputUrl(input), 'http://localhost')
-        return (
-          url.pathname.includes('/consume-chains') &&
-          url.searchParams.get('nodePubkey') === generatedFlowPubkey
-        )
-      }),
-    ).toBe(false)
     await waitFor(() => {
-      const chainCall = fetchMock.mock.calls.find(([input]) => {
-        const url = new URL(requestInputUrl(input), 'http://localhost')
-        return (
-          url.pathname.includes('/consume-chains') &&
-          url.searchParams.get('nodePubkey') === generatedFlowPubkey
-        )
-      })
-      expect(chainCall).toBeTruthy()
-      expect(screen.getByRole('button', { name: `Select node ${graphNodeAId}` })).toBeTruthy()
+      const postViewNodePubkeys = fetchMock.mock.calls
+        .slice(callsBeforeView)
+        .map(([input]) => new URL(requestInputUrl(input), 'http://localhost'))
+        .filter((url) => url.pathname.includes('/consume-chains'))
+        .map((url) => url.searchParams.get('nodePubkey') ?? url.searchParams.get('nodeId'))
+      expect(postViewNodePubkeys).toContain(generatedConsumePubkey)
+      expect(postViewNodePubkeys).toContain(graphNodeAId)
+      expect(postViewNodePubkeys).toContain(generatedFlowPubkey)
+      expect(screen.getByRole('button', { name: `Select node ${graphNodeBId}` })).toBeTruthy()
       expect(screen.getByRole('button', { name: `Select node ${graphNodeCId}` })).toBeTruthy()
       expect(
-        new URL(requestInputUrl(chainCall![0]), 'http://localhost').searchParams.get('nodePubkey'),
-      ).toBe(generatedFlowPubkey)
+        screen.getByRole('button', { name: 'Select edge chain-existing-refreshed-edge' }),
+      ).toBeTruthy()
     })
+    expect(screen.queryByRole('button', { name: 'Select edge chain-existing-edge' })).toBeNull()
   })
 })

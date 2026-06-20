@@ -1,13 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useId, useState } from 'react'
+import { XIcon } from 'lucide-react'
 import { Button } from '../../../components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../../../components/ui/dialog'
 import { Field, FieldGroup, FieldLabel } from '../../../components/ui/field'
 import { flowNodeDisplayName, formatAmount, shortId } from '../../../lib/chainGraph'
 import type { LocalFlowNode } from '../../../lib/flowNodeStorage'
@@ -136,7 +129,7 @@ function MountDialogBody({
         </p>
       ) : null}
 
-      <DialogFooter>
+      <div className="-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end">
         {canViewChain ? (
           <Button variant="secondary" type="button" onClick={onViewChain}>
             查看消费链
@@ -149,7 +142,7 @@ function MountDialogBody({
               : '提交中…'
             : '提交挂载'}
         </Button>
-      </DialogFooter>
+      </div>
     </>
   )
 }
@@ -162,17 +155,56 @@ export function TransactionMountDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
+  const titleId = useId()
+  const descriptionId = useId()
+
+  useEffect(() => {
+    if (!open) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onOpenChange(false)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onOpenChange, open])
+
+  if (!open) return null
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent aria-describedby={undefined}>
-        <DialogHeader>
-          <DialogTitle>挂载消费记录</DialogTitle>
-          <DialogDescription>
+    <>
+      <Button
+        type="button"
+        variant="ghost"
+        aria-label="关闭挂载消费记录"
+        className="fixed inset-0 isolate z-50 h-auto w-auto cursor-default rounded-none bg-black/10 p-0 hover:bg-black/10"
+        onClick={() => onOpenChange(false)}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        className="fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 outline-none sm:max-w-sm"
+      >
+        <div className="flex flex-col gap-2">
+          <h2 id={titleId} className="font-heading text-base leading-none font-medium">
+            挂载消费记录
+          </h2>
+          <p id={descriptionId} className="text-sm text-muted-foreground">
             将已创建的消费记录挂载到流转节点，形成消费链。难度目标自动取自最新区块。
-          </DialogDescription>
-        </DialogHeader>
+          </p>
+        </div>
         <MountDialogBody {...body} />
-      </DialogContent>
-    </Dialog>
+        <Button
+          variant="ghost"
+          className="absolute top-2 right-2"
+          size="icon-sm"
+          type="button"
+          onClick={() => onOpenChange(false)}
+        >
+          <XIcon />
+          <span className="sr-only">关闭</span>
+        </Button>
+      </div>
+    </>
   )
 }

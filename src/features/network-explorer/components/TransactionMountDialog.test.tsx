@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { StrictMode } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { StrictMode, useState } from 'react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TransactionMountDialog } from './TransactionMountDialog'
 import type { LocalFlowNode } from '../../../lib/flowNodeStorage'
 import type { LocalTxRecord } from '../../../lib/txRecordStorage'
@@ -54,6 +54,8 @@ const records: LocalTxRecord[] = [
   },
 ]
 
+afterEach(cleanup)
+
 describe('TransactionMountDialog', () => {
   it('submits the selected record and flow node from non-Radix choice controls under StrictMode', () => {
     const onMount = vi.fn()
@@ -80,5 +82,43 @@ describe('TransactionMountDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: /^提交挂载$/ }))
 
     expect(onMount).toHaveBeenCalledWith(records[1]!.id, flowNodeB.publicKeyHex)
+  })
+
+  it('closes from the view-chain action without a recursive Radix focus update', () => {
+    const onViewChain = vi.fn()
+
+    function Harness() {
+      const [open, setOpen] = useState(true)
+
+      return (
+        <TransactionMountDialog
+          open={open}
+          busy={false}
+          canViewChain
+          error={null}
+          flowNodes={flowNodes}
+          miningAttempts={null}
+          records={records}
+          status="交易已挂载"
+          onMount={vi.fn()}
+          onOpenChange={setOpen}
+          onViewChain={() => {
+            setOpen(false)
+            onViewChain()
+          }}
+        />
+      )
+    }
+
+    render(
+      <StrictMode>
+        <Harness />
+      </StrictMode>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /查看消费链/ }))
+
+    expect(onViewChain).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 })

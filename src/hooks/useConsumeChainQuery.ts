@@ -5,6 +5,7 @@ import {
   buildConsumeChainUrl,
   buildGraphFromConsumeChains,
   mergeConsumeChains,
+  refreshConsumeChains,
 } from '../lib/chainGraph'
 import { consumeChainFilters } from '../lib/consumeChainFilters'
 import { errorMessage } from '../lib/errors'
@@ -218,6 +219,63 @@ export function useConsumeChainQuery(apiBase: string) {
     [client, loopStatus, queryPageSize],
   )
 
+  const refreshFromNodeIds = useCallback(
+    async (nodeIds: readonly string[], selectedNodeId?: string) => {
+      const uniqueNodeIds = Array.from(
+        new Set(nodeIds.map((id) => id.trim()).filter((id) => id.length > 0)),
+      )
+      const selectedId = selectedNodeId?.trim()
+      if (selectedId && !uniqueNodeIds.includes(selectedId)) {
+        uniqueNodeIds.push(selectedId)
+      }
+      if (uniqueNodeIds.length === 0) return
+
+      const generation = graphRequestGenerationRef.current + 1
+      graphRequestGenerationRef.current = generation
+      const graphResetGeneration = graphResetGenerationRef.current
+      setLoading(true)
+      setExtendLoading('node')
+      setError(null)
+      if (selectedId) setSelection({ kind: 'node', id: selectedId })
+
+      try {
+        const results = await Promise.all(
+          uniqueNodeIds.map((id) =>
+            queryConsumeChains(client, consumeChainFilters('node', id, loopStatus), {
+              page: defaultConsumeChainPage,
+              size: queryPageSize,
+            }),
+          ),
+        )
+        if (graphResetGeneration !== graphResetGenerationRef.current) return
+
+        const refreshedRows: ConsumeChainResponseDTO[] = []
+        let skippedCount = 0
+        for (const result of results) {
+          const { content, skipped } = normalizeRowsSafely(result.data.content)
+          refreshedRows.push(...content)
+          skippedCount += skipped
+        }
+
+        setRows((currentRows) => refreshConsumeChains(currentRows, refreshedRows))
+        if (generation === graphRequestGenerationRef.current) {
+          setOrigin('backend')
+          setExtended(true)
+          setWarning(skipWarning(skippedCount))
+        }
+      } catch (queryError) {
+        if (generation !== graphRequestGenerationRef.current) return
+        setError(errorMessage(queryError, '未知请求错误'))
+      } finally {
+        if (generation === graphRequestGenerationRef.current) {
+          setLoading(false)
+          setExtendLoading(null)
+        }
+      }
+    },
+    [client, loopStatus, queryPageSize],
+  )
+
   const selectEdge = useCallback((edge: ChainGraphEdge) => {
     setSelection({ kind: 'edge', id: edge.id })
   }, [])
@@ -243,6 +301,7 @@ export function useConsumeChainQuery(apiBase: string) {
     page: queryPage,
     pageSize: queryPageSize,
     requestUrl,
+    refreshFromNodeIds,
     rows,
     runQuery,
     selectEdge,
