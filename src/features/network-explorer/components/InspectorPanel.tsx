@@ -47,14 +47,9 @@ export function InspectorPanel({
   localFlowNodes: LocalFlowNode[]
   localNodeState: NodeDetail['nodeState']
   nodeDetail: NodeDetail
+  // 节点的导出私钥 / 重命名 / 删除已迁移到画布右键菜单；详情面板只需复制能力。
   nodeActions: {
     handleCopyText: (value: string, label: string) => Promise<void>
-    handleDeleteConsumeNode: () => void
-    handleDeleteLocalNode: () => void
-    handleExportConsumeKey: () => Promise<void>
-    handleExportPrivateKey: () => Promise<void>
-    handleRenameConsumeNode: () => void
-    handleRenameLocalNode: () => void
   }
   selectedChain: ConsumeChainResponseDTO | null
   selectedEdge: ChainGraphEdge | null
@@ -92,17 +87,11 @@ export function InspectorPanel({
             node={selectedLocalNode}
             nodeState={localNodeState}
             onCopy={(value, label) => void nodeActions.handleCopyText(value, label)}
-            onDelete={nodeActions.handleDeleteLocalNode}
-            onExportPrivateKey={() => void nodeActions.handleExportPrivateKey()}
-            onRename={nodeActions.handleRenameLocalNode}
           />
         ) : selectedLocalConsumeNode ? (
           <ConsumeNodeOperatePanel
             node={selectedLocalConsumeNode}
             onCopy={(value, label) => void nodeActions.handleCopyText(value, label)}
-            onDelete={nodeActions.handleDeleteConsumeNode}
-            onExportPrivateKey={() => void nodeActions.handleExportConsumeKey()}
-            onRename={nodeActions.handleRenameConsumeNode}
           />
         ) : selectedEdge ? (
           <EdgeInspector

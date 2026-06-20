@@ -232,6 +232,43 @@ function App() {
     },
     [extendFromNode],
   )
+  // 右键“节点管理”（导出私钥 / 重命名 / 删除）：按节点类型解析出本地节点，操作直接作用于该节点（无需先选中）。
+  const handleExportNodeKey = useCallback(
+    (node: ChainGraphNode) => {
+      if (node.kind === 'local-flow') {
+        const localNode = keyring.localFlowNodes.find((item) => item.publicKeyHex === node.id)
+        if (localNode) void nodeActions.handleExportPrivateKey(localNode)
+      } else if (node.kind === 'local-consume') {
+        const localNode = keyring.localConsumeNodes.find((item) => item.publicKeyHex === node.id)
+        if (localNode) void nodeActions.handleExportConsumeKey(localNode)
+      }
+    },
+    [keyring.localConsumeNodes, keyring.localFlowNodes, nodeActions],
+  )
+  const handleRenameNode = useCallback(
+    (node: ChainGraphNode) => {
+      if (node.kind === 'local-flow') {
+        const localNode = keyring.localFlowNodes.find((item) => item.publicKeyHex === node.id)
+        if (localNode) void nodeActions.handleRenameLocalNode(localNode)
+      } else if (node.kind === 'local-consume') {
+        const localNode = keyring.localConsumeNodes.find((item) => item.publicKeyHex === node.id)
+        if (localNode) void nodeActions.handleRenameConsumeNode(localNode)
+      }
+    },
+    [keyring.localConsumeNodes, keyring.localFlowNodes, nodeActions],
+  )
+  const handleDeleteNode = useCallback(
+    (node: ChainGraphNode) => {
+      if (node.kind === 'local-flow') {
+        const localNode = keyring.localFlowNodes.find((item) => item.publicKeyHex === node.id)
+        if (localNode) void nodeActions.handleDeleteLocalNode(localNode)
+      } else if (node.kind === 'local-consume') {
+        const localNode = keyring.localConsumeNodes.find((item) => item.publicKeyHex === node.id)
+        if (localNode) void nodeActions.handleDeleteConsumeNode(localNode)
+      }
+    },
+    [keyring.localConsumeNodes, keyring.localFlowNodes, nodeActions],
+  )
 
   const politeMessage =
     registration.status ??
@@ -360,6 +397,9 @@ function App() {
             onGenerateRecord={handleGenerateRecord}
             onMountRecord={handleMountRecord}
             onLoadChain={handleLoadChain}
+            onExportNodeKey={handleExportNodeKey}
+            onRenameNode={handleRenameNode}
+            onDeleteNode={handleDeleteNode}
             onSelectEdge={selection.onCanvasSelectEdge}
             onSelectNode={selection.onCanvasSelectNode}
             selectedId={selection.selectedLocalId ?? query.effectiveSelection?.id ?? null}

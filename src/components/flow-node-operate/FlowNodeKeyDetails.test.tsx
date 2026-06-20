@@ -15,16 +15,7 @@ const unregisteredNode: LocalFlowNode = {
 
 describe('FlowNodeKeyDetails', () => {
   it('shows an unregistered sequence name instead of a generated local id', () => {
-    render(
-      <FlowNodeKeyDetails
-        displayName="未注册1"
-        node={unregisteredNode}
-        onCopy={vi.fn()}
-        onDelete={vi.fn()}
-        onExportPrivateKey={vi.fn()}
-        onRename={vi.fn()}
-      />,
-    )
+    render(<FlowNodeKeyDetails displayName="未注册1" node={unregisteredNode} onCopy={vi.fn()} />)
 
     expect(screen.getByText('节点名称')).toBeTruthy()
     expect(screen.getByText('未注册1')).toBeTruthy()

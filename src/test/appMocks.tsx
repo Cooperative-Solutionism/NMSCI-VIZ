@@ -36,6 +36,9 @@ vi.mock('../components/NetworkGraph', () => ({
     onGenerateRecord,
     onMountRecord,
     onLoadChain,
+    onExportNodeKey,
+    onRenameNode,
+    onDeleteNode,
     onSelectEdge,
     onSelectNode,
   }: {
@@ -50,6 +53,9 @@ vi.mock('../components/NetworkGraph', () => ({
     onGenerateRecord?: (node: ChainGraphNode) => void
     onMountRecord?: (node: ChainGraphNode) => void
     onLoadChain?: (node: ChainGraphNode, mode: 'start' | 'end' | 'node') => void
+    onExportNodeKey?: (node: ChainGraphNode) => void
+    onRenameNode?: (node: ChainGraphNode) => void
+    onDeleteNode?: (node: ChainGraphNode) => void
   }) => (
     <div data-testid="network-graph">
       <button type="button" onClick={() => onAddFlowNode?.({ x: 12, y: 34 })}>
@@ -80,6 +86,15 @@ vi.mock('../components/NetworkGraph', () => ({
               </button>
               <button type="button" onClick={() => onMountRecord?.(node)}>
                 context mount record {node.id}
+              </button>
+              <button type="button" onClick={() => onExportNodeKey?.(node)}>
+                context export key {node.id}
+              </button>
+              <button type="button" onClick={() => onRenameNode?.(node)}>
+                context rename {node.id}
+              </button>
+              <button type="button" onClick={() => onDeleteNode?.(node)}>
+                context delete {node.id}
               </button>
             </>
           ) : null}

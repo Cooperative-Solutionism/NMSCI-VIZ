@@ -88,63 +88,70 @@ export function useLocalFlowNodeActions({
     }
   }, [notifyError, notifyStatus, persistLocalFlowNodes, requestText, selectLocalNode, vaultStatus])
 
-  const handleRenameLocalNode = useCallback(async () => {
-    if (!selectedLocalNode) return
-    const next = await requestText({
-      title: '重命名流转节点',
-      label: '节点名称',
-      defaultValue: selectedLocalNode.label,
-      confirmLabel: '保存',
-    })
-    if (next == null) return
-    const label = (next.trim() || selectedLocalNode.label).slice(0, 64)
-    persistLocalFlowNodes((currentNodes) =>
-      patchLocalFlowNode(currentNodes, selectedLocalNode.id, {
-        label,
-        updatedAt: new Date().toISOString(),
-      }),
-    )
-    notifyStatus('流转节点已重命名。')
-  }, [notifyStatus, persistLocalFlowNodes, requestText, selectedLocalNode])
+  // 目标节点可显式传入（画布右键菜单直接作用于右键的节点）；省略时回退到当前选中节点。
+  const handleRenameLocalNode = useCallback(
+    async (target?: LocalFlowNode) => {
+      const node = target ?? selectedLocalNode
+      if (!node) return
+      const next = await requestText({
+        title: '重命名流转节点',
+        label: '节点名称',
+        defaultValue: node.label,
+        confirmLabel: '保存',
+      })
+      if (next == null) return
+      const label = (next.trim() || node.label).slice(0, 64)
+      persistLocalFlowNodes((currentNodes) =>
+        patchLocalFlowNode(currentNodes, node.id, {
+          label,
+          updatedAt: new Date().toISOString(),
+        }),
+      )
+      notifyStatus('流转节点已重命名。')
+    },
+    [notifyStatus, persistLocalFlowNodes, requestText, selectedLocalNode],
+  )
 
-  const handleDeleteLocalNode = useCallback(async () => {
-    if (!selectedLocalNode) return
-    const confirmed = await requestConfirm({
-      title: '删除本地流转节点',
-      description: '对应私钥将从本地存储删除，此操作无法撤销。',
-      confirmLabel: '删除',
-      destructive: true,
-    })
-    if (!confirmed) return
-    const removedPubkey = selectedLocalNode.publicKeyHex
-    persistLocalFlowNodes((currentNodes) =>
-      currentNodes.filter((current) => current.publicKeyHex !== removedPubkey),
-    )
-    clearSelectedLocalNode()
-    notifyStatus('流转节点已删除。')
-  }, [
-    clearSelectedLocalNode,
-    notifyStatus,
-    persistLocalFlowNodes,
-    requestConfirm,
-    selectedLocalNode,
-  ])
+  const handleDeleteLocalNode = useCallback(
+    async (target?: LocalFlowNode) => {
+      const node = target ?? selectedLocalNode
+      if (!node) return
+      const confirmed = await requestConfirm({
+        title: '删除本地流转节点',
+        description: '对应私钥将从本地存储删除，此操作无法撤销。',
+        confirmLabel: '删除',
+        destructive: true,
+      })
+      if (!confirmed) return
+      const removedPubkey = node.publicKeyHex
+      persistLocalFlowNodes((currentNodes) =>
+        currentNodes.filter((current) => current.publicKeyHex !== removedPubkey),
+      )
+      clearSelectedLocalNode()
+      notifyStatus('流转节点已删除。')
+    },
+    [clearSelectedLocalNode, notifyStatus, persistLocalFlowNodes, requestConfirm, selectedLocalNode],
+  )
 
-  const handleExportPrivateKey = useCallback(async () => {
-    if (!selectedLocalNode) return
-    const message =
-      vaultStatus === 'disabled'
-        ? '从 localStorage 导出私钥？私钥当前以明文存储，将直接复制。'
-        : '从 localStorage 导出私钥？解锁后私钥会以明文复制。'
-    const confirmed = await requestConfirm({
-      title: '导出私钥',
-      description: message,
-      confirmLabel: '复制私钥',
-      destructive: true,
-    })
-    if (!confirmed) return
-    await onCopyPrivateKey(selectedLocalNode.privateKeyHex)
-  }, [onCopyPrivateKey, requestConfirm, selectedLocalNode, vaultStatus])
+  const handleExportPrivateKey = useCallback(
+    async (target?: LocalFlowNode) => {
+      const node = target ?? selectedLocalNode
+      if (!node) return
+      const message =
+        vaultStatus === 'disabled'
+          ? '从 localStorage 导出私钥？私钥当前以明文存储，将直接复制。'
+          : '从 localStorage 导出私钥？解锁后私钥会以明文复制。'
+      const confirmed = await requestConfirm({
+        title: '导出私钥',
+        description: message,
+        confirmLabel: '复制私钥',
+        destructive: true,
+      })
+      if (!confirmed) return
+      await onCopyPrivateKey(node.privateKeyHex)
+    },
+    [onCopyPrivateKey, requestConfirm, selectedLocalNode, vaultStatus],
+  )
 
   return {
     handleAddFlowNode,

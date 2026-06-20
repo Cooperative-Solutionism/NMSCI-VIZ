@@ -18,6 +18,9 @@ export interface NetworkGraphProps {
   onGenerateRecord?: (node: ChainGraphNode) => void
   onMountRecord?: (node: ChainGraphNode) => void
   onLoadChain?: (node: ChainGraphNode, mode: QueryMode) => void
+  onExportNodeKey?: (node: ChainGraphNode) => void
+  onRenameNode?: (node: ChainGraphNode) => void
+  onDeleteNode?: (node: ChainGraphNode) => void
 }
 
 export interface ContextMenuState {

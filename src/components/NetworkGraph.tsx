@@ -46,6 +46,9 @@ export function NetworkGraph({
   onGenerateRecord,
   onMountRecord,
   onLoadChain,
+  onExportNodeKey,
+  onRenameNode,
+  onDeleteNode,
 }: NetworkGraphProps) {
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
   const selectedChainIds = useMemo(
@@ -270,19 +273,8 @@ export function NetworkGraph({
     selectedId,
   ])
 
-  useEffect(() => {
-    if (!menu) return
-    const onKey = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') setMenu(null)
-    }
-    const onClick = () => setMenu(null)
-    window.addEventListener('keydown', onKey)
-    window.addEventListener('click', onClick)
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('click', onClick)
-    }
-  }, [menu])
+  // 菜单的关闭（Esc / 点击外部 / 选中条目）由 DropdownMenu 经 onOpenChange→closeMenu 处理；
+  // 画布内的点击另由 useCytoscapeGraph 的 cy.on('tap', closeMenu) 兜底。
 
   const handleDownloadPng = useCallback(() => {
     const cy = cyRef.current
@@ -443,7 +435,11 @@ export function NetworkGraph({
           onGenerateRecord={onGenerateRecord}
           onMountRecord={onMountRecord}
           onLoadChain={onLoadChain}
+          onExportNodeKey={onExportNodeKey}
+          onRenameNode={onRenameNode}
+          onDeleteNode={onDeleteNode}
           onClose={closeMenu}
+          returnFocusRef={containerRef}
         />
       ) : null}
       <GraphAccessList

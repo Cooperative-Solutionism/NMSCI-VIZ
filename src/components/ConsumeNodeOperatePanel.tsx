@@ -5,18 +5,13 @@ import { DetailRow } from './DetailRow'
 import { PanelHeader } from './PanelHeader'
 import { Button } from './ui/button'
 
+// 导出私钥 / 重命名 / 删除等管理操作已迁移到画布右键菜单；此面板仅展示密钥详情。
 export function ConsumeNodeOperatePanel({
   node,
   onCopy,
-  onDelete,
-  onExportPrivateKey,
-  onRename,
 }: {
   node: LocalConsumeNode
   onCopy: (value: string, label: string) => void
-  onDelete: () => void
-  onExportPrivateKey: () => void
-  onRename: () => void
 }) {
   return (
     <div className="inspector-content">
@@ -44,17 +39,10 @@ export function ConsumeNodeOperatePanel({
           value={<code translate="no">{maskSecret(node.privateKeyHex)}</code>}
         />
         <DetailRow label="保存时间" value={formatDateTime(node.createdAt)} />
-        <Button variant="secondary" type="button" onClick={onExportPrivateKey}>
-          导出私钥
-        </Button>
-        <Button variant="secondary" type="button" onClick={onRename}>
-          重命名
-        </Button>
-        <Button variant="destructive" type="button" onClick={onDelete}>
-          删除
-        </Button>
       </div>
-      <p className="field-hint">右键此消费节点即可作为付款方生成消费记录。</p>
+      <p className="field-hint">
+        右键此消费节点可作为付款方生成消费记录，并进行导出私钥、重命名、删除等操作。
+      </p>
     </div>
   )
 }

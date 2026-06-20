@@ -55,63 +55,76 @@ export function useLocalConsumeNodeActions({
     ],
   )
 
-  const handleRenameConsumeNode = useCallback(async () => {
-    if (!selectedLocalConsumeNode) return
-    const next = await requestText({
-      title: '重命名消费节点',
-      label: '节点名称',
-      defaultValue: selectedLocalConsumeNode.label,
-      confirmLabel: '保存',
-    })
-    if (next == null) return
-    const label = (next.trim() || selectedLocalConsumeNode.label).slice(0, 64)
-    persistLocalConsumeNodes((currentNodes) =>
-      patchLocalConsumeNode(currentNodes, selectedLocalConsumeNode.id, {
-        label,
-        updatedAt: new Date().toISOString(),
-      }),
-    )
-    notifyStatus('消费节点已重命名。')
-  }, [notifyStatus, persistLocalConsumeNodes, requestText, selectedLocalConsumeNode])
+  // 目标节点可显式传入（画布右键菜单直接作用于右键的节点）；省略时回退到当前选中节点。
+  const handleRenameConsumeNode = useCallback(
+    async (target?: LocalConsumeNode) => {
+      const node = target ?? selectedLocalConsumeNode
+      if (!node) return
+      const next = await requestText({
+        title: '重命名消费节点',
+        label: '节点名称',
+        defaultValue: node.label,
+        confirmLabel: '保存',
+      })
+      if (next == null) return
+      const label = (next.trim() || node.label).slice(0, 64)
+      persistLocalConsumeNodes((currentNodes) =>
+        patchLocalConsumeNode(currentNodes, node.id, {
+          label,
+          updatedAt: new Date().toISOString(),
+        }),
+      )
+      notifyStatus('消费节点已重命名。')
+    },
+    [notifyStatus, persistLocalConsumeNodes, requestText, selectedLocalConsumeNode],
+  )
 
-  const handleDeleteConsumeNode = useCallback(async () => {
-    if (!selectedLocalConsumeNode) return
-    const confirmed = await requestConfirm({
-      title: '删除消费节点',
-      description: '对应私钥将从本地存储删除，此操作无法撤销。',
-      confirmLabel: '删除',
-      destructive: true,
-    })
-    if (!confirmed) return
-    const removedPubkey = selectedLocalConsumeNode.publicKeyHex
-    persistLocalConsumeNodes((currentNodes) =>
-      currentNodes.filter((current) => current.publicKeyHex !== removedPubkey),
-    )
-    clearSelectedLocalNode()
-    notifyStatus('消费节点已删除。')
-  }, [
-    clearSelectedLocalNode,
-    notifyStatus,
-    persistLocalConsumeNodes,
-    requestConfirm,
-    selectedLocalConsumeNode,
-  ])
+  const handleDeleteConsumeNode = useCallback(
+    async (target?: LocalConsumeNode) => {
+      const node = target ?? selectedLocalConsumeNode
+      if (!node) return
+      const confirmed = await requestConfirm({
+        title: '删除消费节点',
+        description: '对应私钥将从本地存储删除，此操作无法撤销。',
+        confirmLabel: '删除',
+        destructive: true,
+      })
+      if (!confirmed) return
+      const removedPubkey = node.publicKeyHex
+      persistLocalConsumeNodes((currentNodes) =>
+        currentNodes.filter((current) => current.publicKeyHex !== removedPubkey),
+      )
+      clearSelectedLocalNode()
+      notifyStatus('消费节点已删除。')
+    },
+    [
+      clearSelectedLocalNode,
+      notifyStatus,
+      persistLocalConsumeNodes,
+      requestConfirm,
+      selectedLocalConsumeNode,
+    ],
+  )
 
-  const handleExportConsumeKey = useCallback(async () => {
-    if (!selectedLocalConsumeNode) return
-    const message =
-      vaultStatus === 'disabled'
-        ? '从 localStorage 导出私钥？私钥当前以明文存储，将直接复制。'
-        : '从 localStorage 导出私钥？解锁后私钥会以明文复制。'
-    const confirmed = await requestConfirm({
-      title: '导出私钥',
-      description: message,
-      confirmLabel: '复制私钥',
-      destructive: true,
-    })
-    if (!confirmed) return
-    await onCopyPrivateKey(selectedLocalConsumeNode.privateKeyHex)
-  }, [onCopyPrivateKey, requestConfirm, selectedLocalConsumeNode, vaultStatus])
+  const handleExportConsumeKey = useCallback(
+    async (target?: LocalConsumeNode) => {
+      const node = target ?? selectedLocalConsumeNode
+      if (!node) return
+      const message =
+        vaultStatus === 'disabled'
+          ? '从 localStorage 导出私钥？私钥当前以明文存储，将直接复制。'
+          : '从 localStorage 导出私钥？解锁后私钥会以明文复制。'
+      const confirmed = await requestConfirm({
+        title: '导出私钥',
+        description: message,
+        confirmLabel: '复制私钥',
+        destructive: true,
+      })
+      if (!confirmed) return
+      await onCopyPrivateKey(node.privateKeyHex)
+    },
+    [onCopyPrivateKey, requestConfirm, selectedLocalConsumeNode, vaultStatus],
+  )
 
   return {
     handleAddConsumeNode,

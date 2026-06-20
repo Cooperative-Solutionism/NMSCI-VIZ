@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   installAppTestLifecycle,
   jsonResponse,
@@ -29,7 +29,8 @@ describe('App initial state', () => {
       expect(saved.nodes[0]?.privateKey).toBeUndefined()
     })
     // selecting the new node opens its key-details panel in the inspector
-    expect(await screen.findByRole('button', { name: /导出私钥/ })).toBeTruthy()
+    // （导出私钥/重命名/删除等管理操作已迁移到画布右键菜单，面板只展示密钥详情）
+    expect(await screen.findByText('节点名称')).toBeTruthy()
   })
 
   it('encrypts existing plaintext nodes when the vault is enabled', async () => {
@@ -271,13 +272,13 @@ describe('App initial state', () => {
     })
   })
 
-  it('renames and deletes a local flow node', async () => {
+  it('renames and deletes a local flow node via the canvas context menu', async () => {
     render(<App />)
 
     fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
-    await screen.findByRole('button', { name: /导出私钥/ })
 
-    fireEvent.click(screen.getByRole('button', { name: /^重命名$/ }))
+    // 重命名走画布右键菜单（直接作用于右键的节点，无需先选中）。
+    fireEvent.click(await screen.findByRole('button', { name: /context rename/ }))
     const renameDialog = await screen.findByRole('dialog', { name: /重命名流转节点/ })
     fireEvent.change(within(renameDialog).getByLabelText('节点名称'), {
       target: { value: 'Renamed node' },
@@ -290,7 +291,8 @@ describe('App initial state', () => {
       expect(saved.nodes[0]?.label).toBe('Renamed node')
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /^删除$/ }))
+    // 删除同样走画布右键菜单。
+    fireEvent.click(screen.getByRole('button', { name: /context delete/ }))
     const deleteDialog = await screen.findByRole('alertdialog', { name: /删除本地流转节点/ })
     fireEvent.click(within(deleteDialog).getByRole('button', { name: '删除' }))
     await waitFor(() => {
@@ -298,6 +300,26 @@ describe('App initial state', () => {
         nodes: unknown[]
       }
       expect(saved.nodes).toHaveLength(0)
+    })
+  })
+
+  it('exports a local flow node private key to the clipboard via the canvas context menu', async () => {
+    const writeText = vi.fn(() => Promise.resolve())
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
+
+    // 导出私钥走画布右键菜单 → 确认对话框 → 明文私钥复制到剪贴板。
+    fireEvent.click(await screen.findByRole('button', { name: /context export key/ }))
+    const exportDialog = await screen.findByRole('alertdialog', { name: /导出私钥/ })
+    fireEvent.click(within(exportDialog).getByRole('button', { name: '复制私钥' }))
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith('0'.repeat(63) + '1')
     })
   })
 
