@@ -62,7 +62,9 @@ export function normalizeGraphViewState(
   const rawMode = value.highlightMode
 
   const selectedId =
-    rawSelectedId !== null && (!options.elementIds || options.elementIds.has(rawSelectedId))
+    rawSelectedId !== null &&
+    rawSelectedId.length > 0 &&
+    (!options.elementIds || options.elementIds.has(rawSelectedId))
       ? rawSelectedId
       : null
   const highlightMode: GraphHighlightMode =

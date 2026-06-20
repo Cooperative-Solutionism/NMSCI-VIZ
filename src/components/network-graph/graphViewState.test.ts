@@ -64,14 +64,11 @@ describe('graph view state', () => {
     expect(state).toEqual(DEFAULT_GRAPH_VIEW_STATE)
   })
 
-  it('preserves an empty string selectedId when elementIds is absent', () => {
-    expect(normalizeGraphViewState({ selectedId: '' }).selectedId).toBe('')
-  })
-
-  it('preserves an empty string selectedId when elementIds contains it', () => {
+  it('normalizes an empty string selectedId to null', () => {
+    expect(normalizeGraphViewState({ selectedId: '' }).selectedId).toBeNull()
     expect(
       normalizeGraphViewState({ selectedId: '' }, { elementIds: new Set(['']) }).selectedId,
-    ).toBe('')
+    ).toBeNull()
   })
 
   it('clamps zoom into Cytoscape bounds', () => {
