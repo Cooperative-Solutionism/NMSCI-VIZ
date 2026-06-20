@@ -152,6 +152,95 @@ describe('NetworkGraph selection highlighting', () => {
     )
   })
 
+  it('does not notify the view store subscribers when mirroring a controlled selection', () => {
+    const { rerender } = render(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId={null}
+        onSelectEdge={vi.fn()}
+        onSelectNode={vi.fn()}
+      />,
+    )
+    const callsAfterInitialRender = vi.mocked(useCytoscapeGraph).mock.calls.length
+
+    rerender(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId="node-b"
+        onSelectEdge={vi.fn()}
+        onSelectNode={vi.fn()}
+      />,
+    )
+
+    expect(vi.mocked(useCytoscapeGraph).mock.calls.length).toBe(callsAfterInitialRender + 1)
+    expect(readSavedView()).toEqual(
+      expect.objectContaining({
+        selectedId: 'node-b',
+      }),
+    )
+  })
+
+  it('does not re-select a previous node when adding a new node after switching selection', () => {
+    // 复现“新增节点时选中态在旧节点与新节点间闪烁”的回归：
+    // 恢复一次已保存选择后，用户改选别的节点再新增节点，恢复逻辑不得再次触发。
+    writeSavedView({
+      zoom: 1,
+      pan: { x: 0, y: 0 },
+      selectedId: 'node-a',
+      highlightMode: 'related',
+    })
+    const onSelectNode = vi.fn()
+    const onSelectEdge = vi.fn()
+
+    const { rerender } = render(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId={null}
+        onSelectEdge={onSelectEdge}
+        onSelectNode={onSelectNode}
+      />,
+    )
+
+    // 已保存选择仅恢复一次。
+    expect(onSelectNode).toHaveBeenCalledTimes(1)
+    expect(onSelectNode).toHaveBeenLastCalledWith(baseGraph.nodes[0])
+
+    // 父级应用恢复后的选择。
+    rerender(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId="node-a"
+        onSelectEdge={onSelectEdge}
+        onSelectNode={onSelectNode}
+      />,
+    )
+    // 用户改选另一个节点。
+    rerender(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId="node-b"
+        onSelectEdge={onSelectEdge}
+        onSelectNode={onSelectNode}
+      />,
+    )
+    // 用户新增并选中一个全新节点。
+    const extendedGraph: ChainGraph = {
+      ...baseGraph,
+      nodes: [...baseGraph.nodes, node('node-f')],
+    }
+    rerender(
+      <NetworkGraph
+        graph={extendedGraph}
+        selectedId="node-f"
+        onSelectEdge={onSelectEdge}
+        onSelectNode={onSelectNode}
+      />,
+    )
+
+    // 不得再触发任何“恢复”造成选中态回跳。
+    expect(onSelectNode).toHaveBeenCalledTimes(1)
+  })
+
   it('passes every chain containing the selected node to the Cytoscape hook', () => {
     render(
       <NetworkGraph

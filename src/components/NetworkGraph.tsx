@@ -30,7 +30,7 @@ const emptyCanvasPosition = { x: 0, y: 0 }
 
 interface GraphViewStateStore {
   getSnapshot: () => GraphViewState
-  set: (next: GraphViewState) => void
+  set: (next: GraphViewState, options?: { notify?: boolean }) => void
   subscribe: (listener: () => void) => () => void
 }
 
@@ -203,7 +203,7 @@ export function NetworkGraph({
         graphViewStateOptions,
       )
       if (!graphViewStatesEqual(current, next)) {
-        graphViewStateStore.set(next)
+        graphViewStateStore.set(next, { notify: false })
       }
       saveGraphViewState(next, undefined, graphViewStateOptions)
       return
@@ -224,7 +224,7 @@ export function NetworkGraph({
       graphViewStateOptions,
     )
     if (!graphViewStatesEqual(current, next)) {
-      graphViewStateStore.set(next)
+      graphViewStateStore.set(next, { notify: false })
     }
     saveGraphViewState(next, undefined, graphViewStateOptions)
   }, [
@@ -237,7 +237,10 @@ export function NetworkGraph({
   ])
 
   useEffect(() => {
-    const restoredSelectedId = initialViewState?.selectedId
+    // 仅恢复“挂载时”持久化的那个选择，且只恢复一次。
+    // 必须用稳定的 savedInitialViewState（而非随 store 漂移的 initialViewState），
+    // 否则新增节点时它会回放旧选择，导致选中态在旧/新节点间闪烁。
+    const restoredSelectedId = savedInitialViewState?.selectedId
     if (
       !restoredSelectedId ||
       selectedId === restoredSelectedId ||
@@ -260,10 +263,10 @@ export function NetworkGraph({
     }
   }, [
     edgeById,
-    initialViewState?.selectedId,
     nodeById,
     onSelectEdge,
     onSelectNode,
+    savedInitialViewState,
     selectedId,
   ])
 
@@ -497,10 +500,12 @@ function createGraphViewStateStore(initial: GraphViewState): GraphViewStateStore
 
   return {
     getSnapshot: () => current,
-    set: (next) => {
+    set: (next, options) => {
       if (graphViewStatesEqual(current, next)) return
 
       current = next
+      if (options?.notify === false) return
+
       listeners.forEach((listener) => listener())
     },
     subscribe: (listener) => {
