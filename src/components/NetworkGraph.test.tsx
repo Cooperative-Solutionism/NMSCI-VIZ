@@ -1,9 +1,10 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ChainGraph } from '../lib/types'
 import { NetworkGraph } from './NetworkGraph'
+import { GRAPH_VIEW_STORAGE_KEY, type GraphViewState } from './network-graph/graphViewState'
 import { useCytoscapeGraph } from './network-graph/useCytoscapeGraph'
 
 const hookMocks = vi.hoisted(() => ({
@@ -18,7 +19,10 @@ vi.mock('./network-graph/useCytoscapeGraph', () => ({
   })),
 }))
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  localStorage.clear()
+})
 
 const baseGraph: ChainGraph = {
   nodes: [
@@ -143,6 +147,150 @@ describe('NetworkGraph selection highlighting', () => {
     expect(Array.from(params?.cycleChainIds ?? [])).toEqual(['chain-c'])
   })
 
+  it('restores a saved node selection and passes the initial view state to the hook', () => {
+    writeSavedView({
+      zoom: 1.4,
+      pan: { x: 12, y: 18 },
+      selectedId: 'node-c',
+      highlightMode: 'related',
+    })
+    const onSelectNode = vi.fn()
+
+    render(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId={null}
+        onSelectEdge={vi.fn()}
+        onSelectNode={onSelectNode}
+      />,
+    )
+
+    const params = latestHookParams<{ initialViewState?: GraphViewState }>()
+
+    expect(onSelectNode).toHaveBeenCalledWith(baseGraph.nodes[2])
+    expect(params?.initialViewState).toEqual({
+      zoom: 1.4,
+      pan: { x: 12, y: 18 },
+      selectedId: 'node-c',
+      highlightMode: 'related',
+    })
+  })
+
+  it('restores a saved edge selection when the edge exists in the current graph', () => {
+    writeSavedView({
+      zoom: 1,
+      pan: { x: 0, y: 0 },
+      selectedId: 'edge-b1',
+      highlightMode: 'related',
+    })
+    const onSelectEdge = vi.fn()
+
+    render(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId={null}
+        onSelectEdge={onSelectEdge}
+        onSelectNode={vi.fn()}
+      />,
+    )
+
+    expect(onSelectEdge).toHaveBeenCalledWith(baseGraph.edges[2])
+  })
+
+  it('saves search selection and highlight mode changes', () => {
+    render(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId={null}
+        onSelectEdge={vi.fn()}
+        onSelectNode={vi.fn()}
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText('搜索图谱节点'), {
+      target: { value: 'node-d' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '定位节点' }))
+    fireEvent.click(screen.getByRole('button', { name: '循环链路' }))
+
+    expect(readSavedView()).toEqual(
+      expect.objectContaining({
+        selectedId: 'node-d',
+        highlightMode: 'cycles',
+      }),
+    )
+  })
+
+  it('saves pan and zoom changes reported by Cytoscape', () => {
+    render(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId={null}
+        onSelectEdge={vi.fn()}
+        onSelectNode={vi.fn()}
+      />,
+    )
+
+    const params = latestHookParams<{
+      onViewChange?: (view: Pick<GraphViewState, 'zoom' | 'pan'>) => void
+    }>()
+    act(() => {
+      params?.onViewChange?.({ zoom: 1.8, pan: { x: 40, y: -10 } })
+    })
+
+    expect(readSavedView()).toEqual(
+      expect.objectContaining({
+        zoom: 1.8,
+        pan: { x: 40, y: -10 },
+      }),
+    )
+  })
+
+  it('ignores invalid saved selection and persists cycle fallback for graphs without cycles', () => {
+    writeSavedView({
+      zoom: 1.2,
+      pan: { x: 5, y: 6 },
+      selectedId: 'missing-element',
+      highlightMode: 'cycles',
+    })
+    const graphWithoutCycles: ChainGraph = {
+      ...baseGraph,
+      edges: baseGraph.edges.map((item) => ({ ...item, status: 'open' as const })),
+    }
+    const onSelectNode = vi.fn()
+    const onSelectEdge = vi.fn()
+
+    render(
+      <NetworkGraph
+        graph={graphWithoutCycles}
+        selectedId={null}
+        onSelectEdge={onSelectEdge}
+        onSelectNode={onSelectNode}
+      />,
+    )
+
+    const params = latestHookParams<{
+      highlightMode?: string
+      initialViewState?: GraphViewState
+    }>()
+
+    expect(onSelectNode).not.toHaveBeenCalled()
+    expect(onSelectEdge).not.toHaveBeenCalled()
+    expect(params?.highlightMode).toBe('related')
+    expect(params?.initialViewState).toEqual({
+      zoom: 1.2,
+      pan: { x: 5, y: 6 },
+      selectedId: null,
+      highlightMode: 'related',
+    })
+    expect(readSavedView()).toEqual({
+      zoom: 1.2,
+      pan: { x: 5, y: 6 },
+      selectedId: null,
+      highlightMode: 'related',
+    })
+  })
+
   it('disables cycle highlighting when no cycle edges exist', () => {
     render(
       <NetworkGraph
@@ -224,4 +372,17 @@ function edge(
     relatedTransactionMount: 'mount',
     relatedTransactionMountTimestamp: 1n,
   }
+}
+
+function latestHookParams<TParams>(): TParams | undefined {
+  return vi.mocked(useCytoscapeGraph).mock.calls.at(-1)?.[0] as TParams | undefined
+}
+
+function writeSavedView(state: GraphViewState): void {
+  localStorage.setItem(GRAPH_VIEW_STORAGE_KEY, JSON.stringify(state))
+}
+
+function readSavedView(): GraphViewState | null {
+  const raw = localStorage.getItem(GRAPH_VIEW_STORAGE_KEY)
+  return raw ? (JSON.parse(raw) as GraphViewState) : null
 }

@@ -2,19 +2,26 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 import { Plus, Workflow } from 'lucide-react'
 import { shortId } from '../lib/chainGraph'
-import type { ChainGraphNode } from '../lib/types'
+import type { ChainGraphEdge, ChainGraphNode } from '../lib/types'
 import { Button } from './ui/button'
 import { GraphAccessList } from './network-graph/GraphAccessList'
 import { GraphContextMenu } from './network-graph/GraphContextMenu'
 import { GraphLegend } from './network-graph/GraphLegend'
 import { GraphSearch } from './network-graph/GraphSearch'
 import { GraphTools } from './network-graph/GraphTools'
-import type { GraphHighlightMode } from './network-graph/graphViewState'
+import {
+  loadGraphViewState,
+  normalizeGraphViewState,
+  saveGraphViewState,
+  type GraphHighlightMode,
+  type GraphViewState,
+} from './network-graph/graphViewState'
 import type { ContextMenuState, NetworkGraphProps } from './network-graph/types'
 import { useCytoscapeGraph } from './network-graph/useCytoscapeGraph'
 
@@ -46,22 +53,118 @@ export function NetworkGraph({
     [graph.edges],
   )
   const hasCycles = cycleChainIds.size > 0
-  const [requestedHighlightMode, setRequestedHighlightMode] =
-    useState<GraphHighlightMode>('related')
-  const highlightMode: GraphHighlightMode = hasCycles ? requestedHighlightMode : 'related'
+  const graphElementIds = useMemo(
+    () => new Set([...graph.nodes.map((node) => node.id), ...graph.edges.map((edge) => edge.id)]),
+    [graph.edges, graph.nodes],
+  )
+  const graphViewStateOptions = useMemo(
+    () => ({ elementIds: graphElementIds, hasCycles }),
+    [graphElementIds, hasCycles],
+  )
+  const nodeById = useMemo(
+    () => new Map(graph.nodes.map((node) => [node.id, node])),
+    [graph.nodes],
+  )
+  const edgeById = useMemo(
+    () => new Map(graph.edges.map((edge) => [edge.id, edge])),
+    [graph.edges],
+  )
+  const initialViewState = useMemo(
+    () => loadGraphViewState(undefined, graphViewStateOptions),
+    [graphViewStateOptions],
+  )
+  const [graphViewState, setGraphViewState] = useState<GraphViewState>(() => initialViewState)
+  const normalizedGraphViewState = useMemo(
+    () => normalizeGraphViewState(graphViewState, graphViewStateOptions),
+    [graphViewState, graphViewStateOptions],
+  )
+  const restoredSelectionRef = useRef<string | null>(null)
+  const highlightMode: GraphHighlightMode = normalizedGraphViewState.highlightMode
 
   const closeMenu = useCallback(() => setMenu(null), [])
+  const persistGraphViewState = useCallback(
+    (patch: Partial<GraphViewState>) => {
+      setGraphViewState((current) =>
+        normalizeGraphViewState(
+          {
+            ...current,
+            ...patch,
+            pan: patch.pan ?? current.pan,
+          },
+          graphViewStateOptions,
+        ),
+      )
+    },
+    [graphViewStateOptions],
+  )
+  const handleSelectNode = useCallback(
+    (node: ChainGraphNode) => {
+      onSelectNode(node)
+      persistGraphViewState({ selectedId: node.id })
+    },
+    [onSelectNode, persistGraphViewState],
+  )
+  const handleSelectEdge = useCallback(
+    (edge: ChainGraphEdge) => {
+      onSelectEdge(edge)
+      persistGraphViewState({ selectedId: edge.id })
+    },
+    [onSelectEdge, persistGraphViewState],
+  )
+  const handleViewChange = useCallback(
+    (view: Pick<GraphViewState, 'zoom' | 'pan'>) => {
+      persistGraphViewState(view)
+    },
+    [persistGraphViewState],
+  )
   const { containerRef, cyRef, focusNode } = useCytoscapeGraph({
     graph,
     selectedId,
     selectedChainIds,
     cycleChainIds,
     highlightMode,
-    onSelectNode,
-    onSelectEdge,
+    initialViewState,
+    onSelectNode: handleSelectNode,
+    onSelectEdge: handleSelectEdge,
     onOpenMenu: setMenu,
     onCloseMenu: closeMenu,
+    onViewChange: handleViewChange,
   })
+
+  useEffect(() => {
+    saveGraphViewState(normalizedGraphViewState, undefined, graphViewStateOptions)
+  }, [normalizedGraphViewState, graphViewStateOptions])
+
+  useEffect(() => {
+    const restoredSelectedId = initialViewState.selectedId
+    if (
+      !restoredSelectedId ||
+      selectedId === restoredSelectedId ||
+      restoredSelectionRef.current === restoredSelectedId
+    ) {
+      return
+    }
+
+    const restoredNode = nodeById.get(restoredSelectedId)
+    if (restoredNode) {
+      restoredSelectionRef.current = restoredSelectedId
+      onSelectNode(restoredNode)
+      return
+    }
+
+    const restoredEdge = edgeById.get(restoredSelectedId)
+    if (restoredEdge) {
+      restoredSelectionRef.current = restoredSelectedId
+      onSelectEdge(restoredEdge)
+    }
+  }, [
+    edgeById,
+    initialViewState.selectedId,
+    nodeById,
+    onSelectEdge,
+    onSelectNode,
+    selectedId,
+  ])
 
   useEffect(() => {
     if (!menu) return
@@ -89,10 +192,17 @@ export function NetworkGraph({
 
   const handleSearchSelect = useCallback(
     (node: ChainGraphNode) => {
-      onSelectNode(node)
+      handleSelectNode(node)
       focusNode(node.id)
     },
-    [focusNode, onSelectNode],
+    [focusNode, handleSelectNode],
+  )
+
+  const handleHighlightModeChange = useCallback(
+    (mode: GraphHighlightMode) => {
+      persistGraphViewState({ highlightMode: mode })
+    },
+    [persistGraphViewState],
   )
 
   const zoomBy = useCallback(
@@ -221,13 +331,17 @@ export function NetworkGraph({
           onClose={closeMenu}
         />
       ) : null}
-      <GraphAccessList graph={graph} onSelectEdge={onSelectEdge} onSelectNode={onSelectNode} />
+      <GraphAccessList
+        graph={graph}
+        onSelectEdge={handleSelectEdge}
+        onSelectNode={handleSelectNode}
+      />
       <GraphTools
         hasCycles={hasCycles}
         highlightMode={highlightMode}
         onDownloadPng={handleDownloadPng}
         onFit={fitGraph}
-        onHighlightModeChange={setRequestedHighlightMode}
+        onHighlightModeChange={handleHighlightModeChange}
         onZoomBy={zoomBy}
       />
       <GraphLegend />
