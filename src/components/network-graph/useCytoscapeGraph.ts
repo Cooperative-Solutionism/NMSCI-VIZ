@@ -147,7 +147,7 @@ export function useCytoscapeGraph({
     const wasEmpty = cy.elements().empty()
     syncGraphElements(cy, graph.nodes, graph.edges)
 
-    if (wasEmpty && graph.nodes.length > 0 && !initialViewState) {
+    if (wasEmpty && shouldRunInitialLayout(graph.nodes, graph.edges.length, initialViewState)) {
       cy.layout({
         name: 'cose',
         animate: false,
@@ -248,4 +248,14 @@ export function useCytoscapeGraph({
   }, [])
 
   return { containerRef, cyRef, focusNode }
+}
+
+function shouldRunInitialLayout(
+  nodes: ChainGraphNode[],
+  edgeCount: number,
+  initialViewState: GraphViewState | undefined,
+): boolean {
+  if (initialViewState || nodes.length === 0) return false
+  if (edgeCount > 0) return true
+  return nodes.some((node) => node.kind === 'chain')
 }

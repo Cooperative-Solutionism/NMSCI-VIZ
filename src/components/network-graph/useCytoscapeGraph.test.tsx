@@ -324,6 +324,28 @@ describe('useCytoscapeGraph', () => {
     })
   })
 
+  it('does not fit local-only nodes when they are first added to an empty canvas', () => {
+    const { rerender } = render(
+      <HookHarness
+        params={params({ graph: emptyGraph() })}
+        onHook={(hook) => {
+          latestHook = hook
+        }}
+      />,
+    )
+
+    rerender(
+      <HookHarness
+        params={params({ graph: localOnlyGraph() })}
+        onHook={(hook) => {
+          latestHook = hook
+        }}
+      />,
+    )
+
+    expect(cyMock.layoutCalls()).toEqual([])
+  })
+
   it('restores the initial view on a Cytoscape instance recreated by StrictMode', () => {
     render(
       <StrictMode>
@@ -446,6 +468,27 @@ function populatedGraph(): ChainGraph {
       loopedChains: 1,
       openChains: 1,
       volumeByCurrency: new Map([[1, 300n]]),
+    },
+  }
+}
+
+function localOnlyGraph(): ChainGraph {
+  return {
+    nodes: [
+      {
+        id: '03aaaaaa1111',
+        label: '未注册1',
+        chainCount: 0,
+        volumeByCurrency: new Map(),
+        kind: 'local-flow',
+      },
+    ],
+    edges: [],
+    stats: {
+      totalChains: 0,
+      loopedChains: 0,
+      openChains: 0,
+      volumeByCurrency: new Map(),
     },
   }
 }

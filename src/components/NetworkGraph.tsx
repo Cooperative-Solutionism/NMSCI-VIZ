@@ -291,6 +291,17 @@ export function NetworkGraph({
     [focusNode, handleSelectNode],
   )
 
+  const currentCanvasCenter = useCallback(() => {
+    const cy = cyRef.current
+    if (!cy) return emptyCanvasPosition
+
+    const extent = cy.extent()
+    return {
+      x: (extent.x1 + extent.x2) / 2,
+      y: (extent.y1 + extent.y2) / 2,
+    }
+  }, [cyRef])
+
   const handleHighlightModeChange = useCallback(
     (mode: GraphHighlightMode) => {
       persistGraphViewState({ highlightMode: mode })
@@ -394,7 +405,7 @@ export function NetworkGraph({
             <Button
               type="button"
               variant="default"
-              onClick={() => onAddFlowNode?.(emptyCanvasPosition)}
+              onClick={() => onAddFlowNode?.(currentCanvasCenter())}
             >
               <Plus aria-hidden="true" />
               添加流转节点
@@ -402,7 +413,7 @@ export function NetworkGraph({
             <Button
               type="button"
               variant="secondary"
-              onClick={() => onAddConsumeNode?.(emptyCanvasPosition)}
+              onClick={() => onAddConsumeNode?.(currentCanvasCenter())}
             >
               <Plus aria-hidden="true" />
               添加消费节点

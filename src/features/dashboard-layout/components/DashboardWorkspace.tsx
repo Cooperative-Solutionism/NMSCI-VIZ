@@ -56,7 +56,12 @@ export function DashboardWorkspace({ graph, panels }: DashboardWorkspaceProps) {
   const openPanel = useCallback(
     (panelId: DashboardPanelId) => {
       setFocusPanelId(panelId)
-      updateLayout(panelId, { collapsed: false })
+      const dockPosition = layoutRef.current[panelId].dockPosition
+
+      updateLayout(panelId, {
+        collapsed: false,
+        panelPosition: dockPosition,
+      })
     },
     [updateLayout],
   )

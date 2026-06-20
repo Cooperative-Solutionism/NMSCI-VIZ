@@ -165,6 +165,27 @@ describe('DashboardWorkspace', () => {
     expect(storedLayout().query.collapsed).toBe(true)
   })
 
+  it('opens a moved dock icon as a panel at the dock icon position', () => {
+    renderWorkspace()
+    const queryDock = screen.getByRole('button', { name: openQueryName })
+
+    fireEvent.keyDown(queryDock, { key: 'ArrowRight' })
+    fireEvent.click(queryDock)
+
+    const movedDockPosition = {
+      x: defaultQueryDockPosition.x + 8,
+      y: defaultQueryDockPosition.y,
+    }
+
+    expect(screen.getByRole('dialog', { name: queryLabel })).toHaveStyle({
+      left: `${movedDockPosition.x}px`,
+      top: `${movedDockPosition.y}px`,
+    })
+    expect(storedLayout().query.panelPosition).toEqual(movedDockPosition)
+    expect(storedLayout().query.dockPosition).toEqual(movedDockPosition)
+    expect(storedLayout().query.collapsed).toBe(false)
+  })
+
   it('persists dockPosition changes from dragging a dock icon', () => {
     renderWorkspace()
     const queryDock = screen.getByRole('button', { name: openQueryName })
@@ -215,8 +236,8 @@ describe('DashboardWorkspace', () => {
     })
 
     expect(storedLayout().query.panelPosition).toEqual({
-      x: defaultQueryPanelPosition.x,
-      y: defaultQueryPanelPosition.y + 8,
+      x: defaultQueryDockPosition.x,
+      y: defaultQueryDockPosition.y + 8,
     })
     expect(storedLayout().query.dockPosition).toEqual(defaultQueryDockPosition)
     expect(storedLayout().query.collapsed).toBe(false)
@@ -244,6 +265,39 @@ describe('DashboardWorkspace', () => {
     expect(storedLayout().query).toEqual(defaultDashboardLayout.query)
   })
 
+  it('opens a reset dock icon as a panel at the reset dock position after closing', () => {
+    renderWorkspace()
+    fireEvent.click(screen.getByRole('button', { name: openQueryName }))
+
+    const header = screen
+      .getByRole('heading', { name: queryLabel })
+      .closest('.floating-panel__header')
+
+    expect(header).not.toBeNull()
+
+    fireEvent.pointerDown(header as HTMLElement, { button: 0, clientX: 100, clientY: 200 })
+    fireEvent.pointerMove(window, { clientX: 128, clientY: 234 })
+    fireEvent.pointerUp(window)
+    fireEvent.click(screen.getByRole('button', { name: closeQueryName }))
+
+    const resetDock = screen.getByRole('button', { name: openQueryName })
+
+    expect(resetDock).toHaveStyle({
+      left: `${defaultQueryDockPosition.x}px`,
+      top: `${defaultQueryDockPosition.y}px`,
+    })
+
+    fireEvent.click(resetDock)
+
+    expect(screen.getByRole('dialog', { name: queryLabel })).toHaveStyle({
+      left: `${defaultQueryDockPosition.x}px`,
+      top: `${defaultQueryDockPosition.y}px`,
+    })
+    expect(storedLayout().query.panelPosition).toEqual(defaultQueryDockPosition)
+    expect(storedLayout().query.dockPosition).toEqual(defaultQueryDockPosition)
+    expect(storedLayout().query.collapsed).toBe(false)
+  })
+
   it('keeps a collapsed dock icon at the moved panel position after collapsing from the left button', () => {
     renderWorkspace()
     fireEvent.click(screen.getByRole('button', { name: openQueryName }))
@@ -260,8 +314,8 @@ describe('DashboardWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: collapseQueryName }))
 
     const movedPanelPosition = {
-      x: defaultQueryPanelPosition.x + 28,
-      y: defaultQueryPanelPosition.y + 34,
+      x: defaultQueryDockPosition.x + 28,
+      y: defaultQueryDockPosition.y + 34,
     }
 
     expect(screen.getByRole('button', { name: openQueryName })).toHaveStyle({

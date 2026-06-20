@@ -8,13 +8,16 @@ import { GRAPH_VIEW_STORAGE_KEY, type GraphViewState } from './network-graph/gra
 import { useCytoscapeGraph } from './network-graph/useCytoscapeGraph'
 
 const hookMocks = vi.hoisted(() => ({
+  cyRef: {
+    current: null as null | { extent: () => { x1: number; y1: number; x2: number; y2: number } },
+  },
   focusNode: vi.fn(),
 }))
 
 vi.mock('./network-graph/useCytoscapeGraph', () => ({
   useCytoscapeGraph: vi.fn(() => ({
     containerRef: { current: null },
-    cyRef: { current: null },
+    cyRef: hookMocks.cyRef,
     focusNode: hookMocks.focusNode,
   })),
 }))
@@ -49,6 +52,7 @@ const baseGraph: ChainGraph = {
 describe('NetworkGraph selection highlighting', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    hookMocks.cyRef.current = null
   })
 
   it('renders a canvas status bar with graph counts and selection state', () => {
@@ -70,6 +74,9 @@ describe('NetworkGraph selection highlighting', () => {
   it('offers direct add actions on an empty canvas', () => {
     const onAddFlowNode = vi.fn()
     const onAddConsumeNode = vi.fn()
+    hookMocks.cyRef.current = {
+      extent: () => ({ x1: -120, y1: 40, x2: 520, y2: 360 }),
+    }
 
     render(
       <NetworkGraph
@@ -86,8 +93,8 @@ describe('NetworkGraph selection highlighting', () => {
     fireEvent.click(screen.getByRole('button', { name: '添加消费节点' }))
 
     expect(screen.getByText('空白交易画布')).toBeInTheDocument()
-    expect(onAddFlowNode).toHaveBeenCalledWith({ x: 0, y: 0 })
-    expect(onAddConsumeNode).toHaveBeenCalledWith({ x: 0, y: 0 })
+    expect(onAddFlowNode).toHaveBeenCalledWith({ x: 200, y: 200 })
+    expect(onAddConsumeNode).toHaveBeenCalledWith({ x: 200, y: 200 })
   })
 
   it('passes every chain containing the selected node to the Cytoscape hook', () => {

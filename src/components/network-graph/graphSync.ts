@@ -84,8 +84,8 @@ function syncEdges(cy: Core, edges: ChainGraphEdge[]): void {
 
 function positionForNewNode(cy: Core, nodeId: string, edges: ChainGraphEdge[]): Point {
   const neighborPosition = findNeighborPosition(cy, nodeId, edges)
-  const offset = deterministicOffset(nodeId)
   if (neighborPosition) {
+    const offset = deterministicOffset(nodeId)
     return {
       x: neighborPosition.x + offset.x,
       y: neighborPosition.y + offset.y,
@@ -94,8 +94,8 @@ function positionForNewNode(cy: Core, nodeId: string, edges: ChainGraphEdge[]): 
 
   const center = cy.extent()
   return {
-    x: (center.x1 + center.x2) / 2 + offset.x,
-    y: (center.y1 + center.y2) / 2 + offset.y,
+    x: (center.x1 + center.x2) / 2,
+    y: (center.y1 + center.y2) / 2,
   }
 }
 
