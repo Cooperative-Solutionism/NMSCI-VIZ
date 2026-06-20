@@ -31,6 +31,7 @@ function App() {
   const apiBase = defaultApiBase
   const explorer = useNetworkExplorerController(apiBase)
   const { flowRateView, nodeDetail, query, selection, systemStatus } = explorer
+  const { extendFromNode } = query
   const keyring = useLocalKeyringController({
     clearSelectedLocalNode: selection.clearSelectedLocalNode,
   })
@@ -71,15 +72,33 @@ function App() {
       ) ?? null,
     [keyring.localConsumeNodes, selection.selectedLocalId],
   )
+  const loadMountedConsumeChain = useCallback(
+    async (nodePubkey: string) => {
+      const localNode = keyring.localFlowNodes.find((node) => node.publicKeyHex === nodePubkey)
+
+      await extendFromNode(
+        {
+          id: nodePubkey,
+          label: localNode?.label ?? nodePubkey,
+          chainCount: 0,
+          volumeByCurrency: new Map<number, bigint>(),
+          kind: 'local-flow',
+          position: localNode?.position,
+        },
+        'node',
+      )
+    },
+    [extendFromNode, keyring.localFlowNodes],
+  )
   const { localNodeState, registration } = useRegistrationController({
     apiBase,
     selectedLocalNode,
     localFlowNodes: keyring.localFlowNodes,
     localConsumeNodes: keyring.localConsumeNodes,
     localTxRecords: keyring.localTxRecords,
+    loadConsumeChain: loadMountedConsumeChain,
     persistLocalFlowNodes: keyring.persistLocalFlowNodes,
     persistTxRecords: keyring.persistTxRecords,
-    runQuery: query.runQuery,
     clearSelectedLocalNode: selection.clearSelectedLocalNode,
   })
   const nodeActions = useLocalNodeActions({
@@ -400,8 +419,9 @@ function App() {
           if (!open) setMountDialog(null)
         }}
         onViewChain={() => {
-          registration.viewConsumeChain()
+          const viewConsumeChain = registration.viewConsumeChain
           setMountDialog(null)
+          window.setTimeout(viewConsumeChain, 0)
         }}
       />
 

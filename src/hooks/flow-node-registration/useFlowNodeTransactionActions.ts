@@ -17,7 +17,6 @@ import {
   normalizePubkeyHex,
 } from '../../lib/messageBuilders'
 import type { LocalTxRecord } from '../../lib/txRecordStorage'
-import type { QueryMode } from '../../lib/types'
 import type { OperationFeedbackAction } from './feedback'
 import { assertKeypairIntegrity, INT64_MAX } from './validation'
 
@@ -36,8 +35,8 @@ interface UseFlowNodeTransactionActionsParams {
   localConsumeNodes: LocalConsumeNode[]
   localFlowNodes: LocalFlowNode[]
   localTxRecords: LocalTxRecord[]
+  loadConsumeChain: (nodePubkey: string) => Promise<void>
   persistTxRecords: (updater: (records: LocalTxRecord[]) => LocalTxRecord[]) => void
-  runQuery: (override?: { mode: QueryMode; nodeId: string }) => Promise<void>
   setMiningAttempts: Dispatch<SetStateAction<number | null>>
 }
 
@@ -63,8 +62,8 @@ export function useFlowNodeTransactionActions({
   localConsumeNodes,
   localFlowNodes,
   localTxRecords,
+  loadConsumeChain,
   persistTxRecords,
-  runQuery,
   setMiningAttempts,
 }: UseFlowNodeTransactionActionsParams) {
   const [mountedPubkey, setMountedPubkey] = useState<string | null>(null)
@@ -189,8 +188,8 @@ export function useFlowNodeTransactionActions({
   const viewConsumeChain = useCallback(() => {
     if (!mountedPubkey) return
     clearSelectedLocalNode()
-    void runQuery({ mode: 'node', nodeId: mountedPubkey })
-  }, [clearSelectedLocalNode, mountedPubkey, runQuery])
+    void loadConsumeChain(mountedPubkey)
+  }, [clearSelectedLocalNode, loadConsumeChain, mountedPubkey])
 
   const clearMountedPubkey = useCallback(() => setMountedPubkey(null), [])
 

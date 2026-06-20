@@ -1,3 +1,4 @@
+import { StrictMode } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -95,6 +96,60 @@ describe('NetworkGraph selection highlighting', () => {
     expect(screen.getByText('空白交易画布')).toBeInTheDocument()
     expect(onAddFlowNode).toHaveBeenCalledWith({ x: 200, y: 200 })
     expect(onAddConsumeNode).toHaveBeenCalledWith({ x: 200, y: 200 })
+  })
+
+  it('syncs a newly added selected local node without recursively updating the view store', () => {
+    writeSavedView({
+      zoom: 1.3,
+      pan: { x: 8, y: 9 },
+      selectedId: null,
+      highlightMode: 'related',
+    })
+    const localNode = {
+      ...node('02'.padEnd(66, '1')),
+      kind: 'local-flow' as const,
+      chainCount: 0,
+    }
+    const emptyGraph: ChainGraph = { ...baseGraph, nodes: [], edges: [] }
+
+    const { rerender } = render(
+      <StrictMode>
+        <NetworkGraph
+          graph={emptyGraph}
+          selectedId={null}
+          onSelectEdge={vi.fn()}
+          onSelectNode={vi.fn()}
+        />
+      </StrictMode>,
+    )
+
+    rerender(
+      <StrictMode>
+        <NetworkGraph
+          graph={emptyGraph}
+          selectedId={localNode.id}
+          onSelectEdge={vi.fn()}
+          onSelectNode={vi.fn()}
+        />
+      </StrictMode>,
+    )
+
+    rerender(
+      <StrictMode>
+        <NetworkGraph
+          graph={{ ...baseGraph, nodes: [localNode], edges: [] }}
+          selectedId={localNode.id}
+          onSelectEdge={vi.fn()}
+          onSelectNode={vi.fn()}
+        />
+      </StrictMode>,
+    )
+
+    expect(readSavedView()).toEqual(
+      expect.objectContaining({
+        selectedId: localNode.id,
+      }),
+    )
   })
 
   it('passes every chain containing the selected node to the Cytoscape hook', () => {

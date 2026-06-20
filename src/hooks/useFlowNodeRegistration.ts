@@ -3,7 +3,6 @@ import { useCallback, useMemo, useState } from 'react'
 import type { LocalConsumeNode } from '../lib/consumeNodeStorage'
 import type { LocalFlowNode } from '../lib/flowNodeStorage'
 import type { LocalTxRecord } from '../lib/txRecordStorage'
-import type { QueryMode } from '../lib/types'
 import { type FlowNodeBusyState, useOperationFeedback } from './flow-node-registration/feedback'
 import { useFlowNodeLifecycleActions } from './flow-node-registration/useFlowNodeLifecycleActions'
 import { useFlowNodeTransactionActions } from './flow-node-registration/useFlowNodeTransactionActions'
@@ -18,7 +17,7 @@ interface UseFlowNodeRegistrationParams {
   persistLocalFlowNodes: (updater: (nodes: LocalFlowNode[]) => LocalFlowNode[]) => void
   persistTxRecords: (updater: (records: LocalTxRecord[]) => LocalTxRecord[]) => void
   reloadLocalNodeState: (pubkey: string) => void
-  runQuery: (override?: { mode: QueryMode; nodeId: string }) => Promise<void>
+  loadConsumeChain: (nodePubkey: string) => Promise<void>
   clearSelectedLocalNode: () => void
 }
 
@@ -30,7 +29,7 @@ export function useFlowNodeRegistration({
   persistLocalFlowNodes,
   persistTxRecords,
   reloadLocalNodeState,
-  runQuery,
+  loadConsumeChain,
   clearSelectedLocalNode,
 }: UseFlowNodeRegistrationParams) {
   const { busy, status, error, dispatch, notifyStatus, notifyError } = useOperationFeedback()
@@ -56,8 +55,8 @@ export function useFlowNodeRegistration({
     localConsumeNodes,
     localFlowNodes,
     localTxRecords,
+    loadConsumeChain,
     persistTxRecords,
-    runQuery,
     setMiningAttempts,
   })
 

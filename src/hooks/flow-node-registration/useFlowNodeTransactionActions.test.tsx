@@ -135,8 +135,8 @@ describe('useFlowNodeTransactionActions', () => {
         localConsumeNodes: [consumeNode],
         localFlowNodes: [originalFlowNode, targetFlowNode],
         localTxRecords: [],
+        loadConsumeChain: vi.fn(),
         persistTxRecords,
-        runQuery: vi.fn(),
         setMiningAttempts: vi.fn(),
       }),
     )
@@ -179,8 +179,8 @@ describe('useFlowNodeTransactionActions', () => {
         localConsumeNodes: [consumeNode],
         localFlowNodes: [originalFlowNode, targetFlowNode],
         localTxRecords: [record],
+        loadConsumeChain: vi.fn(),
         persistTxRecords: vi.fn(),
-        runQuery: vi.fn(),
         setMiningAttempts: vi.fn(),
       }),
     )
@@ -202,5 +202,33 @@ describe('useFlowNodeTransactionActions', () => {
       expect.any(Function),
     )
     expect(sendTransactionMountMsgMock).toHaveBeenCalled()
+  })
+
+  it('views a mounted consume chain through additive loading instead of resetting the graph query', async () => {
+    const loadConsumeChain = vi.fn(async () => undefined)
+    const runQuery = vi.fn(async () => undefined)
+    const { result } = renderHook(() =>
+      useFlowNodeTransactionActions({
+        clearSelectedLocalNode: vi.fn(),
+        client: {} as ApiClient,
+        dispatch: vi.fn(),
+        localConsumeNodes: [consumeNode],
+        localFlowNodes: [originalFlowNode, targetFlowNode],
+        localTxRecords: [record],
+        loadConsumeChain,
+        persistTxRecords: vi.fn(),
+        setMiningAttempts: vi.fn(),
+      }),
+    )
+
+    await act(async () => {
+      await result.current.createTransactionMount(record.id, targetFlowNode.publicKeyHex)
+    })
+    act(() => {
+      result.current.viewConsumeChain()
+    })
+
+    expect(loadConsumeChain).toHaveBeenCalledWith(targetFlowNode.publicKeyHex)
+    expect(runQuery).not.toHaveBeenCalled()
   })
 })

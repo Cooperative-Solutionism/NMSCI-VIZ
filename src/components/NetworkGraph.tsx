@@ -163,18 +163,23 @@ export function NetworkGraph({
   })
 
   useEffect(() => {
-    if (graphViewStatesEqual(graphViewState, normalizedGraphViewState) || !hasGraphElements) {
+    if (!hasGraphElements) {
       return
     }
 
-    graphViewStateStore.set(normalizedGraphViewState)
-    saveGraphViewState(normalizedGraphViewState, undefined, graphViewStateOptions)
+    const current = graphViewStateStore.getSnapshot()
+    const next = normalizeGraphViewState(current, graphViewStateOptions)
+    if (graphViewStatesEqual(current, next)) {
+      return
+    }
+
+    graphViewStateStore.set(next)
+    saveGraphViewState(next, undefined, graphViewStateOptions)
   }, [
     graphViewState,
     graphViewStateOptions,
     graphViewStateStore,
     hasGraphElements,
-    normalizedGraphViewState,
   ])
 
   useEffect(() => {
@@ -188,14 +193,16 @@ export function NetworkGraph({
 
     if (controlledSelectedId) {
       controlledDeselectedRef.current = false
+      const current = graphViewStateStore.getSnapshot()
+      const normalizedCurrent = normalizeGraphViewState(current, graphViewStateOptions)
       const next = normalizeGraphViewState(
         {
-          ...normalizedGraphViewState,
+          ...normalizedCurrent,
           selectedId: controlledSelectedId,
         },
         graphViewStateOptions,
       )
-      if (!graphViewStatesEqual(normalizedGraphViewState, next)) {
+      if (!graphViewStatesEqual(current, next)) {
         graphViewStateStore.set(next)
       }
       saveGraphViewState(next, undefined, graphViewStateOptions)
@@ -207,14 +214,16 @@ export function NetworkGraph({
     }
 
     controlledDeselectedRef.current = true
+    const current = graphViewStateStore.getSnapshot()
+    const normalizedCurrent = normalizeGraphViewState(current, graphViewStateOptions)
     const next = normalizeGraphViewState(
       {
-        ...normalizedGraphViewState,
+        ...normalizedCurrent,
         selectedId: null,
       },
       graphViewStateOptions,
     )
-    if (!graphViewStatesEqual(normalizedGraphViewState, next)) {
+    if (!graphViewStatesEqual(current, next)) {
       graphViewStateStore.set(next)
     }
     saveGraphViewState(next, undefined, graphViewStateOptions)
@@ -224,7 +233,6 @@ export function NetworkGraph({
     graphViewStateOptions,
     graphViewStateStore,
     hasGraphElements,
-    normalizedGraphViewState,
     selectedId,
   ])
 

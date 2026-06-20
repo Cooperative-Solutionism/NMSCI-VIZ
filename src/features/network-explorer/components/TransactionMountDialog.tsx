@@ -9,18 +9,15 @@ import {
   DialogTitle,
 } from '../../../components/ui/dialog'
 import { Field, FieldGroup, FieldLabel } from '../../../components/ui/field'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../../../components/ui/select'
 import { flowNodeDisplayName, formatAmount, shortId } from '../../../lib/chainGraph'
 import type { LocalFlowNode } from '../../../lib/flowNodeStorage'
 import { formatInteger } from '../../../lib/format'
 import type { LocalTxRecord } from '../../../lib/txRecordStorage'
+
+const choiceListClassName =
+  'grid max-h-36 gap-1 overflow-y-auto rounded-lg border border-border bg-background/50 p-1'
+const choiceButtonClassName =
+  'h-auto min-h-8 w-full justify-start whitespace-normal px-2 py-1.5 text-left'
 
 type MountDialogBodyProps = {
   busy: boolean
@@ -63,40 +60,63 @@ function MountDialogBody({
     <>
       <FieldGroup>
         <Field>
-          <FieldLabel htmlFor="mount-record-id">待挂载记录</FieldLabel>
-          <Select value={recordId} onValueChange={setRecordId}>
-            <SelectTrigger id="mount-record-id" className="w-full">
-              <SelectValue placeholder="暂无记录，请先创建" />
-            </SelectTrigger>
-            <SelectContent position="popper">
-              <SelectGroup>
-                {records.map((record) => (
-                  <SelectItem key={record.id} value={record.id}>
-                    {shortId(record.id)} ·{' '}
-                    {formatAmount(BigInt(record.amount), record.currencyType)}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          <FieldLabel id="mount-record-label">待挂载记录</FieldLabel>
+          <div
+            id="mount-record-id"
+            className={choiceListClassName}
+            role="group"
+            aria-labelledby="mount-record-label"
+          >
+            {records.length === 0 ? (
+              <p className="px-2 py-1.5 text-sm text-muted-foreground">暂无记录，请先创建</p>
+            ) : null}
+            {records.map((record) => {
+              const selected = record.id === recordId
+              return (
+                <Button
+                  key={record.id}
+                  type="button"
+                  variant={selected ? 'secondary' : 'outline'}
+                  className={choiceButtonClassName}
+                  aria-pressed={selected}
+                  aria-label={`选择消费记录 ${record.id}`}
+                  onClick={() => setRecordId(record.id)}
+                >
+                  {shortId(record.id)} · {formatAmount(BigInt(record.amount), record.currencyType)}
+                </Button>
+              )
+            })}
+          </div>
         </Field>
 
         <Field>
-          <FieldLabel htmlFor="mount-flow-node">挂载流转节点</FieldLabel>
-          <Select value={flowNodePubkey} onValueChange={setFlowNodePubkey}>
-            <SelectTrigger id="mount-flow-node" className="w-full">
-              <SelectValue placeholder="暂无流转节点，请先添加" />
-            </SelectTrigger>
-            <SelectContent position="popper">
-              <SelectGroup>
-                {flowNodes.map((node, index) => (
-                  <SelectItem key={node.publicKeyHex} value={node.publicKeyHex}>
-                    {flowNodeDisplayName(node, index)}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          <FieldLabel id="mount-flow-node-label">挂载流转节点</FieldLabel>
+          <div
+            id="mount-flow-node"
+            className={choiceListClassName}
+            role="group"
+            aria-labelledby="mount-flow-node-label"
+          >
+            {flowNodes.length === 0 ? (
+              <p className="px-2 py-1.5 text-sm text-muted-foreground">暂无流转节点，请先添加</p>
+            ) : null}
+            {flowNodes.map((node, index) => {
+              const selected = node.publicKeyHex === flowNodePubkey
+              return (
+                <Button
+                  key={node.publicKeyHex}
+                  type="button"
+                  variant={selected ? 'secondary' : 'outline'}
+                  className={choiceButtonClassName}
+                  aria-pressed={selected}
+                  aria-label={`选择流转节点 ${node.publicKeyHex}`}
+                  onClick={() => setFlowNodePubkey(node.publicKeyHex)}
+                >
+                  {flowNodeDisplayName(node, index)}
+                </Button>
+              )
+            })}
+          </div>
         </Field>
       </FieldGroup>
 

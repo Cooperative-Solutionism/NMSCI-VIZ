@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import {
   chainRow,
+  graphNodeAId,
+  graphNodeCId,
   installAppTestLifecycle,
   jsonResponse,
   requestInputUrl,
@@ -11,6 +13,8 @@ import {
 import App from './App'
 
 const centralPubkey = '02'.padEnd(66, '2')
+const generatedConsumePubkey = '02'.padEnd(66, '1')
+const generatedFlowPubkey = '02'.padEnd(66, '2')
 
 // 记录创建/挂载所需的难度目标与中心公钥统一来自最新区块。
 function latestBlock() {
@@ -49,7 +53,11 @@ describe('App initial state', () => {
     fireEvent.click(await screen.findByRole('button', { name: /canvas add consume node/i }))
     fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
 
-    fireEvent.click(await screen.findByRole('button', { name: /context generate record/ }))
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: `context generate record ${generatedConsumePubkey}`,
+      }),
+    )
     fireEvent.change(await screen.findByLabelText('金额'), { target: { value: '5000' } })
     fireEvent.click(screen.getByRole('button', { name: /^创建记录$/ }))
 
@@ -69,7 +77,6 @@ describe('App initial state', () => {
   })
 
   it('mounts a created record and views the resulting consume chain by pubkey', async () => {
-    const pubkey = '02'.padEnd(66, '1')
     const fetchMock = stubFetchByUrl((url, init) => {
       if (url.pathname === '/blocks/latest') {
         return jsonResponse(latestBlock())
@@ -89,7 +96,16 @@ describe('App initial state', () => {
         })
       }
       if (url.pathname === '/consume-chains') {
-        return jsonResponse(sliceResponse([chainRow('chain-x', 1)]))
+        if (url.searchParams.get('startPubkey') === generatedConsumePubkey) {
+          return jsonResponse(
+            sliceResponse([chainRow('chain-existing', 1, generatedConsumePubkey, graphNodeAId)]),
+          )
+        }
+        if (url.searchParams.get('nodePubkey') === generatedFlowPubkey) {
+          return jsonResponse(
+            sliceResponse([chainRow('chain-mounted', 1, generatedFlowPubkey, graphNodeCId)]),
+          )
+        }
       }
       throw new Error(`Unexpected URL ${url.href}`)
     })
@@ -98,8 +114,19 @@ describe('App initial state', () => {
     fireEvent.click(await screen.findByRole('button', { name: /canvas add consume node/i }))
     fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
 
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: `context load following ${generatedConsumePubkey}`,
+      }),
+    )
+    await screen.findByRole('button', { name: `Select node ${graphNodeAId}` })
+
     // create a record first
-    fireEvent.click(await screen.findByRole('button', { name: /context generate record/ }))
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: `context generate record ${generatedConsumePubkey}`,
+      }),
+    )
     fireEvent.change(await screen.findByLabelText('金额'), { target: { value: '5000' } })
     fireEvent.click(screen.getByRole('button', { name: /^创建记录$/ }))
     await waitFor(() => {
@@ -112,7 +139,9 @@ describe('App initial state', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '生成消费记录' })).toBeNull())
 
     // mount it
-    fireEvent.click(await screen.findByRole('button', { name: /context mount record/ }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: `context mount record ${generatedFlowPubkey}` }),
+    )
     fireEvent.click(await screen.findByRole('button', { name: /^提交挂载$/ }))
     await waitFor(() => {
       expect(
@@ -126,14 +155,29 @@ describe('App initial state', () => {
 
     // view the resulting consume chain — queries by pubkey
     fireEvent.click(await screen.findByRole('button', { name: /查看消费链/ }))
+    expect(
+      fetchMock.mock.calls.some(([input]) => {
+        const url = new URL(requestInputUrl(input), 'http://localhost')
+        return (
+          url.pathname.includes('/consume-chains') &&
+          url.searchParams.get('nodePubkey') === generatedFlowPubkey
+        )
+      }),
+    ).toBe(false)
     await waitFor(() => {
-      const chainCall = fetchMock.mock.calls.find(([input]) =>
-        requestInputUrl(input).includes('/consume-chains'),
-      )
+      const chainCall = fetchMock.mock.calls.find(([input]) => {
+        const url = new URL(requestInputUrl(input), 'http://localhost')
+        return (
+          url.pathname.includes('/consume-chains') &&
+          url.searchParams.get('nodePubkey') === generatedFlowPubkey
+        )
+      })
       expect(chainCall).toBeTruthy()
+      expect(screen.getByRole('button', { name: `Select node ${graphNodeAId}` })).toBeTruthy()
+      expect(screen.getByRole('button', { name: `Select node ${graphNodeCId}` })).toBeTruthy()
       expect(
         new URL(requestInputUrl(chainCall![0]), 'http://localhost').searchParams.get('nodePubkey'),
-      ).toBe(pubkey)
+      ).toBe(generatedFlowPubkey)
     })
   })
 })

@@ -9,9 +9,16 @@ const mockVault = vi.hoisted(() => ({
   status: 'disabled' as MockVaultStatus,
 }))
 
+const mockKeyPairs = vi.hoisted(() => ({
+  next: 1,
+  privateToPublic: new Map<string, string>(),
+}))
+
 export function resetMockVault() {
   mockVault.status = 'disabled'
   mockVault.error = null
+  mockKeyPairs.next = 1
+  mockKeyPairs.privateToPublic.clear()
 }
 
 export function setMockVaultStatus(status: MockVaultStatus) {
@@ -146,14 +153,16 @@ vi.mock('@nmsci/sdk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@nmsci/sdk')>()
   return {
     ...actual,
-    generateKeyPair: () => ({
-      privateKey: '0'.repeat(63) + '1',
-      publicKey: '02'.padEnd(66, '1'),
-    }),
+    generateKeyPair: () => {
+      const keyDigit = (mockKeyPairs.next++).toString(16).slice(-1)
+      const privateKey = '0'.repeat(63) + keyDigit
+      const publicKey = '02'.padEnd(66, keyDigit)
+      mockKeyPairs.privateToPublic.set(privateKey, publicKey)
+
+      return { privateKey, publicKey }
+    },
     getPublicKeyFromPrivate: (privateKeyHex: string) =>
-      privateKeyHex === '0'.repeat(63) + '1'
-        ? '02'.padEnd(66, '1')
-        : actual.getPublicKeyFromPrivate(privateKeyHex),
+      mockKeyPairs.privateToPublic.get(privateKeyHex) ?? actual.getPublicKeyFromPrivate(privateKeyHex),
     mineNonce: async (
       _prefix: Uint8Array,
       _suffix: Uint8Array,

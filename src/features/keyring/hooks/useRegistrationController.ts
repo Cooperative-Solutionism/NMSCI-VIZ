@@ -5,7 +5,6 @@ import { useNodeDetail } from '../../../hooks/useNodeDetail'
 import type { LocalConsumeNode } from '../../../lib/consumeNodeStorage'
 import type { LocalFlowNode } from '../../../lib/flowNodeStorage'
 import type { LocalTxRecord } from '../../../lib/txRecordStorage'
-import type { QueryMode } from '../../../lib/types'
 
 export type RegistrationController = ReturnType<typeof useFlowNodeRegistration>
 
@@ -15,9 +14,9 @@ export function useRegistrationController({
   localConsumeNodes,
   localFlowNodes,
   localTxRecords,
+  loadConsumeChain,
   persistLocalFlowNodes,
   persistTxRecords,
-  runQuery,
   selectedLocalNode,
 }: {
   apiBase: string
@@ -25,9 +24,9 @@ export function useRegistrationController({
   localConsumeNodes: LocalConsumeNode[]
   localFlowNodes: LocalFlowNode[]
   localTxRecords: LocalTxRecord[]
+  loadConsumeChain: (nodePubkey: string) => Promise<void>
   persistLocalFlowNodes: (updater: (nodes: LocalFlowNode[]) => LocalFlowNode[]) => void
   persistTxRecords: (updater: (records: LocalTxRecord[]) => LocalTxRecord[]) => void
-  runQuery: (override?: { mode: QueryMode; nodeId: string }) => Promise<void>
   selectedLocalNode: LocalFlowNode | null
 }) {
   const client = useMemo(() => new ApiClient({ baseUrl: apiBase }), [apiBase])
@@ -49,7 +48,7 @@ export function useRegistrationController({
     persistLocalFlowNodes,
     persistTxRecords,
     reloadLocalNodeState: reloadRegistrationNodeState,
-    runQuery,
+    loadConsumeChain,
     clearSelectedLocalNode,
   })
 
