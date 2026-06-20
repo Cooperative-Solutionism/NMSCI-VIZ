@@ -244,7 +244,7 @@ describe('DashboardWorkspace', () => {
     expect(storedLayout().query).toEqual(defaultDashboardLayout.query)
   })
 
-  it('keeps a collapsed dock icon at the dock position after moving and collapsing a panel', () => {
+  it('keeps a collapsed dock icon at the moved panel position after collapsing from the left button', () => {
     renderWorkspace()
     fireEvent.click(screen.getByRole('button', { name: openQueryName }))
 
@@ -259,14 +259,16 @@ describe('DashboardWorkspace', () => {
     fireEvent.pointerUp(window)
     fireEvent.click(screen.getByRole('button', { name: collapseQueryName }))
 
-    expect(screen.getByRole('button', { name: openQueryName })).toHaveStyle({
-      left: `${defaultQueryDockPosition.x}px`,
-      top: `${defaultQueryDockPosition.y}px`,
-    })
-    expect(storedLayout().query.panelPosition).toEqual({
+    const movedPanelPosition = {
       x: defaultQueryPanelPosition.x + 28,
       y: defaultQueryPanelPosition.y + 34,
+    }
+
+    expect(screen.getByRole('button', { name: openQueryName })).toHaveStyle({
+      left: `${movedPanelPosition.x}px`,
+      top: `${movedPanelPosition.y}px`,
     })
-    expect(storedLayout().query.dockPosition).toEqual(defaultQueryDockPosition)
+    expect(storedLayout().query.panelPosition).toEqual(movedPanelPosition)
+    expect(storedLayout().query.dockPosition).toEqual(movedPanelPosition)
   })
 })

@@ -60,6 +60,17 @@ export function DashboardWorkspace({ graph, panels }: DashboardWorkspaceProps) {
     },
     [updateLayout],
   )
+  const collapsePanel = useCallback(
+    (panelId: DashboardPanelId) => {
+      const panelPosition = layoutRef.current[panelId].panelPosition
+
+      updateLayout(panelId, {
+        collapsed: true,
+        dockPosition: panelPosition,
+      })
+    },
+    [updateLayout],
+  )
   const closePanel = useCallback(
     (panelId: DashboardPanelId) => {
       const bounds = workspaceBounds(workspaceRef.current)
@@ -100,7 +111,7 @@ export function DashboardWorkspace({ graph, panels }: DashboardWorkspaceProps) {
             position={panelLayout.panelPosition}
             boundsRef={workspaceRef}
             focusOnMount={focusPanelId === panel.id}
-            onCollapse={() => updateLayout(panel.id, { collapsed: true })}
+            onCollapse={() => collapsePanel(panel.id)}
             onClose={() => closePanel(panel.id)}
             onFocusMount={() => clearFocusedPanel(panel.id)}
             onPositionChange={(panelPosition) => updateLayout(panel.id, { panelPosition })}
