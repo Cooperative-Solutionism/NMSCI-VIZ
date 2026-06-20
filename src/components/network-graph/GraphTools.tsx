@@ -1,15 +1,49 @@
 import { Download, Maximize2, ZoomIn, ZoomOut } from 'lucide-react'
+import type { GraphHighlightMode } from './graphViewState'
 import { Button } from '../ui/button'
 
 interface GraphToolsProps {
+  hasCycles: boolean
+  highlightMode: GraphHighlightMode
   onDownloadPng: () => void
   onFit: () => void
+  onHighlightModeChange: (mode: GraphHighlightMode) => void
   onZoomBy: (delta: number) => void
 }
 
-export function GraphTools({ onDownloadPng, onFit, onZoomBy }: GraphToolsProps) {
+export function GraphTools({
+  hasCycles,
+  highlightMode,
+  onDownloadPng,
+  onFit,
+  onHighlightModeChange,
+  onZoomBy,
+}: GraphToolsProps) {
   return (
     <div className="graph-tools" aria-label="图谱控制">
+      <div className="graph-tools__mode" role="group" aria-label="高亮模式">
+        <Button
+          aria-label="相关链路"
+          aria-pressed={highlightMode === 'related'}
+          size="sm"
+          type="button"
+          variant="ghost"
+          onClick={() => onHighlightModeChange('related')}
+        >
+          相关
+        </Button>
+        <Button
+          aria-label="循环链路"
+          aria-pressed={highlightMode === 'cycles'}
+          disabled={!hasCycles}
+          size="sm"
+          type="button"
+          variant="ghost"
+          onClick={() => onHighlightModeChange('cycles')}
+        >
+          循环
+        </Button>
+      </div>
       <Button
         variant="ghost"
         size="icon"

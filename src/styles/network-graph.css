@@ -258,6 +258,59 @@
   color: var(--teal);
 }
 
+.graph-tools__mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 4px;
+  padding-right: 4px;
+  border-right: 1px solid rgb(217 222 232 / 0.9);
+}
+
+.graph-tools__mode button {
+  width: auto;
+  min-width: 42px;
+  padding: 0 8px;
+}
+
+.graph-tools__mode button[aria-pressed='true'] {
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.graph-search {
+  position: absolute;
+  top: 68px;
+  right: 16px;
+  z-index: 14;
+  display: grid;
+  gap: 4px;
+  width: min(280px, calc(100vw - 32px));
+  border: 1px solid rgb(198 207 220 / 0.82);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  padding: 6px;
+  box-shadow:
+    0 16px 42px -28px rgba(30, 42, 62, 0.42),
+    0 1px 8px -5px rgba(30, 42, 62, 0.22);
+}
+
+.graph-search__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  gap: 4px;
+}
+
+.graph-search__hint {
+  padding: 0 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
 .legend {
   position: absolute;
   left: 16px;

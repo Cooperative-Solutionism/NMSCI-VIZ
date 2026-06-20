@@ -6,11 +6,15 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 import { Plus, Workflow } from 'lucide-react'
+import { shortId } from '../lib/chainGraph'
+import type { ChainGraphNode } from '../lib/types'
 import { Button } from './ui/button'
 import { GraphAccessList } from './network-graph/GraphAccessList'
 import { GraphContextMenu } from './network-graph/GraphContextMenu'
 import { GraphLegend } from './network-graph/GraphLegend'
+import { GraphSearch } from './network-graph/GraphSearch'
 import { GraphTools } from './network-graph/GraphTools'
+import type { GraphHighlightMode } from './network-graph/graphViewState'
 import type { ContextMenuState, NetworkGraphProps } from './network-graph/types'
 import { useCytoscapeGraph } from './network-graph/useCytoscapeGraph'
 
@@ -34,11 +38,25 @@ export function NetworkGraph({
     () => chainsForSelection(graph, selectedId),
     [graph, selectedId],
   )
+  const cycleChainIds = useMemo(
+    () =>
+      new Set(
+        graph.edges.filter((edge) => edge.status === 'looped').map((edge) => edge.chainId),
+      ),
+    [graph.edges],
+  )
+  const hasCycles = cycleChainIds.size > 0
+  const [requestedHighlightMode, setRequestedHighlightMode] =
+    useState<GraphHighlightMode>('related')
+  const highlightMode: GraphHighlightMode = hasCycles ? requestedHighlightMode : 'related'
+
   const closeMenu = useCallback(() => setMenu(null), [])
-  const { containerRef, cyRef } = useCytoscapeGraph({
+  const { containerRef, cyRef, focusNode } = useCytoscapeGraph({
     graph,
     selectedId,
     selectedChainIds,
+    cycleChainIds,
+    highlightMode,
     onSelectNode,
     onSelectEdge,
     onOpenMenu: setMenu,
@@ -68,6 +86,14 @@ export function NetworkGraph({
     link.download = 'nmsci-graph.png'
     link.click()
   }, [cyRef])
+
+  const handleSearchSelect = useCallback(
+    (node: ChainGraphNode) => {
+      onSelectNode(node)
+      focusNode(node.id)
+    },
+    [focusNode, onSelectNode],
+  )
 
   const zoomBy = useCallback(
     (delta: number) => {
@@ -118,7 +144,12 @@ export function NetworkGraph({
     [fitGraph, openMenuAtCenter, zoomBy],
   )
 
-  const selectedState = selectedId ? '已选择对象' : '未选择'
+  const activeHighlightCount =
+    highlightMode === 'cycles' ? cycleChainIds.size : selectedChainIds.size
+  const selectedState = selectedId ? `选中 ${shortId(selectedId)}` : '未选择'
+  const highlightState =
+    highlightMode === 'cycles' ? `循环 ${cycleChainIds.size}` : `高亮链 ${activeHighlightCount}`
+  const densityHint = graph.nodes.length > 100 ? '节点较多，建议使用搜索定位' : null
 
   return (
     <div className="graph-shell" onContextMenu={(event) => event.preventDefault()}>
@@ -130,7 +161,9 @@ export function NetworkGraph({
         <div className="graph-statusbar__meta">
           <span>节点 {graph.nodes.length}</span>
           <span>连接 {graph.edges.length}</span>
+          <span>{highlightState}</span>
           <span>{selectedState}</span>
+          {densityHint ? <span>{densityHint}</span> : null}
         </div>
       </div>
 
@@ -146,6 +179,7 @@ export function NetworkGraph({
         onKeyDown={handleCanvasKeyDown}
       />
       {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
+      <GraphSearch nodes={graph.nodes} onSelectNode={handleSearchSelect} />
 
       {graph.nodes.length === 0 ? (
         <div className="graph-empty-state" aria-label="空画布">
@@ -188,7 +222,14 @@ export function NetworkGraph({
         />
       ) : null}
       <GraphAccessList graph={graph} onSelectEdge={onSelectEdge} onSelectNode={onSelectNode} />
-      <GraphTools onDownloadPng={handleDownloadPng} onFit={fitGraph} onZoomBy={zoomBy} />
+      <GraphTools
+        hasCycles={hasCycles}
+        highlightMode={highlightMode}
+        onDownloadPng={handleDownloadPng}
+        onFit={fitGraph}
+        onHighlightModeChange={setRequestedHighlightMode}
+        onZoomBy={zoomBy}
+      />
       <GraphLegend />
     </div>
   )

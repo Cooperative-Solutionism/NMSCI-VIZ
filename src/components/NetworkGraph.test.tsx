@@ -1,15 +1,22 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ChainGraph } from '../lib/types'
 import { NetworkGraph } from './NetworkGraph'
 import { useCytoscapeGraph } from './network-graph/useCytoscapeGraph'
+
+const hookMocks = vi.hoisted(() => ({
+  focusNode: vi.fn(),
+}))
 
 vi.mock('./network-graph/useCytoscapeGraph', () => ({
   useCytoscapeGraph: vi.fn(() => ({
     containerRef: { current: null },
     cyRef: { current: null },
+    focusNode: hookMocks.focusNode,
   })),
 }))
+
+afterEach(cleanup)
 
 const baseGraph: ChainGraph = {
   nodes: [
@@ -23,7 +30,7 @@ const baseGraph: ChainGraph = {
     edge('edge-a1', 'node-a', 'node-b', 'chain-a'),
     edge('edge-a2', 'node-b', 'node-c', 'chain-a'),
     edge('edge-b1', 'node-d', 'node-b', 'chain-b'),
-    edge('edge-c1', 'node-d', 'node-e', 'chain-c'),
+    edge('edge-c1', 'node-d', 'node-e', 'chain-c', 'looped'),
   ],
   stats: {
     totalChains: 3,
@@ -34,6 +41,10 @@ const baseGraph: ChainGraph = {
 }
 
 describe('NetworkGraph selection highlighting', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('renders a canvas status bar with graph counts and selection state', () => {
     render(
       <NetworkGraph
@@ -47,7 +58,7 @@ describe('NetworkGraph selection highlighting', () => {
     expect(screen.getByText('NMSCI 交易画布')).toBeInTheDocument()
     expect(screen.getByText('节点 5')).toBeInTheDocument()
     expect(screen.getByText('连接 4')).toBeInTheDocument()
-    expect(screen.getByText('已选择对象')).toBeInTheDocument()
+    expect(screen.getByText('选中 NODE-B')).toBeInTheDocument()
   })
 
   it('offers direct add actions on an empty canvas', () => {
@@ -89,6 +100,81 @@ describe('NetworkGraph selection highlighting', () => {
 
     expect(Array.from(params?.selectedChainIds ?? []).sort()).toEqual(['chain-a', 'chain-b'])
   })
+
+  it('searches and focuses the first matching node', () => {
+    const onSelectNode = vi.fn()
+    render(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId={null}
+        onSelectEdge={vi.fn()}
+        onSelectNode={onSelectNode}
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText('搜索图谱节点'), {
+      target: { value: 'node-c' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '定位节点' }))
+
+    expect(onSelectNode).toHaveBeenCalledWith(baseGraph.nodes[2])
+    expect(hookMocks.focusNode).toHaveBeenCalledWith('node-c')
+  })
+
+  it('switches to cycle highlighting when cycles are available', () => {
+    render(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId={null}
+        onSelectEdge={vi.fn()}
+        onSelectNode={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '循环链路' }))
+
+    const params = vi.mocked(useCytoscapeGraph).mock.calls.at(-1)?.[0] as
+      | { cycleChainIds?: Set<string>; highlightMode?: string }
+      | undefined
+
+    expect(params?.highlightMode).toBe('cycles')
+    expect(Array.from(params?.cycleChainIds ?? [])).toEqual(['chain-c'])
+  })
+
+  it('disables cycle highlighting when no cycle edges exist', () => {
+    render(
+      <NetworkGraph
+        graph={{
+          ...baseGraph,
+          edges: baseGraph.edges.map((item) => ({ ...item, status: 'open' as const })),
+        }}
+        selectedId={null}
+        onSelectEdge={vi.fn()}
+        onSelectNode={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: '循环链路' })).toBeDisabled()
+  })
+
+  it('shows selected short id and density guidance for large graphs', () => {
+    const largeGraph: ChainGraph = {
+      ...baseGraph,
+      nodes: Array.from({ length: 101 }, (_, index) => node(`node-${index}`)),
+    }
+
+    render(
+      <NetworkGraph
+        graph={largeGraph}
+        selectedId="node-100"
+        onSelectEdge={vi.fn()}
+        onSelectNode={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('选中 NODE-1')).toBeInTheDocument()
+    expect(screen.getByText('节点较多，建议使用搜索定位')).toBeInTheDocument()
+  })
 })
 
 function node(id: string): ChainGraph['nodes'][number] {
@@ -106,6 +192,7 @@ function edge(
   source: string,
   target: string,
   chainId: string,
+  status: ChainGraph['edges'][number]['status'] = 'open',
 ): ChainGraph['edges'][number] {
   return {
     id,
@@ -115,7 +202,7 @@ function edge(
     label: '1.00 CNY',
     amount: 100n,
     currencyType: 1,
-    status: 'open',
+    status,
     color: '#0f766e',
     relatedTransactionRecord: 'record',
     relatedTransactionMount: 'mount',
