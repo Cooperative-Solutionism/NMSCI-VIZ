@@ -46,7 +46,7 @@ export function useCytoscapeGraph({
   const onOpenMenuRef = useRef(onOpenMenu)
   const onCloseMenuRef = useRef(onCloseMenu)
   const onViewChangeRef = useRef(onViewChange)
-  const initialViewAppliedRef = useRef(false)
+  const initialViewAppliedCyRef = useRef<Core | null>(null)
 
   const nodeMap = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node])), [graph.nodes])
   const edgeMap = useMemo(() => new Map(graph.edges.map((edge) => [edge.id, edge])), [graph.edges])
@@ -134,8 +134,9 @@ export function useCytoscapeGraph({
 
     cyRef.current = cy
     return () => {
+      if (initialViewAppliedCyRef.current === cy) initialViewAppliedCyRef.current = null
       cy.destroy()
-      cyRef.current = null
+      if (cyRef.current === cy) cyRef.current = null
     }
   }, [])
 
@@ -146,7 +147,7 @@ export function useCytoscapeGraph({
     const wasEmpty = cy.elements().empty()
     syncGraphElements(cy, graph.nodes, graph.edges)
 
-    if (wasEmpty && graph.nodes.length > 0) {
+    if (wasEmpty && graph.nodes.length > 0 && !initialViewState) {
       cy.layout({
         name: 'cose',
         animate: false,
@@ -156,12 +157,19 @@ export function useCytoscapeGraph({
         idealEdgeLength: 132,
       }).run()
     }
-  }, [graph.edges, graph.nodes])
+  }, [graph.edges, graph.nodes, initialViewState])
 
   useEffect(() => {
     const cy = cyRef.current
-    if (!cy || !initialViewState || initialViewAppliedRef.current) return
-    initialViewAppliedRef.current = true
+    if (
+      !cy ||
+      !initialViewState ||
+      graph.nodes.length === 0 ||
+      initialViewAppliedCyRef.current === cy
+    ) {
+      return
+    }
+    initialViewAppliedCyRef.current = cy
     cy.zoom(initialViewState.zoom)
     cy.pan(initialViewState.pan)
   }, [graph.edges.length, graph.nodes.length, initialViewState])
@@ -226,7 +234,7 @@ export function useCytoscapeGraph({
     const cy = cyRef.current
     if (!cy) return
     const target = cy.getElementById(nodeId)
-    if (target.empty()) return
+    if (target.empty() || !target.isNode()) return
 
     cy.animate(
       {
