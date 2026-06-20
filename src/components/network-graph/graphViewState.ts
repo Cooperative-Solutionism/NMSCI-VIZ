@@ -16,11 +16,17 @@ interface NormalizeOptions {
   maxZoom?: number
 }
 
+const DEFAULT_ZOOM = 1
+const DEFAULT_PAN_X = 0
+const DEFAULT_PAN_Y = 0
+const DEFAULT_SELECTED_ID = null
+const DEFAULT_HIGHLIGHT_MODE: GraphHighlightMode = 'related'
+
 export const DEFAULT_GRAPH_VIEW_STATE: GraphViewState = {
-  zoom: 1,
-  pan: { x: 0, y: 0 },
-  selectedId: null,
-  highlightMode: 'related',
+  zoom: DEFAULT_ZOOM,
+  pan: { x: DEFAULT_PAN_X, y: DEFAULT_PAN_Y },
+  selectedId: DEFAULT_SELECTED_ID,
+  highlightMode: DEFAULT_HIGHLIGHT_MODE,
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -33,6 +39,19 @@ function finiteNumber(value: unknown): number | null {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
+}
+
+function createDefaultPan(): GraphViewState['pan'] {
+  return { x: DEFAULT_PAN_X, y: DEFAULT_PAN_Y }
+}
+
+function createDefaultGraphViewState(): GraphViewState {
+  return {
+    zoom: DEFAULT_ZOOM,
+    pan: createDefaultPan(),
+    selectedId: DEFAULT_SELECTED_ID,
+    highlightMode: DEFAULT_HIGHLIGHT_MODE,
+  }
 }
 
 function readStorage(storage?: Storage): Storage | null {
@@ -52,7 +71,7 @@ export function normalizeGraphViewState(
 ): GraphViewState {
   const minZoom = options.minZoom ?? 0.35
   const maxZoom = options.maxZoom ?? 2.4
-  if (!isRecord(value)) return DEFAULT_GRAPH_VIEW_STATE
+  if (!isRecord(value)) return createDefaultGraphViewState()
 
   const rawZoom = finiteNumber(value.zoom)
   const rawPan = isRecord(value.pan) ? value.pan : null
@@ -77,10 +96,10 @@ export function normalizeGraphViewState(
   const pan =
     rawPanX !== null && rawPanY !== null
       ? { x: rawPanX, y: rawPanY }
-      : DEFAULT_GRAPH_VIEW_STATE.pan
+      : createDefaultPan()
 
   return {
-    zoom: clamp(rawZoom ?? DEFAULT_GRAPH_VIEW_STATE.zoom, minZoom, maxZoom),
+    zoom: clamp(rawZoom ?? DEFAULT_ZOOM, minZoom, maxZoom),
     pan,
     selectedId,
     highlightMode,
@@ -92,13 +111,13 @@ export function loadGraphViewState(
   options?: NormalizeOptions,
 ): GraphViewState {
   const targetStorage = readStorage(storage)
-  if (!targetStorage) return DEFAULT_GRAPH_VIEW_STATE
+  if (!targetStorage) return createDefaultGraphViewState()
 
   try {
     const raw = targetStorage.getItem(GRAPH_VIEW_STORAGE_KEY)
     return normalizeGraphViewState(raw ? JSON.parse(raw) : null, options)
   } catch {
-    return DEFAULT_GRAPH_VIEW_STATE
+    return createDefaultGraphViewState()
   }
 }
 

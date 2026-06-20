@@ -102,6 +102,17 @@ describe('graph view state', () => {
     saveGraphViewState(state, storage, { elementIds: new Set(['node-a']), hasCycles: false })
     expect(storage.getItem(GRAPH_VIEW_STORAGE_KEY)).toBe(JSON.stringify(state))
 
+    const dirtyState = {
+      zoom: Number.POSITIVE_INFINITY,
+      pan: { x: 'bad', y: 20 },
+      selectedId: '',
+      highlightMode: 'cycles',
+    } as unknown as GraphViewState
+    saveGraphViewState(dirtyState, storage, { elementIds: new Set(['']), hasCycles: false })
+    expect(storage.getItem(GRAPH_VIEW_STORAGE_KEY)).toBe(
+      JSON.stringify(DEFAULT_GRAPH_VIEW_STATE),
+    )
+
     const failingStorage = {
       ...memoryStorage(),
       setItem: () => {
@@ -109,5 +120,19 @@ describe('graph view state', () => {
       },
     } as Storage
     expect(() => saveGraphViewState(state, failingStorage)).not.toThrow()
+  })
+
+  it('returns fresh defaults so callers cannot mutate later fallback state', () => {
+    const first = normalizeGraphViewState(null)
+
+    first.pan.x = 99
+    first.highlightMode = 'cycles'
+
+    expect(normalizeGraphViewState(null)).toEqual({
+      zoom: 1,
+      pan: { x: 0, y: 0 },
+      selectedId: null,
+      highlightMode: 'related',
+    })
   })
 })
