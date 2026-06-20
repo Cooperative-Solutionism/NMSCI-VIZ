@@ -37,7 +37,7 @@ describe('GraphSearch', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: '定位节点' }))
 
-    expect(screen.getByText('匹配 2 个节点')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('匹配 2 个节点')
     expect(onSelectNode).toHaveBeenCalledWith(nodes[0])
   })
 
@@ -57,12 +57,15 @@ describe('GraphSearch', () => {
     const onSelectNode = vi.fn()
     render(<GraphSearch nodes={nodes} onSelectNode={onSelectNode} />)
 
-    fireEvent.change(screen.getByLabelText('搜索图谱节点'), {
+    const searchInput = screen.getByLabelText('搜索图谱节点')
+    fireEvent.change(searchInput, {
       target: { value: 'missing' },
     })
-    fireEvent.click(screen.getByRole('button', { name: '定位节点' }))
 
-    expect(screen.getByText('未找到匹配节点')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '定位节点' })).toBeDisabled()
+    fireEvent.keyDown(searchInput, { key: 'Enter' })
+
+    expect(screen.getByRole('status')).toHaveTextContent('未找到匹配节点')
     expect(onSelectNode).not.toHaveBeenCalled()
   })
 

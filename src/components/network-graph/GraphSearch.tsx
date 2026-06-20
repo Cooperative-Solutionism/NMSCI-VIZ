@@ -9,6 +9,7 @@ interface GraphSearchProps {
   onSelectNode: (node: ChainGraphNode) => void
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function findGraphSearchMatches(
   nodes: ChainGraphNode[],
   query: string,
@@ -68,9 +69,15 @@ export function GraphSearch({ nodes, onSelectNode }: GraphSearchProps) {
           <Search aria-hidden="true" />
         </Button>
       </div>
-      {hasNoMatches ? <div className="graph-search__hint">未找到匹配节点</div> : null}
+      {hasNoMatches ? (
+        <div className="graph-search__hint" role="status">
+          未找到匹配节点
+        </div>
+      ) : null}
       {matches.length > 0 ? (
-        <div className="graph-search__hint">匹配 {matches.length} 个节点</div>
+        <div className="graph-search__hint" role="status">
+          匹配 {matches.length} 个节点
+        </div>
       ) : null}
     </div>
   )
