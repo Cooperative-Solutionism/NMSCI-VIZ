@@ -22,6 +22,8 @@ export function GraphPanel({
   onDeleteNode,
   onSelectEdge,
   onSelectNode,
+  mountPickActive,
+  onCancelMountPick,
   selectedId,
 }: {
   canvasGraph: ChainGraph
@@ -39,6 +41,8 @@ export function GraphPanel({
   onDeleteNode: (node: ChainGraphNode) => void
   onSelectEdge: (edge: ChainGraphEdge) => void
   onSelectNode: (node: ChainGraphNode) => void
+  mountPickActive: boolean
+  onCancelMountPick: () => void
   selectedId: string | null
 }) {
   return (
@@ -65,6 +69,8 @@ export function GraphPanel({
               onExportNodeKey={onExportNodeKey}
               onRenameNode={onRenameNode}
               onDeleteNode={onDeleteNode}
+              mountPickActive={mountPickActive}
+              onCancelMountPick={onCancelMountPick}
             />
           </Suspense>
         </ErrorBoundary>

@@ -15,6 +15,7 @@ import { GraphContextMenu } from './network-graph/GraphContextMenu'
 import { GraphLegend } from './network-graph/GraphLegend'
 import { GraphSearch } from './network-graph/GraphSearch'
 import { GraphTools } from './network-graph/GraphTools'
+import { Button } from './ui/button'
 import {
   GRAPH_VIEW_STORAGE_KEY,
   normalizeGraphViewState,
@@ -47,6 +48,8 @@ export function NetworkGraph({
   onExportNodeKey,
   onRenameNode,
   onDeleteNode,
+  mountPickActive,
+  onCancelMountPick,
 }: NetworkGraphProps) {
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
   const selectedChainIds = useMemo(
@@ -370,6 +373,14 @@ export function NetworkGraph({
           {densityHint ? <span>{densityHint}</span> : null}
         </div>
       </div>
+      {mountPickActive ? (
+        <div className="graph-mount-banner" role="status">
+          <span>挂载模式：点击画布上的流转节点完成挂载（Esc 取消）</span>
+          <Button type="button" variant="secondary" size="sm" onClick={() => onCancelMountPick?.()}>
+            取消
+          </Button>
+        </div>
+      ) : null}
 
       {/* Cytoscape owns this custom canvas widget; keyboard affordances are wired below. */}
       {/* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}

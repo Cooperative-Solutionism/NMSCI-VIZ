@@ -22,3 +22,15 @@
 .graph-context-menu-content {
   z-index: 60;
 }
+
+.graph-mount-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid color-mix(in oklch, var(--primary), transparent 65%);
+  background: color-mix(in oklch, var(--primary), var(--background) 86%);
+  color: var(--foreground);
+  font-size: 13px;
+}

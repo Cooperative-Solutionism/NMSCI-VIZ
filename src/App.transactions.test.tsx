@@ -196,4 +196,70 @@ describe('App initial state', () => {
     })
     expect(screen.queryByRole('button', { name: 'Select edge chain-existing-edge' })).toBeNull()
   })
+
+  it('mounts a newly created record by picking a local flow node on the canvas', async () => {
+    const fetchMock = stubFetchByUrl((url, init) => {
+      if (url.pathname === '/blocks/latest') {
+        return jsonResponse(latestBlock())
+      }
+      if (url.pathname === '/transaction-records' && init?.method === 'POST') {
+        return jsonResponse({
+          code: 200,
+          message: 'ok',
+          data: { id: '33333333-3333-4333-8333-3333333333cc', txid: 'txid-rec' },
+        })
+      }
+      if (url.pathname === '/transaction-mounts' && init?.method === 'POST') {
+        return jsonResponse({
+          code: 200,
+          message: 'ok',
+          data: { id: 'tx-mount-pick-1', txid: 'txid-mount' },
+        })
+      }
+      throw new Error(`Unexpected URL ${url.href}`)
+    })
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /canvas add consume node/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
+
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: `context generate record ${generatedConsumePubkey}`,
+      }),
+    )
+    fireEvent.change(await screen.findByLabelText('金额'), { target: { value: '5000' } })
+    fireEvent.click(screen.getByRole('button', { name: /^创建记录$/ }))
+
+    fireEvent.click(await screen.findByRole('button', { name: '挂载至节点' }))
+
+    expect(await screen.findByTestId('mount-pick-active')).toBeInTheDocument()
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: `Select node ${generatedConsumePubkey}` }),
+    )
+    expect(await screen.findAllByText('请选择流转节点进行挂载。')).not.toHaveLength(0)
+    expect(screen.getByTestId('mount-pick-active')).toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.some(
+        ([input, requestInit]) =>
+          requestInputUrl(input).includes('/transaction-mounts') &&
+          (requestInit as RequestInit | undefined)?.method === 'POST',
+      ),
+    ).toBe(false)
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: `Select node ${generatedFlowPubkey}` }),
+    )
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([input, requestInit]) =>
+            requestInputUrl(input).includes('/transaction-mounts') &&
+            (requestInit as RequestInit | undefined)?.method === 'POST',
+        ),
+      ).toBe(true)
+    })
+  })
 })

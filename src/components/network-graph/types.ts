@@ -22,6 +22,8 @@ export interface NetworkGraphProps {
   onExportNodeKey?: (node: ChainGraphNode) => void
   onRenameNode?: (node: ChainGraphNode) => void
   onDeleteNode?: (node: ChainGraphNode) => void
+  mountPickActive?: boolean
+  onCancelMountPick?: () => void
 }
 
 export interface ContextMenuState {

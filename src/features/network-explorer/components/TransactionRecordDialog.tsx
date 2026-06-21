@@ -38,19 +38,22 @@ function amountIssue(raw: string): string | null {
 type RecordDialogBodyProps = {
   busy: boolean
   consumeNodes: LocalConsumeNode[]
+  createdRecordId?: string
   defaultConsumeNodePubkey?: string
   defaultFlowNodePubkey?: string
   error: string | null
   flowNodes: LocalFlowNode[]
   miningAttempts: number | null
   status: string | null
-  onCreate: (draft: TransactionRecordDraft) => void
+  onCreate: (draft: TransactionRecordDraft) => void | Promise<void>
+  onMountToNode?: (recordId: string) => void
 }
 
 // 表单状态随弹窗内容挂载/卸载而重建：每次打开都按右键来源（默认值）重新预填，无需副作用同步。
 function RecordDialogBody({
   busy,
   consumeNodes,
+  createdRecordId,
   defaultConsumeNodePubkey,
   defaultFlowNodePubkey,
   error,
@@ -58,6 +61,7 @@ function RecordDialogBody({
   miningAttempts,
   status,
   onCreate,
+  onMountToNode,
 }: RecordDialogBodyProps) {
   const [consumeNodePubkey, setConsumeNodePubkey] = useState(
     defaultConsumeNodePubkey ?? consumeNodes[0]?.publicKeyHex ?? '',
@@ -75,7 +79,7 @@ function RecordDialogBody({
     if (busy || missingNodes) return
     setAmountTouched(true)
     if (!consumeNodePubkey || !flowNodePubkey || amountError) return
-    onCreate({
+    void onCreate({
       consumeNodePubkey,
       flowNodePubkey,
       amount: amount.trim(),
@@ -172,6 +176,16 @@ function RecordDialogBody({
       ) : null}
 
       <DialogFooter>
+        {createdRecordId ? (
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={busy}
+            onClick={() => onMountToNode?.(createdRecordId)}
+          >
+            挂载至节点
+          </Button>
+        ) : null}
         <Button type="button" disabled={busy || missingNodes} onClick={handleSubmit}>
           {busy
             ? miningAttempts != null

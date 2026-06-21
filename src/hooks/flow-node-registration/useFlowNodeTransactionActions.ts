@@ -123,6 +123,7 @@ export function useFlowNodeTransactionActions({
         }
         persistTxRecords((current) => [record, ...current])
         dispatch({ type: 'SUCCESS', status: `交易记录已创建（${shortId(record.id)}）。` })
+        return record.id
       } catch (operationError) {
         dispatch({ type: 'FAILURE', error: errorMessage(operationError, '创建交易记录失败') })
       } finally {

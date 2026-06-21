@@ -201,8 +201,10 @@ function App() {
   const [recordDialog, setRecordDialog] = useState<{
     flowNodePubkey?: string
     consumeNodePubkey?: string
+    createdRecordId?: string
   } | null>(null)
   const [mountDialog, setMountDialog] = useState<{ flowNodePubkey?: string } | null>(null)
+  const [pendingMountRecordId, setPendingMountRecordId] = useState<string | null>(null)
   const handleGenerateRecord = useCallback(
     (node: ChainGraphNode) => {
       registration.notifyStatus(null)
@@ -224,6 +226,53 @@ function App() {
     },
     [registration],
   )
+  const handleMountToNode = useCallback(
+    (recordId: string) => {
+      setRecordDialog(null)
+      setPendingMountRecordId(recordId)
+      registration.notifyError(null)
+      registration.notifyStatus('点击画布上的流转节点完成挂载。')
+    },
+    [registration],
+  )
+  const handlePickMountTarget = useCallback(
+    (node: ChainGraphNode) => {
+      if (!pendingMountRecordId) return
+      if (node.kind !== 'local-flow') {
+        registration.notifyError('请选择流转节点进行挂载。')
+        return
+      }
+      const recordId = pendingMountRecordId
+      setPendingMountRecordId(null)
+      registration.notifyError(null)
+      void registration.createTransactionMount(recordId, node.id)
+    },
+    [pendingMountRecordId, registration],
+  )
+  const cancelMountPick = useCallback(() => {
+    setPendingMountRecordId(null)
+    registration.notifyStatus(null)
+  }, [registration])
+  const handleCanvasSelectNode = useCallback(
+    (node: ChainGraphNode) => {
+      if (pendingMountRecordId) {
+        handlePickMountTarget(node)
+        return
+      }
+      selection.onCanvasSelectNode(node)
+    },
+    [handlePickMountTarget, pendingMountRecordId, selection],
+  )
+  useEffect(() => {
+    if (!pendingMountRecordId) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') cancelMountPick()
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [cancelMountPick, pendingMountRecordId])
   // 右键加载消费链：以该节点为端点查询并并入当前画布（mergeConsumeChains 去重累积，实现延展）。
   const handleLoadChain = useCallback(
     (node: ChainGraphNode, mode: QueryMode) => {
@@ -390,7 +439,9 @@ function App() {
             onRenameNode={handleRenameNode}
             onDeleteNode={handleDeleteNode}
             onSelectEdge={selection.onCanvasSelectEdge}
-            onSelectNode={selection.onCanvasSelectNode}
+            onSelectNode={handleCanvasSelectNode}
+            mountPickActive={pendingMountRecordId !== null}
+            onCancelMountPick={cancelMountPick}
             selectedId={selection.selectedLocalId ?? query.effectiveSelection?.id ?? null}
           />
         }
@@ -411,13 +462,19 @@ function App() {
         open={recordDialog !== null}
         busy={registration.busy === 'record'}
         consumeNodes={keyring.localConsumeNodes}
+        createdRecordId={recordDialog?.createdRecordId}
         defaultConsumeNodePubkey={recordDialog?.consumeNodePubkey}
         defaultFlowNodePubkey={recordDialog?.flowNodePubkey}
         error={registration.error}
         flowNodes={keyring.localFlowNodes}
         miningAttempts={registration.miningAttempts}
         status={registration.status}
-        onCreate={(draft) => void registration.createTransactionRecord(draft)}
+        onCreate={async (draft) => {
+          const id = await registration.createTransactionRecord(draft)
+          if (id)
+            setRecordDialog((dialog) => (dialog ? { ...dialog, createdRecordId: id } : dialog))
+        }}
+        onMountToNode={handleMountToNode}
         onOpenChange={(open) => {
           if (!open) setRecordDialog(null)
         }}

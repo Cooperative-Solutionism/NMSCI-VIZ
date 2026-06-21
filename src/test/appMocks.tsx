@@ -42,6 +42,8 @@ vi.mock('../components/NetworkGraph', () => ({
     onDeleteNode,
     onSelectEdge,
     onSelectNode,
+    mountPickActive,
+    onCancelMountPick,
   }: {
     graph: ChainGraph
     selectedId: string | null
@@ -58,8 +60,18 @@ vi.mock('../components/NetworkGraph', () => ({
     onExportNodeKey?: (node: ChainGraphNode) => void
     onRenameNode?: (node: ChainGraphNode) => void
     onDeleteNode?: (node: ChainGraphNode) => void
+    mountPickActive?: boolean
+    onCancelMountPick?: () => void
   }) => (
     <div data-testid="network-graph">
+      {mountPickActive ? (
+        <div data-testid="mount-pick-active">
+          mount pick active
+          <button type="button" onClick={() => onCancelMountPick?.()}>
+            cancel mount pick
+          </button>
+        </div>
+      ) : null}
       <button type="button" onClick={() => onAddFlowNode?.({ x: 12, y: 34 })}>
         canvas add flow node
       </button>
@@ -182,7 +194,8 @@ vi.mock('@nmsci/sdk', async (importOriginal) => {
       return { privateKey, publicKey }
     },
     getPublicKeyFromPrivate: (privateKeyHex: string) =>
-      mockKeyPairs.privateToPublic.get(privateKeyHex) ?? actual.getPublicKeyFromPrivate(privateKeyHex),
+      mockKeyPairs.privateToPublic.get(privateKeyHex) ??
+      actual.getPublicKeyFromPrivate(privateKeyHex),
     mineNonce: async (
       _prefix: Uint8Array,
       _suffix: Uint8Array,
