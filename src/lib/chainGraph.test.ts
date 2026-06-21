@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { normalizeConsumeChainResponseDTO } from '@nmsci/sdk'
 import {
+  aggregateGraphBySourceTarget,
   buildConsumeChainUrl,
   buildGraphFromConsumeChains,
   chainColor,
@@ -13,7 +14,7 @@ import {
   shortId,
 } from './chainGraph'
 import { queryNodeId } from '../test/appFixtures'
-import type { ConsumeChainResponseDTORaw } from './types'
+import type { ChainGraph, ChainGraphEdge, ConsumeChainResponseDTORaw } from './types'
 
 const rawChainRows: ConsumeChainResponseDTORaw[] = [
   {
@@ -770,6 +771,55 @@ describe('chain graph mapping', () => {
     expect(merged[0]!.consumeChain.amount).toBe(12500n)
   })
 
+  it('aggregates same source→target edges into one with total/looped/reflow metrics', () => {
+    const graph = graphOf([
+      aggEdge('e1', 'a', 'b', 1, 5000n, 'looped'),
+      aggEdge('e2', 'a', 'b', 1, 3000n, 'open'),
+      aggEdge('e3', 'a', 'b', 1, 2000n, 'looped'),
+      aggEdge('e4', 'b', 'c', 1, 1000n, 'open'),
+    ])
+
+    const aggregated = aggregateGraphBySourceTarget(graph)
+
+    // a→b 三条合并为一；b→c 保持一条。
+    expect(aggregated.edges).toHaveLength(2)
+    const ab = aggregated.edges.find((edge) => edge.source === 'a' && edge.target === 'b')!
+    expect(ab.amount).toBe(10000n)
+    expect(ab.status).toBe('looped')
+    expect(ab.aggregated).toEqual({
+      totalAmount: 10000n,
+      loopedAmount: 7000n,
+      reflowRate: 0.7,
+      edgeCount: 3,
+    })
+    // 三个数据标注在链边标签上：总额 / 成环 / 回流率。
+    expect(ab.label).toContain('总额 100.00 CNY')
+    expect(ab.label).toContain('成环 70.00 CNY')
+    expect(ab.label).toContain('回流率 70.00%')
+
+    const bc = aggregated.edges.find((edge) => edge.source === 'b' && edge.target === 'c')!
+    expect(bc.amount).toBe(1000n)
+    expect(bc.status).toBe('open')
+    expect(bc.aggregated?.reflowRate).toBe(0)
+
+    // 聚合只改边：节点与链级 stats 原样保留（同一引用）。
+    expect(aggregated.nodes).toBe(graph.nodes)
+    expect(aggregated.stats).toBe(graph.stats)
+  })
+
+  it('never merges edges of different currencies between the same nodes', () => {
+    const graph = graphOf([
+      aggEdge('cny', 'a', 'b', 1, 5000n, 'open'),
+      aggEdge('au', 'a', 'b', 0, 2_500_000n, 'open'),
+    ])
+
+    expect(aggregateGraphBySourceTarget(graph).edges).toHaveLength(2)
+  })
+
+  it('returns an empty edge list for an empty graph', () => {
+    expect(aggregateGraphBySourceTarget(graphOf([])).edges).toEqual([])
+  })
+
   it('refreshes consume chains by replacing matching chain id rows', () => {
     const refreshed = normalizeConsumeChainResponseDTO({
       ...rawChainRows[0]!,
@@ -790,3 +840,35 @@ describe('chain graph mapping', () => {
     expect(refreshedRows[0]!.consumeChainEdges[0]!.id).toBe('edge-a-refreshed')
   })
 })
+
+function aggEdge(
+  id: string,
+  source: string,
+  target: string,
+  currencyType: number,
+  amount: bigint,
+  status: ChainGraphEdge['status'],
+): ChainGraphEdge {
+  return {
+    id,
+    source,
+    target,
+    label: '',
+    amount,
+    currencyType,
+    chainId: `chain-${id}`,
+    status,
+    color: '#000',
+    relatedTransactionRecord: '',
+    relatedTransactionMount: '',
+    relatedTransactionMountTimestamp: 0n,
+  }
+}
+
+function graphOf(edges: ChainGraphEdge[]): ChainGraph {
+  return {
+    nodes: [],
+    edges,
+    stats: { totalChains: 0, loopedChains: 0, openChains: 0, volumeByCurrency: new Map() },
+  }
+}

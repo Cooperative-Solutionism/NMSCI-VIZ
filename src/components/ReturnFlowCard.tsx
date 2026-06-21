@@ -1,5 +1,6 @@
 import type { ReturningFlowRateResponseDTO } from '@nmsci/sdk'
 import { formatAmount } from '../lib/chainGraph'
+import { formatRate } from '../lib/format'
 import { DetailRow } from './DetailRow'
 
 type FlowRateStatus = 'idle' | 'loading' | 'loaded' | 'error'
@@ -62,11 +63,6 @@ export function ReturnFlowCard({
       ) : null}
     </>
   )
-}
-
-function formatRate(rate: number): string {
-  if (!Number.isFinite(rate)) return '-'
-  return `${(rate * 100).toFixed(2)}%`
 }
 
 function retention(looped: number, unlooped: number): number {

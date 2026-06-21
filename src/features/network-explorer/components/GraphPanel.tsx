@@ -8,6 +8,8 @@ const NetworkGraph = lazy(() =>
 
 export function GraphPanel({
   canvasGraph,
+  aggregateMode,
+  onAggregateModeChange,
   loading,
   onAddConsumeNode,
   onAddFlowNode,
@@ -27,6 +29,8 @@ export function GraphPanel({
   selectedId,
 }: {
   canvasGraph: ChainGraph
+  aggregateMode: boolean
+  onAggregateModeChange: (aggregate: boolean) => void
   loading: boolean
   onAddConsumeNode: (position?: { x: number; y: number }) => void
   onAddFlowNode: (position?: { x: number; y: number }) => void
@@ -55,6 +59,8 @@ export function GraphPanel({
           <Suspense fallback={<div className="graph-loading">正在加载图谱…</div>}>
             <NetworkGraph
               graph={canvasGraph}
+              aggregateMode={aggregateMode}
+              onAggregateModeChange={onAggregateModeChange}
               selectedId={selectedId}
               onSelectNode={onSelectNode}
               onSelectEdge={onSelectEdge}

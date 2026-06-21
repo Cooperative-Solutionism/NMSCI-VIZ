@@ -204,6 +204,53 @@ describe('useFlowNodeTransactionActions', () => {
     expect(sendTransactionMountMsgMock).toHaveBeenCalled()
   })
 
+  it('returns the mounted flow node pubkey on success so the canvas-pick path can refresh once', async () => {
+    const { result } = renderHook(() =>
+      useFlowNodeTransactionActions({
+        clearSelectedLocalNode: vi.fn(),
+        client: {} as ApiClient,
+        dispatch: vi.fn(),
+        localConsumeNodes: [consumeNode],
+        localFlowNodes: [originalFlowNode, targetFlowNode],
+        localTxRecords: [record],
+        loadConsumeChain: vi.fn(),
+        persistTxRecords: vi.fn(),
+        setMiningAttempts: vi.fn(),
+      }),
+    )
+
+    let returned: string | undefined
+    await act(async () => {
+      returned = await result.current.createTransactionMount(record.id, targetFlowNode.publicKeyHex)
+    })
+
+    expect(returned).toBe(targetFlowNode.publicKeyHex)
+  })
+
+  it('returns undefined when the mount cannot proceed (no refresh should be triggered)', async () => {
+    const { result } = renderHook(() =>
+      useFlowNodeTransactionActions({
+        clearSelectedLocalNode: vi.fn(),
+        client: {} as ApiClient,
+        dispatch: vi.fn(),
+        localConsumeNodes: [consumeNode],
+        localFlowNodes: [originalFlowNode, targetFlowNode],
+        localTxRecords: [],
+        loadConsumeChain: vi.fn(),
+        persistTxRecords: vi.fn(),
+        setMiningAttempts: vi.fn(),
+      }),
+    )
+
+    let returned: string | undefined = 'sentinel'
+    await act(async () => {
+      returned = await result.current.createTransactionMount(record.id, targetFlowNode.publicKeyHex)
+    })
+
+    expect(returned).toBeUndefined()
+    expect(sendTransactionMountMsgMock).not.toHaveBeenCalled()
+  })
+
   it('views a mounted consume chain through additive loading instead of resetting the graph query', async () => {
     const loadConsumeChain = vi.fn(async () => undefined)
     const runQuery = vi.fn(async () => undefined)

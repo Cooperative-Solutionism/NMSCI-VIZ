@@ -176,6 +176,8 @@ export function useFlowNodeTransactionActions({
         await sendTransactionMountMsg(client, built.bytes)
         setMountedPubkey(flowNode.publicKeyHex)
         dispatch({ type: 'SUCCESS', status: '交易已挂载。查看消费链即可在图谱中看到结果。' })
+        // 返回挂载到的流转节点公钥：画布点选挂载路径据此在挂载成功后立即刷新一次消费链。
+        return flowNode.publicKeyHex
       } catch (operationError) {
         dispatch({ type: 'FAILURE', error: errorMessage(operationError, '挂载交易失败') })
       } finally {

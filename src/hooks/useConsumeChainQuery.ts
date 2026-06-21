@@ -2,6 +2,7 @@ import { ApiClient, queryConsumeChains } from '@nmsci/sdk'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { defaultConsumeChainPage, defaultConsumeChainPageSize } from '../app/config'
 import {
+  aggregateGraphBySourceTarget,
   buildConsumeChainUrl,
   buildGraphFromConsumeChains,
   mergeConsumeChains,
@@ -60,6 +61,8 @@ export function useConsumeChainQuery(apiBase: string) {
   const [extended, setExtended] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
+  // 总计模式：开启后把相同 source→target 的链边合并为一条并标注总额/成环/回流率。
+  const [aggregateMode, setAggregateMode] = useState(false)
   const client = useMemo(() => new ApiClient({ baseUrl: apiBase }), [apiBase])
   const graphRequestGenerationRef = useRef(0)
   const graphResetGenerationRef = useRef(0)
@@ -92,7 +95,11 @@ export function useConsumeChainQuery(apiBase: string) {
     () => filterConsumeChainRows(rows, currencyFilter, loopStatus),
     [currencyFilter, loopStatus, rows],
   )
-  const graph = useMemo(() => buildGraphFromConsumeChains(filteredRows), [filteredRows])
+  const baseGraph = useMemo(() => buildGraphFromConsumeChains(filteredRows), [filteredRows])
+  const graph = useMemo(
+    () => (aggregateMode ? aggregateGraphBySourceTarget(baseGraph) : baseGraph),
+    [aggregateMode, baseGraph],
+  )
   const effectiveSelection = useMemo<Selection | null>(
     () => resolveEffectiveSelection(graph, selection),
     [graph, selection],
@@ -174,22 +181,26 @@ export function useConsumeChainQuery(apiBase: string) {
     [client, loopStatus, mode, nodeId, queryPage, queryPageSize],
   )
 
-  const extendFromNode = useCallback(
-    async (node: ChainGraphNode, targetMode: QueryMode) => {
+  // 以某个节点标识（id 或 pubkey）为端点的加法/延展查询：合并入当前图谱而非替换。
+  // extendFromNode（右键加载）与 importExternalNode（导入外部节点）共用此核心。
+  const extendByNodeId = useCallback(
+    async (rawNodeId: string, targetMode: QueryMode) => {
+      const nodeId = rawNodeId.trim()
+      if (!nodeId) return
       const generation = graphRequestGenerationRef.current + 1
       graphRequestGenerationRef.current = generation
       const graphResetGeneration = graphResetGenerationRef.current
       setLoading(true)
       setExtendLoading(targetMode)
       setError(null)
-      // 加载消费链是加法/延展语义：只标记选中右键来源节点，不改写浏览查询的 mode/nodeId/page
+      // 加载消费链是加法/延展语义：只标记选中来源节点，不改写浏览查询的 mode/nodeId/page
       // （那些驱动 requestUrl / 复制 curl，属于上一次 runQuery 的语义）。
-      setSelection({ kind: 'node', id: node.id })
+      setSelection({ kind: 'node', id: nodeId })
 
       try {
         const result = await queryConsumeChains(
           client,
-          consumeChainFilters(targetMode, node.id, loopStatus),
+          consumeChainFilters(targetMode, nodeId, loopStatus),
           {
             page: defaultConsumeChainPage,
             size: queryPageSize,
@@ -218,6 +229,26 @@ export function useConsumeChainQuery(apiBase: string) {
     },
     [client, loopStatus, queryPageSize],
   )
+
+  const extendFromNode = useCallback(
+    (node: ChainGraphNode, targetMode: QueryMode) => extendByNodeId(node.id, targetMode),
+    [extendByNodeId],
+  )
+
+  // 导入外部节点（仅有 id/pubkey、无私钥）：复用延展查询，把该节点的消费链并入当前画布。
+  const importExternalNode = useCallback(
+    (identifier: string) => extendByNodeId(identifier, 'node'),
+    [extendByNodeId],
+  )
+
+  // 离线导入：把已解析的消费链行加法并入当前画布（用于导入此前导出的 JSON）。
+  const importRows = useCallback((nextRows: ConsumeChainResponseDTO[], skipped = 0) => {
+    if (nextRows.length === 0 && skipped === 0) return
+    setRows((currentRows) => mergeConsumeChains(currentRows, nextRows))
+    setOrigin('backend')
+    setExtended(true)
+    setWarning(skipWarning(skipped))
+  }, [])
 
   const refreshFromNodeIds = useCallback(
     async (nodeIds: readonly string[], selectedNodeId?: string) => {
@@ -300,6 +331,8 @@ export function useConsumeChainQuery(apiBase: string) {
   }, [])
 
   return {
+    aggregateMode,
+    setAggregateMode,
     clear,
     currencyFilter,
     effectiveSelection,
@@ -309,6 +342,8 @@ export function useConsumeChainQuery(apiBase: string) {
     extended,
     filteredRows,
     graph,
+    importExternalNode,
+    importRows,
     loading,
     loopStatus,
     mode,

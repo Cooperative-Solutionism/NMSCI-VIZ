@@ -216,6 +216,12 @@ describe('App initial state', () => {
           data: { id: 'tx-mount-pick-1', txid: 'txid-mount' },
         })
       }
+      // 挂载完成后自动刷新一次消费链：按画布节点（含新挂载的流转节点）查询。
+      if (url.pathname === '/consume-chains') {
+        return jsonResponse(
+          sliceResponse([chainRow('chain-picked', 1, generatedFlowPubkey, graphNodeCId)]),
+        )
+      }
       throw new Error(`Unexpected URL ${url.href}`)
     })
     render(<App />)
@@ -261,5 +267,17 @@ describe('App initial state', () => {
         ),
       ).toBe(true)
     })
+
+    // 挂载完成即自动刷新一次消费链：按新挂载的流转节点查询，并把结果并入画布。
+    await waitFor(() => {
+      const consumeChainNodes = fetchMock.mock.calls
+        .map(([input]) => new URL(requestInputUrl(input), 'http://localhost'))
+        .filter((requestUrl) => requestUrl.pathname.includes('/consume-chains'))
+        .map((requestUrl) => requestUrl.searchParams.get('nodePubkey') ?? requestUrl.searchParams.get('nodeId'))
+      expect(consumeChainNodes).toContain(generatedFlowPubkey)
+    })
+    expect(
+      await screen.findByRole('button', { name: `Select node ${graphNodeCId}` }),
+    ).toBeTruthy()
   })
 })

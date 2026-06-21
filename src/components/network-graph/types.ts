@@ -8,6 +8,9 @@ import type {
 
 export interface NetworkGraphProps {
   graph: ChainGraph
+  // 总计模式开关：由 App/GraphPanel 注入；单测直接渲染 NetworkGraph 时可省略（默认关闭）。
+  aggregateMode?: boolean
+  onAggregateModeChange?: (aggregate: boolean) => void
   selectedId: string | null
   onSelectNode: (node: ChainGraphNode) => void
   onSelectEdge: (edge: ChainGraphEdge) => void

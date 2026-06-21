@@ -34,6 +34,8 @@ interface GraphViewStateStore {
 
 export function NetworkGraph({
   graph,
+  aggregateMode = false,
+  onAggregateModeChange = () => {},
   selectedId,
   onSelectNode,
   onSelectEdge,
@@ -419,8 +421,10 @@ export function NetworkGraph({
         onSelectNode={handleSelectNode}
       />
       <GraphTools
+        aggregateMode={aggregateMode}
         hasCycles={hasCycles}
         highlightMode={highlightMode}
+        onAggregateModeChange={onAggregateModeChange}
         onDownloadPng={handleDownloadPng}
         onFit={fitGraph}
         onHighlightModeChange={handleHighlightModeChange}

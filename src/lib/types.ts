@@ -45,6 +45,15 @@ export interface ChainGraphNode {
   flowStatus?: FlowNodeCanvasStatus
 }
 
+// 总计模式下，合并同 source→target 的多条链边后挂在边上的汇总数据。
+export interface AggregatedEdgeMetrics {
+  totalAmount: bigint
+  loopedAmount: bigint
+  // 回流率 = 成环金额 / 总金额（0~1）；总金额为 0 时为 0。
+  reflowRate: number
+  edgeCount: number
+}
+
 export interface ChainGraphEdge {
   id: string
   source: string
@@ -58,6 +67,8 @@ export interface ChainGraphEdge {
   relatedTransactionRecord: string
   relatedTransactionMount: string
   relatedTransactionMountTimestamp: bigint
+  // 仅在总计模式合并边上存在；详细模式的逐段边无此字段。
+  aggregated?: AggregatedEdgeMetrics
 }
 
 export interface ChainGraphStats {

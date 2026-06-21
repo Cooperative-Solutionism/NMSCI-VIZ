@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
+import { normalizeConsumeChainResponseDTO } from '@nmsci/sdk'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useConsumeChainQuery } from './useConsumeChainQuery'
 import { jsonResponse, sliceResponse, stubFetchByUrl } from '../test/appFetch'
@@ -150,5 +151,37 @@ describe('useConsumeChainQuery.extendFromNode', () => {
 
     expect(result.current.rows.map((row) => row.consumeChain.id)).toEqual(['chain-seed'])
     expect(result.current.extendLoading).toBeNull()
+  })
+})
+
+describe('useConsumeChainQuery import', () => {
+  it('importExternalNode loads the external node chain and merges it into the canvas', async () => {
+    const nodeId = '11111111-1111-4111-8111-111111111111'
+    stubFetchByUrl((url) => {
+      if (url.pathname === '/consume-chains' && url.searchParams.get('nodeId') === nodeId) {
+        return jsonResponse(sliceResponse([chain('chain-ext', nodeId, 'end-x')]))
+      }
+      throw new Error(`Unexpected URL ${url.href}`)
+    })
+
+    const { result } = renderHook(() => useConsumeChainQuery('/api'))
+
+    await act(async () => {
+      await result.current.importExternalNode(nodeId)
+    })
+
+    expect(result.current.rows.map((row) => row.consumeChain.id)).toEqual(['chain-ext'])
+  })
+
+  it('importRows merges offline rows additively without issuing a request', () => {
+    const { result } = renderHook(() => useConsumeChainQuery('/api'))
+    const offline = [normalizeConsumeChainResponseDTO(chain('chain-offline', pkA, pkB))]
+
+    act(() => {
+      result.current.importRows(offline)
+    })
+
+    expect(result.current.rows.map((row) => row.consumeChain.id)).toEqual(['chain-offline'])
+    expect(result.current.origin).toBe('backend')
   })
 })

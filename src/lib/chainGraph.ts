@@ -9,6 +9,7 @@ import type {
   VolumeByCurrency,
 } from './types'
 import { consumeChainParamName, detectIdentityKind } from './consumeChainFilters'
+import { formatRate } from './format'
 import { readGraphTokens } from './tokens'
 
 export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTO[]): ChainGraph {
@@ -59,6 +60,74 @@ export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTO[]): Ch
       volumeByCurrency,
     },
   }
+}
+
+// 总计模式：把相同 source→target（且同币种）的链边合并为一条，汇总总金额/成环金额，并算出
+// 回流率（成环金额/总金额）。纯客户端按每条边已有的 status('looped'|'open') 汇总，不调后端，
+// 因此对导入的离线数据同样有效。节点与链级 stats 不变（聚合只改边）。
+export function aggregateGraphBySourceTarget(graph: ChainGraph): ChainGraph {
+  const groups = new Map<
+    string,
+    { source: string; target: string; currencyType: number; color: string; edges: ChainGraphEdge[] }
+  >()
+  for (const edge of graph.edges) {
+    // 按币种分桶：CNY 分与 Au 微克不可相加（与全仓 volumeByCurrency 分桶纪律一致）。
+    const key = `${edge.source}|${edge.target}|${edge.currencyType}`
+    const group = groups.get(key)
+    if (group) {
+      group.edges.push(edge)
+    } else {
+      groups.set(key, {
+        source: edge.source,
+        target: edge.target,
+        currencyType: edge.currencyType,
+        color: edge.color,
+        edges: [edge],
+      })
+    }
+  }
+
+  const edges: ChainGraphEdge[] = []
+  for (const group of groups.values()) {
+    let totalAmount = 0n
+    let loopedAmount = 0n
+    for (const edge of group.edges) {
+      totalAmount += edge.amount
+      if (edge.status === 'looped') loopedAmount += edge.amount
+    }
+    // 金额已被 normalizeRowsSafely 保证 ≤ 2^53，Number() 转换安全。
+    const reflowRate = totalAmount > 0n ? Number(loopedAmount) / Number(totalAmount) : 0
+    const id = `agg:${group.source}->${group.target}:${group.currencyType}`
+    edges.push({
+      id,
+      source: group.source,
+      target: group.target,
+      label: aggregatedEdgeLabel(totalAmount, loopedAmount, reflowRate, group.currencyType),
+      amount: totalAmount,
+      currencyType: group.currencyType,
+      chainId: id,
+      status: loopedAmount > 0n ? 'looped' : 'open',
+      color: group.color,
+      relatedTransactionRecord: '',
+      relatedTransactionMount: '',
+      relatedTransactionMountTimestamp: 0n,
+      aggregated: { totalAmount, loopedAmount, reflowRate, edgeCount: group.edges.length },
+    })
+  }
+
+  return { ...graph, edges }
+}
+
+function aggregatedEdgeLabel(
+  totalAmount: bigint,
+  loopedAmount: bigint,
+  reflowRate: number,
+  currencyType: number,
+): string {
+  return `总额 ${formatAmount(totalAmount, currencyType)} · 成环 ${formatAmount(
+    loopedAmount,
+    currencyType,
+  )} · 回流率 ${formatRate(reflowRate)}`
 }
 
 // 展示用：还原 SDK queryConsumeChains 实际请求的 URL（集合根 + id/pubkey 模式查询参数）。

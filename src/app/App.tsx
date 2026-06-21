@@ -8,7 +8,10 @@ import {
   type DashboardPanelConfig,
 } from '../features/dashboard-layout/panelRegistry'
 import { mergeLocalNodes } from '../lib/chainGraph'
+import { errorMessage } from '../lib/errors'
+import { parseExportedConsumeChainsJson } from '../lib/exporters'
 import type { ChainGraphNode, QueryMode } from '../lib/types'
+import { Button } from '../components/ui/button'
 import { useLocalKeyringController } from '../features/keyring/hooks/useLocalKeyringController'
 import { useLocalNodeActions } from '../features/keyring/hooks/useLocalNodeActions'
 import { useRegistrationController } from '../features/keyring/hooks/useRegistrationController'
@@ -19,6 +22,7 @@ import { VaultPromptDialog } from '../features/keyring/components/VaultPromptDia
 import { BrowsePanel } from '../features/network-explorer/components/BrowsePanel'
 import { ExportPanelContent } from '../features/network-explorer/components/ExportPanelContent'
 import { GraphPanel } from '../features/network-explorer/components/GraphPanel'
+import { ImportExternalNodeDialog } from '../features/network-explorer/components/ImportExternalNodeDialog'
 import { InspectorPanel } from '../features/network-explorer/components/InspectorPanel'
 import { SystemPanelContent } from '../features/network-explorer/components/SystemPanelContent'
 import { TransactionRecordDialog } from '../features/network-explorer/components/TransactionRecordDialog'
@@ -169,6 +173,33 @@ function App() {
   const handleImportLocalNode = useCallback(() => {
     requestVault('导入流转节点', () => void nodeActionsRef.current.handleImportLocalNode())
   }, [requestVault])
+  // 导入外部节点：粘贴公钥/ID 走后端查询，或上传导出的 JSON 离线解析；两者都加法并入当前画布。
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const handleImportExternalNode = useCallback(
+    (identifier: string) => {
+      registration.notifyError(null)
+      void query.importExternalNode(identifier)
+      registration.notifyStatus('已加载外部节点的消费链。')
+    },
+    [query, registration],
+  )
+  const handleImportExternalJson = useCallback(
+    (text: string) => {
+      registration.notifyError(null)
+      try {
+        const { content, skipped } = parseExportedConsumeChainsJson(text)
+        if (content.length === 0) {
+          registration.notifyError('未从 JSON 解析到任何消费链。')
+          return
+        }
+        query.importRows(content, skipped)
+        registration.notifyStatus(`已导入 ${content.length} 条消费链。`)
+      } catch (importError) {
+        registration.notifyError(errorMessage(importError, '导入 JSON 失败'))
+      }
+    },
+    [query, registration],
+  )
   const networkActions = useNetworkExplorerActions({
     filteredRows: query.filteredRows,
     graphEdges: query.graph.edges,
@@ -236,7 +267,7 @@ function App() {
     [registration],
   )
   const handlePickMountTarget = useCallback(
-    (node: ChainGraphNode) => {
+    async (node: ChainGraphNode) => {
       if (!pendingMountRecordId) return
       if (node.kind !== 'local-flow') {
         registration.notifyError('请选择流转节点进行挂载。')
@@ -245,9 +276,13 @@ function App() {
       const recordId = pendingMountRecordId
       setPendingMountRecordId(null)
       registration.notifyError(null)
-      void registration.createTransactionMount(recordId, node.id)
+      const mountedPubkey = await registration.createTransactionMount(recordId, node.id)
+      // 挂载成功即直接更新一次消费链：以画布当前全部节点 + 新挂载节点为端点刷新图谱。
+      if (mountedPubkey) {
+        await loadMountedConsumeChain(mountedPubkey)
+      }
     },
-    [pendingMountRecordId, registration],
+    [loadMountedConsumeChain, pendingMountRecordId, registration],
   )
   const cancelMountPick = useCallback(() => {
     setPendingMountRecordId(null)
@@ -256,7 +291,7 @@ function App() {
   const handleCanvasSelectNode = useCallback(
     (node: ChainGraphNode) => {
       if (pendingMountRecordId) {
-        handlePickMountTarget(node)
+        void handlePickMountTarget(node)
         return
       }
       selection.onCanvasSelectNode(node)
@@ -426,6 +461,8 @@ function App() {
         graph={
           <GraphPanel
             canvasGraph={canvasGraph}
+            aggregateMode={query.aggregateMode}
+            onAggregateModeChange={query.setAggregateMode}
             loading={query.loading}
             onAddConsumeNode={handleAddConsumeNode}
             onAddFlowNode={handleAddFlowNode}
@@ -449,6 +486,11 @@ function App() {
       />
 
       <div className="dashboard-export-dock">
+        <div className="export-bar" role="group" aria-label="导入">
+          <Button variant="ghost" type="button" onClick={() => setImportDialogOpen(true)}>
+            导入外部节点
+          </Button>
+        </div>
         <ExportPanelContent
           filteredRowCount={query.filteredRows.length}
           graphEdgeCount={query.graph.edges.length}
@@ -500,6 +542,12 @@ function App() {
           setMountDialog(null)
           window.setTimeout(viewConsumeChain, 0)
         }}
+      />
+      <ImportExternalNodeDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImportIdentifier={handleImportExternalNode}
+        onImportJson={handleImportExternalJson}
       />
 
       <OperationStatusToast

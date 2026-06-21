@@ -3,8 +3,10 @@ import type { GraphHighlightMode } from './graphViewState'
 import { Button } from '../ui/button'
 
 interface GraphToolsProps {
+  aggregateMode: boolean
   hasCycles: boolean
   highlightMode: GraphHighlightMode
+  onAggregateModeChange: (aggregate: boolean) => void
   onClearCanvas?: () => void
   onDownloadPng: () => void
   onFit: () => void
@@ -13,8 +15,10 @@ interface GraphToolsProps {
 }
 
 export function GraphTools({
+  aggregateMode,
   hasCycles,
   highlightMode,
+  onAggregateModeChange,
   onClearCanvas,
   onDownloadPng,
   onFit,
@@ -44,6 +48,28 @@ export function GraphTools({
           onClick={() => onHighlightModeChange('cycles')}
         >
           循环
+        </Button>
+      </div>
+      <div className="graph-tools__mode" role="group" aria-label="聚合模式">
+        <Button
+          aria-label="详细模式"
+          aria-pressed={!aggregateMode}
+          size="sm"
+          type="button"
+          variant="ghost"
+          onClick={() => onAggregateModeChange(false)}
+        >
+          详细
+        </Button>
+        <Button
+          aria-label="总计模式"
+          aria-pressed={aggregateMode}
+          size="sm"
+          type="button"
+          variant="ghost"
+          onClick={() => onAggregateModeChange(true)}
+        >
+          总计
         </Button>
       </div>
       <Button

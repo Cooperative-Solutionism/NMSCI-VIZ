@@ -38,6 +38,68 @@ export function rowsToJson(rows: ConsumeChainResponseDTO[]): string {
   return JSON.stringify(rows, (_key, value: unknown) => (typeof value === 'bigint' ? value.toString() : value), 2)
 }
 
+// 反转 rowsToJson：把导出的消费链 JSON 解析回 ConsumeChainResponseDTO[]（导入外部节点-文件来源）。
+// 不能直接走 SDK 的 normalize——其 toSafeBigInt 仅接受 number，会拒绝导出时被序列化成字符串的金额。
+// BigInt() 同时接受数字与数字字符串，故导出文件（字符串）与原始后端 JSON（数字）都能解析。
+// 逐行容错：坏行跳过并计数，与 normalizeRowsSafely 的 {content, skipped} 形状保持一致。
+export function parseExportedConsumeChainsJson(text: string): {
+  content: ConsumeChainResponseDTO[]
+  skipped: number
+} {
+  const parsed: unknown = JSON.parse(text)
+  if (!Array.isArray(parsed)) {
+    throw new Error('JSON 顶层必须是消费链数组。')
+  }
+  const content: ConsumeChainResponseDTO[] = []
+  let skipped = 0
+  for (const raw of parsed) {
+    try {
+      content.push(reviveConsumeChainRow(raw))
+    } catch {
+      skipped += 1
+    }
+  }
+  return { content, skipped }
+}
+
+function reviveConsumeChainRow(raw: unknown): ConsumeChainResponseDTO {
+  if (typeof raw !== 'object' || raw === null) throw new Error('行不是对象。')
+  const row = raw as Record<string, unknown>
+  const chain = row.consumeChain as Record<string, unknown> | undefined
+  const edges = row.consumeChainEdges
+  if (!chain || !Array.isArray(edges)) {
+    throw new Error('缺少 consumeChain 或 consumeChainEdges。')
+  }
+  return {
+    consumeChain: {
+      id: String(chain.id),
+      start: String(chain.start),
+      end: String(chain.end),
+      amount: BigInt(chain.amount as string | number),
+      currencyType: Number(chain.currencyType),
+      isLoop: Boolean(chain.isLoop),
+      tailMountTimestamp: BigInt(chain.tailMountTimestamp as string | number),
+    },
+    consumeChainEdges: edges.map((edge) => {
+      const e = edge as Record<string, unknown>
+      return {
+        id: String(e.id),
+        source: String(e.source),
+        target: String(e.target),
+        amount: BigInt(e.amount as string | number),
+        currencyType: Number(e.currencyType),
+        chain: String(e.chain),
+        relatedTransactionRecord: String(e.relatedTransactionRecord),
+        relatedTransactionMount: String(e.relatedTransactionMount),
+        relatedTransactionMountTimestamp: BigInt(
+          e.relatedTransactionMountTimestamp as string | number,
+        ),
+        isLoop: Boolean(e.isLoop),
+      }
+    }),
+  }
+}
+
 export function toCurl(url: string): string {
   return `curl '${url.replace(/'/g, "'\\''")}'`
 }
