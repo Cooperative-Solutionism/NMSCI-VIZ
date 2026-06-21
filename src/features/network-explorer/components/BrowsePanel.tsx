@@ -2,6 +2,7 @@ import { Tabs, TabsContent } from '../../../components/ui/tabs'
 import { useUrlStateParam } from '../../../shared/hooks/useUrlQueryParam'
 import { BlockBrowser } from './browse-panel/BlockBrowser'
 import { BrowsePanelTabs } from './browse-panel/BrowsePanelTabs'
+import { FlowIndexBrowser } from './browse-panel/FlowIndexBrowser'
 import { FlowNodeBrowser } from './browse-panel/FlowNodeBrowser'
 import type { BrowsePanelTab } from './browse-panel/types'
 
@@ -10,7 +11,7 @@ type BrowsePanelProps = {
 }
 
 function isBrowsePanelTab(value: string): value is BrowsePanelTab {
-  return value === 'blocks' || value === 'flow-nodes'
+  return value === 'blocks' || value === 'flow-nodes' || value === 'flow-index'
 }
 
 export function BrowsePanel({ apiBase }: BrowsePanelProps) {
@@ -37,6 +38,9 @@ export function BrowsePanel({ apiBase }: BrowsePanelProps) {
         </TabsContent>
         <TabsContent value="flow-nodes">
           <FlowNodeBrowser apiBase={apiBase} />
+        </TabsContent>
+        <TabsContent value="flow-index">
+          <FlowIndexBrowser apiBase={apiBase} />
         </TabsContent>
       </div>
     </Tabs>

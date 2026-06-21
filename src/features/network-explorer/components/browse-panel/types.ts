@@ -1,1 +1,1 @@
-export type BrowsePanelTab = 'blocks' | 'flow-nodes'
+export type BrowsePanelTab = 'blocks' | 'flow-nodes' | 'flow-index'
