@@ -1,16 +1,24 @@
 import { vi } from 'vitest'
 import type { ChainGraph, ChainGraphEdge, ChainGraphNode } from '../lib/types'
 
-type MockVaultStatus = 'setup' | 'locked' | 'unlocked'
+type MockVaultStatus = 'disabled' | 'setup' | 'locked' | 'unlocked'
 
 const mockVault = vi.hoisted(() => ({
   error: null as string | null,
-  status: 'unlocked' as MockVaultStatus,
+  // 默认关闭：贴合真实默认（保险库关闭、私钥明文存储、无需口令）。
+  status: 'disabled' as MockVaultStatus,
+}))
+
+const mockKeyPairs = vi.hoisted(() => ({
+  next: 1,
+  privateToPublic: new Map<string, string>(),
 }))
 
 export function resetMockVault() {
-  mockVault.status = 'unlocked'
+  mockVault.status = 'disabled'
   mockVault.error = null
+  mockKeyPairs.next = 1
+  mockKeyPairs.privateToPublic.clear()
 }
 
 export function setMockVaultStatus(status: MockVaultStatus) {
@@ -23,8 +31,19 @@ vi.mock('../components/NetworkGraph', () => ({
     graph,
     onAddConsumeNode,
     onAddFlowNode,
+    onRegisterFlowNode,
+    onAuthorizeFlowNode,
+    onGenerateRecord,
+    onMountRecord,
+    onLoadChain,
+    onClearCanvas,
+    onExportNodeKey,
+    onRenameNode,
+    onDeleteNode,
     onSelectEdge,
     onSelectNode,
+    mountPickActive,
+    onCancelMountPick,
   }: {
     graph: ChainGraph
     selectedId: string | null
@@ -32,18 +51,81 @@ vi.mock('../components/NetworkGraph', () => ({
     onSelectNode: (node: ChainGraphNode) => void
     onAddFlowNode?: (position: { x: number; y: number }) => void
     onAddConsumeNode?: (position: { x: number; y: number }) => void
+    onRegisterFlowNode?: (node: ChainGraphNode) => void
+    onAuthorizeFlowNode?: (node: ChainGraphNode) => void
+    onGenerateRecord?: (node: ChainGraphNode) => void
+    onMountRecord?: (node: ChainGraphNode) => void
+    onLoadChain?: (node: ChainGraphNode, mode: 'start' | 'end' | 'node') => void
+    onClearCanvas?: () => void
+    onExportNodeKey?: (node: ChainGraphNode) => void
+    onRenameNode?: (node: ChainGraphNode) => void
+    onDeleteNode?: (node: ChainGraphNode) => void
+    mountPickActive?: boolean
+    onCancelMountPick?: () => void
   }) => (
     <div data-testid="network-graph">
+      {mountPickActive ? (
+        <div data-testid="mount-pick-active">
+          mount pick active
+          <button type="button" onClick={() => onCancelMountPick?.()}>
+            cancel mount pick
+          </button>
+        </div>
+      ) : null}
       <button type="button" onClick={() => onAddFlowNode?.({ x: 12, y: 34 })}>
         canvas add flow node
       </button>
       <button type="button" onClick={() => onAddConsumeNode?.({ x: 56, y: 78 })}>
         canvas add consume node
       </button>
+      <button type="button" onClick={() => onClearCanvas?.()}>
+        canvas clear
+      </button>
       {graph.nodes.map((node) => (
-        <button key={node.id} type="button" onClick={() => onSelectNode(node)}>
-          Select node {node.id}
-        </button>
+        <div key={node.id}>
+          <button type="button" onClick={() => onSelectNode(node)}>
+            Select node {node.id}
+          </button>
+          {node.kind === 'local-flow' ? (
+            <>
+              <button type="button" onClick={() => onRegisterFlowNode?.(node)}>
+                context register {node.id}
+              </button>
+              <button type="button" onClick={() => onAuthorizeFlowNode?.(node)}>
+                context authorize {node.id}
+              </button>
+            </>
+          ) : null}
+          {node.kind === 'local-flow' || node.kind === 'local-consume' ? (
+            <>
+              <button type="button" onClick={() => onGenerateRecord?.(node)}>
+                context generate record {node.id}
+              </button>
+              <button type="button" onClick={() => onMountRecord?.(node)}>
+                context mount record {node.id}
+              </button>
+              <button type="button" onClick={() => onExportNodeKey?.(node)}>
+                context export key {node.id}
+              </button>
+              <button type="button" onClick={() => onRenameNode?.(node)}>
+                context rename {node.id}
+              </button>
+              <button type="button" onClick={() => onDeleteNode?.(node)}>
+                context delete {node.id}
+              </button>
+            </>
+          ) : null}
+          {/* 加载消费链对本地与链节点都可用。 */}
+          <button type="button" onClick={() => onLoadChain?.(node, 'end')}>
+            context load preceding {node.id}
+          </button>
+          <button type="button" onClick={() => onLoadChain?.(node, 'start')}>
+            context load following {node.id}
+          </button>
+          <button type="button" onClick={() => onLoadChain?.(node, 'node')}>
+            context load all {node.id}
+          </button>
+        </div>
       ))}
       {graph.edges.map((edge) => (
         <button key={edge.id} type="button" onClick={() => onSelectEdge(edge)}>
@@ -78,10 +160,22 @@ vi.mock('../hooks/useKeyVault', async () => {
           mockVault.status = 'locked'
           setStatus('locked')
         }),
-        codec: {
-          encrypt: (plaintext: string) => Promise.resolve({ iv: 'iv', ct: btoa(plaintext) }),
-          decrypt: (secret: { ct: string }) => Promise.resolve(atob(secret.ct)),
-        },
+        enable: vi.fn(() => {
+          mockVault.status = 'setup'
+          setStatus('setup')
+        }),
+        disable: vi.fn(() => {
+          mockVault.status = 'disabled'
+          setStatus('disabled')
+        }),
+        // 关闭态 codec 为 null：存储层据此以明文落盘，贴合真实行为。
+        codec:
+          status === 'disabled'
+            ? null
+            : {
+                encrypt: (plaintext: string) => Promise.resolve({ iv: 'iv', ct: btoa(plaintext) }),
+                decrypt: (secret: { ct: string }) => Promise.resolve(atob(secret.ct)),
+              },
       }
     },
   }
@@ -91,14 +185,17 @@ vi.mock('@nmsci/sdk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@nmsci/sdk')>()
   return {
     ...actual,
-    generateKeyPair: () => ({
-      privateKey: '0'.repeat(63) + '1',
-      publicKey: '02'.padEnd(66, '1'),
-    }),
+    generateKeyPair: () => {
+      const keyDigit = (mockKeyPairs.next++).toString(16).slice(-1)
+      const privateKey = '0'.repeat(63) + keyDigit
+      const publicKey = '02'.padEnd(66, keyDigit)
+      mockKeyPairs.privateToPublic.set(privateKey, publicKey)
+
+      return { privateKey, publicKey }
+    },
     getPublicKeyFromPrivate: (privateKeyHex: string) =>
-      privateKeyHex === '0'.repeat(63) + '1'
-        ? '02'.padEnd(66, '1')
-        : actual.getPublicKeyFromPrivate(privateKeyHex),
+      mockKeyPairs.privateToPublic.get(privateKeyHex) ??
+      actual.getPublicKeyFromPrivate(privateKeyHex),
     mineNonce: async (
       _prefix: Uint8Array,
       _suffix: Uint8Array,

@@ -40,6 +40,18 @@ describe('flow node local storage', () => {
     expect(await loadLocalFlowNodes(fakeCodec)).toEqual([node])
   })
 
+  it('stores and reads plaintext when the vault is off (null codec)', async () => {
+    await saveLocalFlowNodes([node], null)
+
+    const raw = localStorage.getItem('nmsci.flowNodes.v1')
+    // 关闭态：私钥以明文 privateKeyHex 落盘，没有密文字段。
+    expect(raw).toContain(node.privateKeyHex)
+    expect(raw).not.toContain('"privateKey"')
+    // 关闭态加载（null codec）读回明文，且被识别为待迁移（启用后可加密）。
+    expect(await loadLocalFlowNodes(null)).toEqual([node])
+    expect(hasLegacyPlaintextFlowNodes()).toBe(true)
+  })
+
   it('patches matching nodes without duplicating the same local id', async () => {
     const patchedNodes = patchLocalFlowNode([node], node.id, {
       label: 'NODE02',

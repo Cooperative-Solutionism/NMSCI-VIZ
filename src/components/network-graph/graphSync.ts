@@ -1,7 +1,16 @@
 import type { Core, NodeSingular } from 'cytoscape'
-import { formatAmount } from '../../lib/chainGraph'
+import { flowNodeStatusLabels } from '../../lib/chainGraph'
 import { deterministicOffset, type Point } from '../../lib/graphLayout'
 import type { ChainGraphEdge, ChainGraphNode } from '../../lib/types'
+import { graphNodeIconFor } from './graphIcons'
+
+// 本地流转节点在画布上展示两行：名称 + 状态标签，使状态随时可见。
+function nodeCanvasLabel(node: ChainGraphNode): string {
+  if (node.kind === 'local-flow' && node.flowStatus) {
+    return `${node.label}\n${flowNodeStatusLabels[node.flowStatus]}`
+  }
+  return node.label
+}
 
 export function syncGraphElements(
   cy: Core,
@@ -19,22 +28,24 @@ function syncNodes(cy: Core, nodes: ChainGraphNode[], edges: ChainGraphEdge[]): 
   })
 
   for (const node of nodes) {
+    const nodeData = {
+      id: node.id,
+      label: nodeCanvasLabel(node),
+      kind: node.kind,
+      flowStatus: node.flowStatus ?? null,
+      icon: graphNodeIconFor(node),
+    }
     const existingNode = cy.getElementById(node.id)
     if (existingNode.nonempty()) {
       existingNode.data({
         ...existingNode.data(),
-        label: node.label,
-        kind: node.kind,
+        ...nodeData,
       })
       continue
     }
 
     cy.add({
-      data: {
-        id: node.id,
-        label: node.label,
-        kind: node.kind,
-      },
+      data: nodeData,
       group: 'nodes',
       position: node.position ?? positionForNewNode(cy, node.id, edges),
     })
@@ -52,7 +63,7 @@ function syncEdges(cy: Core, edges: ChainGraphEdge[]): void {
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      label: formatAmount(edge.amount, edge.currencyType),
+      label: edge.label,
       status: edge.status,
       chainId: edge.chainId,
       color: edge.color,
@@ -74,8 +85,8 @@ function syncEdges(cy: Core, edges: ChainGraphEdge[]): void {
 
 function positionForNewNode(cy: Core, nodeId: string, edges: ChainGraphEdge[]): Point {
   const neighborPosition = findNeighborPosition(cy, nodeId, edges)
-  const offset = deterministicOffset(nodeId)
   if (neighborPosition) {
+    const offset = deterministicOffset(nodeId)
     return {
       x: neighborPosition.x + offset.x,
       y: neighborPosition.y + offset.y,
@@ -84,8 +95,8 @@ function positionForNewNode(cy: Core, nodeId: string, edges: ChainGraphEdge[]): 
 
   const center = cy.extent()
   return {
-    x: (center.x1 + center.x2) / 2 + offset.x,
-    y: (center.y1 + center.y2) / 2 + offset.y,
+    x: (center.x1 + center.x2) / 2,
+    y: (center.y1 + center.y2) / 2,
   }
 }
 

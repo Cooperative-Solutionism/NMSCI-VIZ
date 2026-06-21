@@ -1,6 +1,8 @@
 import { Lock, LockOpen, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import type { VaultStatus } from '../hooks/useKeyVault'
+import { Button } from './ui/button'
+import { Input } from './ui/input'
 
 interface VaultGateProps {
   status: VaultStatus
@@ -19,9 +21,9 @@ export function VaultGate({ status, error, onSetup, onUnlock, onLock }: VaultGat
         <span className="vault-state">
           <LockOpen size={14} aria-hidden="true" /> 密钥保险库已解锁
         </span>
-        <button className="ghost-button" type="button" onClick={onLock}>
+        <Button variant="ghost" type="button" onClick={onLock}>
           锁定
-        </button>
+        </Button>
       </div>
     )
   }
@@ -50,7 +52,7 @@ export function VaultGate({ status, error, onSetup, onUnlock, onLock }: VaultGat
           : '输入口令以解密本次会话的本地密钥环。'}
       </p>
       <div className="action-row two">
-        <input
+        <Input
           name="vaultPassphrase"
           type="password"
           aria-label={isSetup ? '新保险库口令' : '保险库口令'}
@@ -61,9 +63,9 @@ export function VaultGate({ status, error, onSetup, onUnlock, onLock }: VaultGat
             if (event.key === 'Enter') submit()
           }}
         />
-        <button className="primary-button" type="button" onClick={submit}>
+        <Button type="button" onClick={submit}>
           {isSetup ? '创建保险库' : '解锁'}
-        </button>
+        </Button>
       </div>
       {error ? (
         <p className="operation-message error" role="alert">

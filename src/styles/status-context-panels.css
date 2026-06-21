@@ -6,22 +6,6 @@
   color: var(--muted);
 }
 
-.frozen-badge {
-  border-radius: 4px;
-  background: var(--red-soft);
-  color: var(--red);
-  font-weight: 600;
-  padding: 2px 8px;
-}
-
-.secondary-button.danger {
-  color: var(--red);
-}
-
-.secondary-button.danger:hover {
-  border-color: var(--red);
-}
-
 /* 交易记录表单 / 列表 */
 .record-form,
 .record-list {
@@ -33,30 +17,20 @@
   border-top: 1px solid var(--line);
 }
 
-/* 画布右键菜单 */
-.graph-context-menu {
-  position: absolute;
-  z-index: 30;
+/* 画布右键菜单改用 shadcn DropdownMenu（样式由 Tailwind/shadcn token 提供，见 ui/dropdown-menu.tsx）。
+   此处仅保留 z-index，确保 Portal 渲染的菜单浮层位于画布浮窗之上。 */
+.graph-context-menu-content {
+  z-index: 60;
+}
+
+.graph-mount-banner {
   display: flex;
-  flex-direction: column;
-  min-width: 156px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  overflow: hidden;
-}
-
-.graph-context-menu button {
-  border: none;
-  background: none;
-  color: var(--text);
-  text-align: left;
-  font-size: 13px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 8px 12px;
-}
-
-.graph-context-menu button:hover {
-  background: var(--teal-soft);
-  color: var(--teal);
+  border-bottom: 1px solid color-mix(in oklch, var(--primary), transparent 65%);
+  background: color-mix(in oklch, var(--primary), var(--background) 86%);
+  color: var(--foreground);
+  font-size: 13px;
 }

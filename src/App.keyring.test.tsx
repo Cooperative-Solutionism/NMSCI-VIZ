@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import {
   installAppTestLifecycle,
   jsonResponse,
-  openQueryTab,
+  openFlowNodesTab,
+  requestInputUrl,
   setMockVaultStatus,
   stubFetchByUrl,
 } from './test/appTestHarness'
@@ -12,7 +13,7 @@ import App from './App'
 describe('App initial state', () => {
   installAppTestLifecycle()
 
-  it('adds a flow node from the keys toolbar and persists it', async () => {
+  it('adds a flow node from the canvas and persists it as plaintext by default (vault off)', async () => {
     render(<App />)
 
     fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
@@ -20,63 +21,158 @@ describe('App initial state', () => {
     await waitFor(() => {
       const raw = localStorage.getItem('nmsci.flowNodes.v1')
       const saved = JSON.parse(raw ?? '{"nodes":[]}') as {
-        nodes: Array<{ privateKey: { ct: string }; publicKeyHex: string }>
+        nodes: Array<{ privateKeyHex?: string; privateKey?: unknown; publicKeyHex: string }>
       }
-      // 私钥以密文落盘（明文不出现在 raw），pubkey 明文；密文用替身编解码器可解回原私钥。
-      expect(raw).not.toContain('0'.repeat(63) + '1')
+      // 默认保险库关闭：私钥以明文 privateKeyHex 落盘，没有密文字段，pubkey 明文。
       expect(saved.nodes[0]?.publicKeyHex).toBe('02'.padEnd(66, '1'))
-      expect(atob(saved.nodes[0]!.privateKey.ct)).toBe('0'.repeat(63) + '1')
+      expect(saved.nodes[0]?.privateKeyHex).toBe('0'.repeat(63) + '1')
+      expect(saved.nodes[0]?.privateKey).toBeUndefined()
     })
-    // selecting the new node opens its operate panel in the inspector
-    expect(await screen.findByRole('button', { name: /注册节点/ })).toBeTruthy()
+    // selecting the new node opens its key-details panel in the inspector
+    // （导出私钥/重命名/删除等管理操作已迁移到画布右键菜单，面板只展示密钥详情）
+    expect(await screen.findByText('节点名称')).toBeTruthy()
   })
 
-  it('fills the selected flow node public key into the query field', async () => {
+  it('encrypts existing plaintext nodes when the vault is enabled', async () => {
     render(<App />)
 
+    // 关闭态下添加一个明文节点。
     fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
-    fireEvent.click(await screen.findByRole('button', { name: /查询此节点/ }))
-    openQueryTab()
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
+        nodes: Array<{ privateKeyHex?: string }>
+      }
+      expect(saved.nodes[0]?.privateKeyHex).toBe('0'.repeat(63) + '1')
+    })
 
-    expect((screen.getByLabelText('流转节点 ID / 公钥') as HTMLTextAreaElement).value).toBe(
-      '02'.padEnd(66, '1'),
-    )
-  })
-
-  it('loads a hex register difficulty target returned by the backend', async () => {
-    const centralPubkey = '03dfb2c7716697bba0a12c21c431f86d4bfe3b536b2ec0b7f32e7f97bbcfb20cbe'
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(
-        async () =>
-          new Response(
-            JSON.stringify({
-              code: 200,
-              message: 'ok',
-              data: { height: 2518, registerDifficultyTarget: '20ffffff', centralPubkey },
-            }),
-            {
-              headers: { 'Content-Type': 'application/json' },
-              status: 200,
-            },
-          ),
-      ),
-    )
-    render(<App />)
-
-    fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
-    fireEvent.click(await screen.findByRole('button', { name: /使用最新难度/ }))
+    // 启用保险库并创建口令：现存明文私钥应迁移为密文。
+    fireEvent.click(screen.getByRole('button', { name: /启用密钥保险库/ }))
+    fireEvent.change(await screen.findByLabelText('新保险库口令'), {
+      target: { value: 'session-passphrase' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /创建保险库/ }))
 
     await waitFor(() => {
-      expect((screen.getByLabelText('注册难度目标') as HTMLInputElement).value).toBe('20ffffff')
+      const raw = localStorage.getItem('nmsci.flowNodes.v1')
+      const saved = JSON.parse(raw ?? '{"nodes":[]}') as {
+        nodes: Array<{ privateKey?: { ct: string }; privateKeyHex?: string }>
+      }
+      // 明文私钥不再落盘，密文可解回原私钥。
+      expect(raw).not.toContain('0'.repeat(63) + '1')
+      expect(saved.nodes[0]?.privateKeyHex).toBeUndefined()
+      expect(atob(saved.nodes[0]!.privateKey!.ct)).toBe('0'.repeat(63) + '1')
     })
-    expect((screen.getByLabelText('中心公钥') as HTMLTextAreaElement).value).toBe(centralPubkey)
-    expect(screen.queryByText(/最新区块未包含 registerDifficultyTarget/)).toBeNull()
   })
 
-  it('registers a flow node end to end and persists a sent registration', async () => {
+  it('returns encrypted keys to plaintext when the vault is disabled again', async () => {
+    render(<App />)
+
+    // 关闭态添加节点 → 启用并加密。
+    fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /启用密钥保险库/ }))
+    fireEvent.change(await screen.findByLabelText('新保险库口令'), {
+      target: { value: 'session-passphrase' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /创建保险库/ }))
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
+        nodes: Array<{ privateKey?: { ct: string } }>
+      }
+      expect(saved.nodes[0]?.privateKey?.ct).toBeTruthy()
+    })
+
+    // 关闭保险库：内存中的私钥应以明文重新落盘，且不丢失。
+    fireEvent.click(await screen.findByRole('button', { name: /关闭保险库/ }))
+    const confirmDialog = await screen.findByRole('alertdialog', { name: /关闭密钥保险库/ })
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '关闭保险库' }))
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
+        nodes: Array<{ privateKey?: unknown; privateKeyHex?: string }>
+      }
+      expect(saved.nodes[0]?.privateKeyHex).toBe('0'.repeat(63) + '1')
+      expect(saved.nodes[0]?.privateKey).toBeUndefined()
+    })
+    // 关闭后重新出现“启用密钥保险库”入口。
+    expect(await screen.findByRole('button', { name: /启用密钥保险库/ })).toBeTruthy()
+  })
+
+  it('does not disable the vault when the confirmation is declined', async () => {
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /启用密钥保险库/ }))
+    fireEvent.change(await screen.findByLabelText('新保险库口令'), {
+      target: { value: 'session-passphrase' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /创建保险库/ }))
+    await screen.findByRole('button', { name: /关闭保险库/ })
+
+    fireEvent.click(screen.getByRole('button', { name: /关闭保险库/ }))
+    const confirmDialog = await screen.findByRole('alertdialog', { name: /关闭密钥保险库/ })
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '取消' }))
+
+    // 取消确认：仍处于已解锁加密态，未回退到关闭。
+    expect(screen.getByRole('button', { name: /关闭保险库/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /启用密钥保险库/ })).toBeNull()
+    const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
+      nodes: Array<{ privateKey?: { ct: string } }>
+    }
+    expect(saved.nodes[0]?.privateKey?.ct).toBeTruthy()
+  })
+
+  it('abandons enabling when the setup dialog is closed without creating a passphrase', async () => {
+    render(<App />)
+
+    // 关闭态添加一个明文节点，再打开“启用”流程进入 setup。
+    fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /启用密钥保险库/ }))
+    const dialog = await screen.findByRole('dialog', { name: /创建密钥保险库/ })
+    expect(await screen.findByLabelText('新保险库口令')).toBeTruthy()
+
+    // 不创建口令直接关闭弹窗 → 放弃启用，回退到关闭态。
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText('新保险库口令')).toBeNull()
+    })
+    // 回到“启用密钥保险库”入口，且私钥仍是明文、未被加密。
+    expect(await screen.findByRole('button', { name: /启用密钥保险库/ })).toBeTruthy()
+    const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
+      nodes: Array<{ privateKey?: unknown; privateKeyHex?: string }>
+    }
+    expect(saved.nodes[0]?.privateKeyHex).toBe('0'.repeat(63) + '1')
+    expect(saved.nodes[0]?.privateKey).toBeUndefined()
+
+    // 未卡在 setup：仍可继续添加节点（明文）。
+    fireEvent.click(screen.getByRole('button', { name: /canvas add flow node/i }))
+    await waitFor(() => {
+      const after = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
+        nodes: unknown[]
+      }
+      expect(after.nodes).toHaveLength(2)
+    })
+  })
+
+  it('does not expose the removed consume-chain query shortcut for local flow nodes', async () => {
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
+
+    expect(screen.queryByRole('button', { name: /浏览此节点/ })).toBeNull()
+    expect(screen.queryByLabelText('流转节点 ID / 公钥')).toBeNull()
+  })
+
+  it('registers a flow node from the context menu, auto-fetching the latest difficulty', async () => {
     const pubkey = '02'.padEnd(66, '1')
-    stubFetchByUrl((url, init) => {
+    const centralPubkey = '03dfb2c7716697bba0a12c21c431f86d4bfe3b536b2ec0b7f32e7f97bbcfb20cbe'
+    const fetchMock = stubFetchByUrl((url, init) => {
+      if (url.pathname === '/blocks/latest') {
+        return jsonResponse({
+          code: 200,
+          message: 'ok',
+          data: { height: 2518, registerDifficultyTarget: '20ffffff', centralPubkey },
+        })
+      }
       if (url.pathname === '/flow-node-registrations' && init?.method === 'POST') {
         return jsonResponse({
           code: 200,
@@ -84,7 +180,7 @@ describe('App initial state', () => {
           data: {
             id: 'reg-1',
             msgType: 0,
-            registerDifficultyTarget: '1d00ffff',
+            registerDifficultyTarget: '20ffffff',
             nonce: 42,
             flowNodePubkey: pubkey,
             flowNodeSignature: '00',
@@ -110,38 +206,84 @@ describe('App initial state', () => {
     render(<App />)
 
     fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
-    fireEvent.change(await screen.findByLabelText('注册难度目标'), {
-      target: { value: '1d00ffff' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /注册节点/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /context register/ }))
 
     await waitFor(() => {
       const raw = localStorage.getItem('nmsci.flowNodes.v1')
       const saved = JSON.parse(raw ?? '{"nodes":[]}') as {
-        nodes: Array<{ registration?: { status: string; txid?: string } }>
+        nodes: Array<{
+          registration?: { status: string; txid?: string; registerDifficultyTarget?: string }
+        }>
       }
       expect(saved.nodes[0]?.registration?.status).toBe('sent')
       expect(saved.nodes[0]?.registration?.txid).toBe('regtxid')
+      // 难度目标取自最新区块，无需手动填写。
+      expect(saved.nodes[0]?.registration?.registerDifficultyTarget).toBe('20ffffff')
     })
-    await waitFor(() => {
-      const messages = screen.getAllByText(/已注册 .+，nonce 为 42。/)
-      expect(messages.length).toBeGreaterThan(0)
-      expect(messages.some((message) => message.textContent?.includes('REG-1'))).toBe(true)
-      expect(messages.some((message) => message.textContent?.includes('021111'))).toBe(false)
-    })
+    // 注册前自动拉取了最新区块。
+    expect(
+      fetchMock.mock.calls.some(([input]) => requestInputUrl(input).includes('/blocks/latest')),
+    ).toBe(true)
   })
 
-  it('renames and deletes a local flow node', async () => {
+  it('authorizes a flow node from the context menu, auto-fetching the central pubkey', async () => {
+    const pubkey = '02'.padEnd(66, '1')
+    const centralPubkey = '03dfb2c7716697bba0a12c21c431f86d4bfe3b536b2ec0b7f32e7f97bbcfb20cbe'
+    stubFetchByUrl((url, init) => {
+      if (url.pathname === '/blocks/latest') {
+        return jsonResponse({
+          code: 200,
+          message: 'ok',
+          data: { height: 2518, registerDifficultyTarget: '20ffffff', centralPubkey },
+        })
+      }
+      if (url.pathname === '/central-pubkey-empowerments' && init?.method === 'POST') {
+        return jsonResponse({
+          code: 200,
+          message: 'ok',
+          data: { id: 'empower-1', txid: 'emptxid' },
+        })
+      }
+      if (url.pathname === `/flow-nodes/${pubkey}`) {
+        return jsonResponse({
+          code: 200,
+          message: 'ok',
+          data: {
+            registered: true,
+            authorized: true,
+            locked: false,
+            currentCentralPubkeyAuthorized: true,
+          },
+        })
+      }
+      throw new Error(`Unexpected URL ${url.href}`)
+    })
     render(<App />)
 
     fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
-    await screen.findByRole('button', { name: /注册节点/ })
+    fireEvent.click(await screen.findByRole('button', { name: /context authorize/ }))
 
-    vi.stubGlobal(
-      'prompt',
-      vi.fn(() => 'Renamed node'),
-    )
-    fireEvent.click(screen.getByRole('button', { name: /^重命名$/ }))
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
+        nodes: Array<{ authorizations?: Array<{ status: string; centralPubkeyHex: string }> }>
+      }
+      expect(saved.nodes[0]?.authorizations?.[0]?.status).toBe('sent')
+      expect(saved.nodes[0]?.authorizations?.[0]?.centralPubkeyHex).toBe(centralPubkey)
+    })
+  })
+
+  it('renames and deletes a local flow node via the canvas context menu', async () => {
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
+
+    // 重命名走画布右键菜单（直接作用于右键的节点，无需先选中）。
+    fireEvent.click(await screen.findByRole('button', { name: /context rename/ }))
+    const renameDialog = await screen.findByRole('dialog', { name: /重命名流转节点/ })
+    fireEvent.change(within(renameDialog).getByLabelText('节点名称'), {
+      target: { value: 'Renamed node' },
+    })
+    fireEvent.click(within(renameDialog).getByRole('button', { name: '保存' }))
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
         nodes: Array<{ label: string }>
@@ -149,16 +291,35 @@ describe('App initial state', () => {
       expect(saved.nodes[0]?.label).toBe('Renamed node')
     })
 
-    vi.stubGlobal(
-      'confirm',
-      vi.fn(() => true),
-    )
-    fireEvent.click(screen.getByRole('button', { name: /^删除$/ }))
+    // 删除同样走画布右键菜单。
+    fireEvent.click(screen.getByRole('button', { name: /context delete/ }))
+    const deleteDialog = await screen.findByRole('alertdialog', { name: /删除本地流转节点/ })
+    fireEvent.click(within(deleteDialog).getByRole('button', { name: '删除' }))
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
         nodes: unknown[]
       }
       expect(saved.nodes).toHaveLength(0)
+    })
+  })
+
+  it('exports a local flow node private key to the clipboard via the canvas context menu', async () => {
+    const writeText = vi.fn(() => Promise.resolve())
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
+
+    // 导出私钥走画布右键菜单 → 确认对话框 → 明文私钥复制到剪贴板。
+    fireEvent.click(await screen.findByRole('button', { name: /context export key/ }))
+    const exportDialog = await screen.findByRole('alertdialog', { name: /导出私钥/ })
+    fireEvent.click(within(exportDialog).getByRole('button', { name: '复制私钥' }))
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith('0'.repeat(63) + '1')
     })
   })
 
@@ -207,22 +368,24 @@ describe('App initial state', () => {
 
   it('imports a flow node from a pasted private key', async () => {
     const privateKey = '01'.padStart(64, '0')
-    vi.stubGlobal(
-      'prompt',
-      vi.fn(() => privateKey),
-    )
     render(<App />)
 
+    openFlowNodesTab()
     fireEvent.click(await screen.findByRole('button', { name: /导入流转节点/ }))
+    const importDialog = await screen.findByRole('dialog', { name: /导入流转节点/ })
+    fireEvent.change(within(importDialog).getByLabelText('私钥（hex）'), {
+      target: { value: privateKey },
+    })
+    fireEvent.click(within(importDialog).getByRole('button', { name: '导入' }))
 
     await waitFor(() => {
       const raw = localStorage.getItem('nmsci.flowNodes.v1')
       const saved = JSON.parse(raw ?? '{"nodes":[]}') as {
-        nodes: Array<{ privateKey: { ct: string }; publicKeyHex: string }>
+        nodes: Array<{ privateKeyHex?: string; privateKey?: unknown; publicKeyHex: string }>
       }
-      // 导入的私钥同样以密文落盘（明文不出现在 raw），密文可解回原私钥。
-      expect(raw).not.toContain(privateKey)
-      expect(atob(saved.nodes[0]!.privateKey.ct)).toBe(privateKey)
+      // 默认保险库关闭：导入的私钥以明文 privateKeyHex 落盘，无密文字段。
+      expect(saved.nodes[0]?.privateKeyHex).toBe(privateKey)
+      expect(saved.nodes[0]?.privateKey).toBeUndefined()
       expect(saved.nodes[0]?.publicKeyHex.length).toBe(66)
     })
   })

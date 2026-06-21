@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react'
 import {
+  createDefaultDashboardLayout,
   loadDashboardLayout,
   saveDashboardLayout,
   updatePanelLayout,
@@ -55,7 +56,36 @@ export function DashboardWorkspace({ graph, panels }: DashboardWorkspaceProps) {
   const openPanel = useCallback(
     (panelId: DashboardPanelId) => {
       setFocusPanelId(panelId)
-      updateLayout(panelId, { collapsed: false })
+      const dockPosition = layoutRef.current[panelId].dockPosition
+
+      updateLayout(panelId, {
+        collapsed: false,
+        panelPosition: dockPosition,
+      })
+    },
+    [updateLayout],
+  )
+  const collapsePanel = useCallback(
+    (panelId: DashboardPanelId) => {
+      const panelPosition = layoutRef.current[panelId].panelPosition
+
+      updateLayout(panelId, {
+        collapsed: true,
+        dockPosition: panelPosition,
+      })
+    },
+    [updateLayout],
+  )
+  const closePanel = useCallback(
+    (panelId: DashboardPanelId) => {
+      const bounds = workspaceBounds(workspaceRef.current)
+      const defaults = createDefaultDashboardLayout(bounds)[panelId]
+
+      updateLayout(panelId, {
+        collapsed: true,
+        dockPosition: defaults.dockPosition,
+        panelPosition: defaults.panelPosition,
+      })
     },
     [updateLayout],
   )
@@ -74,10 +104,10 @@ export function DashboardWorkspace({ graph, panels }: DashboardWorkspaceProps) {
             key={panel.id}
             label={panel.label}
             icon={panel.icon}
-            position={panelLayout.panelPosition}
+            position={panelLayout.dockPosition}
             boundsRef={workspaceRef}
             onOpen={() => openPanel(panel.id)}
-            onPositionChange={(panelPosition) => updateLayout(panel.id, { panelPosition })}
+            onPositionChange={(dockPosition) => updateLayout(panel.id, { dockPosition })}
           />
         ) : (
           <FloatingPanel
@@ -86,7 +116,8 @@ export function DashboardWorkspace({ graph, panels }: DashboardWorkspaceProps) {
             position={panelLayout.panelPosition}
             boundsRef={workspaceRef}
             focusOnMount={focusPanelId === panel.id}
-            onCollapse={() => updateLayout(panel.id, { collapsed: true })}
+            onCollapse={() => collapsePanel(panel.id)}
+            onClose={() => closePanel(panel.id)}
             onFocusMount={() => clearFocusedPanel(panel.id)}
             onPositionChange={(panelPosition) => updateLayout(panel.id, { panelPosition })}
           >

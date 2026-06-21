@@ -1,10 +1,8 @@
 import {
-  Activity,
-  Download,
+  Database,
   Info,
-  ListTree,
+  KeyRound,
   PanelRight,
-  Search,
   type LucideIcon,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
@@ -18,10 +16,8 @@ export type DashboardPanelConfig = {
 }
 
 export const dashboardPanelIcons: Record<DashboardPanelId, LucideIcon> = {
-  query: Search,
+  query: Database,
   details: PanelRight,
-  loops: ListTree,
-  metrics: Activity,
-  export: Download,
   system: Info,
+  localNodes: KeyRound,
 }

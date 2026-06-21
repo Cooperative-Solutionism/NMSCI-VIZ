@@ -2,53 +2,282 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
+  useSyncExternalStore,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
+import { Workflow } from 'lucide-react'
+import { shortId } from '../lib/chainGraph'
+import type { ChainGraphEdge, ChainGraphNode } from '../lib/types'
 import { GraphAccessList } from './network-graph/GraphAccessList'
 import { GraphContextMenu } from './network-graph/GraphContextMenu'
 import { GraphLegend } from './network-graph/GraphLegend'
+import { GraphSearch } from './network-graph/GraphSearch'
 import { GraphTools } from './network-graph/GraphTools'
+import { Button } from './ui/button'
+import {
+  GRAPH_VIEW_STORAGE_KEY,
+  normalizeGraphViewState,
+  saveGraphViewState,
+  type GraphHighlightMode,
+  type GraphViewState,
+} from './network-graph/graphViewState'
 import type { ContextMenuState, NetworkGraphProps } from './network-graph/types'
 import { useCytoscapeGraph } from './network-graph/useCytoscapeGraph'
 
+interface GraphViewStateStore {
+  getSnapshot: () => GraphViewState
+  set: (next: GraphViewState, options?: { notify?: boolean }) => void
+  subscribe: (listener: () => void) => () => void
+}
+
 export function NetworkGraph({
   graph,
+  aggregateMode = false,
+  onAggregateModeChange = () => {},
   selectedId,
   onSelectNode,
   onSelectEdge,
   onAddFlowNode,
   onAddConsumeNode,
+  onRegisterFlowNode,
+  onAuthorizeFlowNode,
+  onGenerateRecord,
+  onMountRecord,
+  onLoadChain,
+  onClearCanvas,
+  onExportNodeKey,
+  onRenameNode,
+  onDeleteNode,
+  mountPickActive,
+  onCancelMountPick,
 }: NetworkGraphProps) {
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
-  const selectedChainId = useMemo(
-    () => graph.edges.find((edge) => edge.id === selectedId)?.chainId ?? null,
-    [graph.edges, selectedId],
+  const selectedChainIds = useMemo(
+    () => chainsForSelection(graph, selectedId),
+    [graph, selectedId],
   )
+  const cycleChainIds = useMemo(
+    () =>
+      new Set(
+        graph.edges.filter((edge) => edge.status === 'looped').map((edge) => edge.chainId),
+      ),
+    [graph.edges],
+  )
+  const hasCycles = cycleChainIds.size > 0
+  const graphElementIds = useMemo(
+    () => new Set([...graph.nodes.map((node) => node.id), ...graph.edges.map((edge) => edge.id)]),
+    [graph.edges, graph.nodes],
+  )
+  const graphViewStateOptions = useMemo(
+    () => ({ elementIds: graphElementIds, hasCycles }),
+    [graphElementIds, hasCycles],
+  )
+  const hasGraphElements = graphElementIds.size > 0
+  const graphViewStatePersistenceOptions = hasGraphElements ? graphViewStateOptions : undefined
+  const controlledSelectedId =
+    selectedId && graphElementIds.has(selectedId) ? selectedId : null
+  const nodeById = useMemo(
+    () => new Map(graph.nodes.map((node) => [node.id, node])),
+    [graph.nodes],
+  )
+  const edgeById = useMemo(
+    () => new Map(graph.edges.map((edge) => [edge.id, edge])),
+    [graph.edges],
+  )
+  const [savedInitialViewState] = useState<GraphViewState | null>(() => readSavedGraphViewState())
+  const [graphViewStateStore] = useState(() =>
+    createGraphViewStateStore(savedInitialViewState ?? normalizeGraphViewState(null)),
+  )
+  const graphViewState = useSyncExternalStore(
+    graphViewStateStore.subscribe,
+    graphViewStateStore.getSnapshot,
+    graphViewStateStore.getSnapshot,
+  )
+  const controlledDeselectedRef = useRef(false)
+  const previousSelectedIdRef = useRef<string | null>(selectedId)
+  const normalizedGraphViewState = useMemo(
+    () => normalizeGraphViewState(graphViewState, graphViewStateOptions),
+    [graphViewState, graphViewStateOptions],
+  )
+  const initialViewState = useMemo(
+    () => (savedInitialViewState ? normalizedGraphViewState : undefined),
+    [normalizedGraphViewState, savedInitialViewState],
+  )
+  const restoredSelectionRef = useRef<string | null>(null)
+  const highlightMode: GraphHighlightMode = normalizedGraphViewState.highlightMode
+
   const closeMenu = useCallback(() => setMenu(null), [])
-  const { containerRef, cyRef } = useCytoscapeGraph({
+  const persistGraphViewState = useCallback(
+    (patch: Partial<GraphViewState>) => {
+      const current = graphViewStateStore.getSnapshot()
+      const next = normalizeGraphViewState(
+        {
+          ...current,
+          ...patch,
+          pan: patch.pan ?? current.pan,
+          selectedId:
+            patch.selectedId !== undefined
+              ? patch.selectedId
+              : controlledDeselectedRef.current
+                ? null
+                : (controlledSelectedId ?? current.selectedId),
+        },
+        graphViewStatePersistenceOptions,
+      )
+      if (patch.selectedId !== undefined) {
+        controlledDeselectedRef.current = patch.selectedId === null
+      }
+      graphViewStateStore.set(next)
+      saveGraphViewState(next, undefined, graphViewStatePersistenceOptions)
+    },
+    [controlledSelectedId, graphViewStatePersistenceOptions, graphViewStateStore],
+  )
+  const handleSelectNode = useCallback(
+    (node: ChainGraphNode) => {
+      onSelectNode(node)
+      persistGraphViewState({ selectedId: node.id })
+    },
+    [onSelectNode, persistGraphViewState],
+  )
+  const handleSelectEdge = useCallback(
+    (edge: ChainGraphEdge) => {
+      onSelectEdge(edge)
+      persistGraphViewState({ selectedId: edge.id })
+    },
+    [onSelectEdge, persistGraphViewState],
+  )
+  const handleViewChange = useCallback(
+    (view: Pick<GraphViewState, 'zoom' | 'pan'>) => {
+      persistGraphViewState(view)
+    },
+    [persistGraphViewState],
+  )
+  const { containerRef, cyRef, focusNode } = useCytoscapeGraph({
     graph,
     selectedId,
-    selectedChainId,
-    onSelectNode,
-    onSelectEdge,
+    selectedChainIds,
+    cycleChainIds,
+    highlightMode,
+    initialViewState,
+    onSelectNode: handleSelectNode,
+    onSelectEdge: handleSelectEdge,
     onOpenMenu: setMenu,
     onCloseMenu: closeMenu,
+    onViewChange: handleViewChange,
   })
 
   useEffect(() => {
-    if (!menu) return
-    const onKey = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') setMenu(null)
+    if (!hasGraphElements) {
+      return
     }
-    const onClick = () => setMenu(null)
-    window.addEventListener('keydown', onKey)
-    window.addEventListener('click', onClick)
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('click', onClick)
+
+    const current = graphViewStateStore.getSnapshot()
+    const next = normalizeGraphViewState(current, graphViewStateOptions)
+    if (graphViewStatesEqual(current, next)) {
+      return
     }
-  }, [menu])
+
+    graphViewStateStore.set(next)
+    saveGraphViewState(next, undefined, graphViewStateOptions)
+  }, [
+    graphViewState,
+    graphViewStateOptions,
+    graphViewStateStore,
+    hasGraphElements,
+  ])
+
+  useEffect(() => {
+    if (!hasGraphElements) {
+      previousSelectedIdRef.current = selectedId
+      return
+    }
+
+    const previousSelectedId = previousSelectedIdRef.current
+    previousSelectedIdRef.current = selectedId
+
+    if (controlledSelectedId) {
+      controlledDeselectedRef.current = false
+      const current = graphViewStateStore.getSnapshot()
+      const normalizedCurrent = normalizeGraphViewState(current, graphViewStateOptions)
+      const next = normalizeGraphViewState(
+        {
+          ...normalizedCurrent,
+          selectedId: controlledSelectedId,
+        },
+        graphViewStateOptions,
+      )
+      if (!graphViewStatesEqual(current, next)) {
+        graphViewStateStore.set(next, { notify: false })
+      }
+      saveGraphViewState(next, undefined, graphViewStateOptions)
+      return
+    }
+
+    if (selectedId !== null || !previousSelectedId || !graphElementIds.has(previousSelectedId)) {
+      return
+    }
+
+    controlledDeselectedRef.current = true
+    const current = graphViewStateStore.getSnapshot()
+    const normalizedCurrent = normalizeGraphViewState(current, graphViewStateOptions)
+    const next = normalizeGraphViewState(
+      {
+        ...normalizedCurrent,
+        selectedId: null,
+      },
+      graphViewStateOptions,
+    )
+    if (!graphViewStatesEqual(current, next)) {
+      graphViewStateStore.set(next, { notify: false })
+    }
+    saveGraphViewState(next, undefined, graphViewStateOptions)
+  }, [
+    controlledSelectedId,
+    graphElementIds,
+    graphViewStateOptions,
+    graphViewStateStore,
+    hasGraphElements,
+    selectedId,
+  ])
+
+  useEffect(() => {
+    // 仅恢复“挂载时”持久化的那个选择，且只恢复一次。
+    // 必须用稳定的 savedInitialViewState（而非随 store 漂移的 initialViewState），
+    // 否则新增节点时它会回放旧选择，导致选中态在旧/新节点间闪烁。
+    const restoredSelectedId = savedInitialViewState?.selectedId
+    if (
+      !restoredSelectedId ||
+      selectedId === restoredSelectedId ||
+      restoredSelectionRef.current === restoredSelectedId
+    ) {
+      return
+    }
+
+    const restoredNode = nodeById.get(restoredSelectedId)
+    if (restoredNode) {
+      restoredSelectionRef.current = restoredSelectedId
+      onSelectNode(restoredNode)
+      return
+    }
+
+    const restoredEdge = edgeById.get(restoredSelectedId)
+    if (restoredEdge) {
+      restoredSelectionRef.current = restoredSelectedId
+      onSelectEdge(restoredEdge)
+    }
+  }, [
+    edgeById,
+    nodeById,
+    onSelectEdge,
+    onSelectNode,
+    savedInitialViewState,
+    selectedId,
+  ])
+
+  // 菜单的关闭（Esc / 点击外部 / 选中条目）由 DropdownMenu 经 onOpenChange→closeMenu 处理；
+  // 画布内的点击另由 useCytoscapeGraph 的 cy.on('tap', closeMenu) 兜底。
 
   const handleDownloadPng = useCallback(() => {
     const cy = cyRef.current
@@ -59,6 +288,21 @@ export function NetworkGraph({
     link.download = 'nmsci-graph.png'
     link.click()
   }, [cyRef])
+
+  const handleSearchSelect = useCallback(
+    (node: ChainGraphNode) => {
+      handleSelectNode(node)
+      focusNode(node.id)
+    },
+    [focusNode, handleSelectNode],
+  )
+
+  const handleHighlightModeChange = useCallback(
+    (mode: GraphHighlightMode) => {
+      persistGraphViewState({ highlightMode: mode })
+    },
+    [persistGraphViewState],
+  )
 
   const zoomBy = useCallback(
     (delta: number) => {
@@ -109,8 +353,37 @@ export function NetworkGraph({
     [fitGraph, openMenuAtCenter, zoomBy],
   )
 
+  const activeHighlightCount =
+    highlightMode === 'cycles' ? cycleChainIds.size : selectedChainIds.size
+  const selectedState = selectedId ? `选中 ${shortId(selectedId)}` : '未选择'
+  const highlightState =
+    highlightMode === 'cycles' ? `循环 ${cycleChainIds.size}` : `高亮链 ${activeHighlightCount}`
+  const densityHint = graph.nodes.length > 100 ? '节点较多，建议使用搜索定位' : null
+
   return (
     <div className="graph-shell" onContextMenu={(event) => event.preventDefault()}>
+      <div className="graph-statusbar" aria-label="画布状态">
+        <div className="graph-statusbar__brand">
+          <Workflow aria-hidden="true" />
+          <strong>NMSCI 交易画布</strong>
+        </div>
+        <div className="graph-statusbar__meta">
+          <span>节点 {graph.nodes.length}</span>
+          <span>连接 {graph.edges.length}</span>
+          <span>{highlightState}</span>
+          <span>{selectedState}</span>
+          {densityHint ? <span>{densityHint}</span> : null}
+        </div>
+      </div>
+      {mountPickActive ? (
+        <div className="graph-mount-banner" role="status">
+          <span>挂载模式：点击画布上的流转节点完成挂载（Esc 取消）</span>
+          <Button type="button" variant="secondary" size="sm" onClick={() => onCancelMountPick?.()}>
+            取消
+          </Button>
+        </div>
+      ) : null}
+
       {/* Cytoscape owns this custom canvas widget; keyboard affordances are wired below. */}
       {/* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
       <div
@@ -123,17 +396,106 @@ export function NetworkGraph({
         onKeyDown={handleCanvasKeyDown}
       />
       {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
+      <GraphSearch nodes={graph.nodes} onSelectNode={handleSearchSelect} />
+
       {menu ? (
         <GraphContextMenu
           menu={menu}
           onAddConsumeNode={onAddConsumeNode}
           onAddFlowNode={onAddFlowNode}
+          onRegisterFlowNode={onRegisterFlowNode}
+          onAuthorizeFlowNode={onAuthorizeFlowNode}
+          onGenerateRecord={onGenerateRecord}
+          onMountRecord={onMountRecord}
+          onLoadChain={onLoadChain}
+          onExportNodeKey={onExportNodeKey}
+          onRenameNode={onRenameNode}
+          onDeleteNode={onDeleteNode}
           onClose={closeMenu}
+          returnFocusRef={containerRef}
         />
       ) : null}
-      <GraphAccessList graph={graph} onSelectEdge={onSelectEdge} onSelectNode={onSelectNode} />
-      <GraphTools onDownloadPng={handleDownloadPng} onFit={fitGraph} onZoomBy={zoomBy} />
+      <GraphAccessList
+        graph={graph}
+        onSelectEdge={handleSelectEdge}
+        onSelectNode={handleSelectNode}
+      />
+      <GraphTools
+        aggregateMode={aggregateMode}
+        hasCycles={hasCycles}
+        highlightMode={highlightMode}
+        onAggregateModeChange={onAggregateModeChange}
+        onDownloadPng={handleDownloadPng}
+        onFit={fitGraph}
+        onHighlightModeChange={handleHighlightModeChange}
+        onClearCanvas={onClearCanvas}
+        onZoomBy={zoomBy}
+      />
       <GraphLegend />
     </div>
   )
+}
+
+function chainsForSelection(
+  graph: NetworkGraphProps['graph'],
+  selectedId: string | null,
+): Set<string> {
+  if (!selectedId) return new Set()
+
+  const selectedEdge = graph.edges.find((edge) => edge.id === selectedId)
+  if (selectedEdge) return new Set([selectedEdge.chainId])
+
+  if (!graph.nodes.some((node) => node.id === selectedId)) return new Set()
+
+  const chainIds = new Set<string>()
+  for (const edge of graph.edges) {
+    if (edge.source === selectedId || edge.target === selectedId) {
+      chainIds.add(edge.chainId)
+    }
+  }
+  return chainIds
+}
+
+function graphViewStatesEqual(left: GraphViewState, right: GraphViewState): boolean {
+  return (
+    left.zoom === right.zoom &&
+    left.pan.x === right.pan.x &&
+    left.pan.y === right.pan.y &&
+    left.selectedId === right.selectedId &&
+    left.highlightMode === right.highlightMode
+  )
+}
+
+function createGraphViewStateStore(initial: GraphViewState): GraphViewStateStore {
+  let current = initial
+  const listeners = new Set<() => void>()
+
+  return {
+    getSnapshot: () => current,
+    set: (next, options) => {
+      if (graphViewStatesEqual(current, next)) return
+
+      current = next
+      if (options?.notify === false) return
+
+      listeners.forEach((listener) => listener())
+    },
+    subscribe: (listener) => {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
+  }
+}
+
+function readSavedGraphViewState(): GraphViewState | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const raw = window.localStorage.getItem(GRAPH_VIEW_STORAGE_KEY)
+    return raw ? normalizeGraphViewState(JSON.parse(raw)) : null
+  } catch {
+    return null
+  }
 }

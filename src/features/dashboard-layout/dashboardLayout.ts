@@ -1,4 +1,8 @@
-export type DashboardPanelId = 'query' | 'details' | 'loops' | 'metrics' | 'export' | 'system'
+export type DashboardPanelId =
+  | 'query'
+  | 'details'
+  | 'system'
+  | 'localNodes'
 
 export type DashboardPoint = {
   x: number
@@ -23,44 +27,61 @@ export const DASHBOARD_LAYOUT_STORAGE_KEY = 'nmsci.dashboard.layout.v1'
 export const dashboardPanelIds: DashboardPanelId[] = [
   'query',
   'details',
-  'loops',
-  'metrics',
-  'export',
   'system',
+  'localNodes',
 ]
 
-export const defaultDashboardLayout: DashboardLayoutState = {
-  query: {
-    collapsed: true,
-    dockPosition: { x: 16, y: 16 },
-    panelPosition: { x: 72, y: 16 },
-  },
-  details: {
-    collapsed: true,
-    dockPosition: { x: 16, y: 72 },
-    panelPosition: { x: 880, y: 80 },
-  },
-  loops: {
-    collapsed: true,
-    dockPosition: { x: 16, y: 128 },
-    panelPosition: { x: 880, y: 360 },
-  },
-  metrics: {
-    collapsed: true,
-    dockPosition: { x: 16, y: 184 },
-    panelPosition: { x: 72, y: 96 },
-  },
-  export: {
-    collapsed: true,
-    dockPosition: { x: 16, y: 240 },
-    panelPosition: { x: 72, y: 176 },
-  },
-  system: {
-    collapsed: true,
-    dockPosition: { x: 16, y: 296 },
-    panelPosition: { x: 72, y: 256 },
-  },
+const defaultReferenceBounds = { width: 1024, height: 768 } satisfies DashboardBounds
+const defaultPanelTop = 16
+const defaultPanelHorizontalStep = 96
+const defaultDockLeft = 16
+const defaultDockTop = 84
+const defaultDockVerticalStep = 54
+const dockReservedSize = { width: 48, height: 48 }
+const panelReservedSize = { width: 280, height: 48 }
+
+function defaultBoundsWidth(bounds: DashboardBounds | undefined): number {
+  return bounds && Number.isFinite(bounds.width) ? bounds.width : defaultReferenceBounds.width
 }
+
+function defaultPanelPosition(index: number, bounds?: DashboardBounds): DashboardPoint {
+  const width = defaultBoundsWidth(bounds)
+  const maxSpan = Math.max(width - panelReservedSize.width, 0)
+  const horizontalStep =
+    dashboardPanelIds.length > 1
+      ? Math.min(defaultPanelHorizontalStep, maxSpan / (dashboardPanelIds.length - 1))
+      : 0
+  const rowWidth = panelReservedSize.width + horizontalStep * (dashboardPanelIds.length - 1)
+  const startX = Math.max(0, Math.round((width - rowWidth) / 2))
+
+  return {
+    x: Math.round(startX + horizontalStep * index),
+    y: defaultPanelTop,
+  }
+}
+
+function defaultDockPosition(index: number): DashboardPoint {
+  return {
+    x: defaultDockLeft,
+    y: defaultDockTop + defaultDockVerticalStep * index,
+  }
+}
+
+export const createDefaultDashboardLayout = (bounds?: DashboardBounds): DashboardLayoutState =>
+  dashboardPanelIds.reduce((layout, panelId, index) => {
+    const dockPosition = defaultDockPosition(index)
+    const panelPosition = defaultPanelPosition(index, bounds)
+
+    layout[panelId] = {
+      collapsed: true,
+      dockPosition,
+      panelPosition,
+    }
+
+    return layout
+  }, {} as DashboardLayoutState)
+
+export const defaultDashboardLayout: DashboardLayoutState = createDefaultDashboardLayout()
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -78,9 +99,6 @@ function clampCoordinate(value: number, max: number): number {
   return Math.min(Math.max(value, 0), Math.max(max, 0))
 }
 
-const dockReservedSize = { width: 48, height: 48 }
-const panelReservedSize = { width: 280, height: 48 }
-
 function clampPoint(point: DashboardPoint, bounds: DashboardBounds, reservedSize: DashboardBounds) {
   return {
     x: clampCoordinate(point.x, bounds.width - reservedSize.width),
@@ -97,9 +115,10 @@ export const normalizeDashboardLayout = (
   bounds?: DashboardBounds,
 ): DashboardLayoutState => {
   const source = isRecord(input) ? input : {}
+  const defaultsByPanel = createDefaultDashboardLayout(bounds)
 
   return dashboardPanelIds.reduce((layout, panelId) => {
-    const defaults = defaultDashboardLayout[panelId]
+    const defaults = defaultsByPanel[panelId]
     const savedPanel = source[panelId]
     const savedLayout = isRecord(savedPanel) ? savedPanel : {}
     const normalizedPanel = {

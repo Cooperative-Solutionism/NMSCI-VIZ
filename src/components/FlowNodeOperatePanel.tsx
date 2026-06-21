@@ -2,62 +2,19 @@ import type { FlowNodeStateResponseDTO } from '@nmsci/sdk'
 import { KeyRound } from 'lucide-react'
 import type { LocalFlowNode } from '../lib/flowNodeStorage'
 import { PanelHeader } from './PanelHeader'
-import { FlowNodeAuthorizationControls } from './flow-node-operate/FlowNodeAuthorizationControls'
 import { FlowNodeKeyDetails } from './flow-node-operate/FlowNodeKeyDetails'
-import { FlowNodeRegistrationControls } from './flow-node-operate/FlowNodeRegistrationControls'
-import { FlowNodeTransactionControls } from './flow-node-operate/FlowNodeTransactionControls'
-import { OperationFeedback } from './flow-node-operate/OperationFeedback'
 
-export type FlowNodeBusyState = 'difficulty' | 'register' | 'authorize' | 'record' | 'mount' | null
-
+// 注册/授权/记录/挂载与导出私钥/重命名/删除等操作均已迁移到画布右键菜单；详情面板仅展示密钥详情。
 export function FlowNodeOperatePanel({
-  busy,
-  centralLocked,
-  centralPubkey,
   displayName,
-  error,
-  lastRawBytes,
-  miningAttempts,
   node,
   nodeState,
-  onAuthorize,
-  onCentralPubkeyChange,
   onCopy,
-  onCreateMount,
-  onCreateRecord,
-  onDelete,
-  onDifficultyChange,
-  onExportPrivateKey,
-  onFetchDifficulty,
-  onQuery,
-  onRegister,
-  onRename,
-  registerDifficultyTarget,
-  status,
 }: {
-  busy: FlowNodeBusyState
-  centralLocked: boolean
-  centralPubkey: string
   displayName: string
-  error: string | null
-  lastRawBytes: string
-  miningAttempts: number | null
   node: LocalFlowNode
   nodeState?: FlowNodeStateResponseDTO
-  onAuthorize: () => void
-  onCentralPubkeyChange: (value: string) => void
   onCopy: (value: string, label: string) => void
-  onCreateRecord?: () => void
-  onCreateMount?: () => void
-  onDelete: () => void
-  onDifficultyChange: (value: string) => void
-  onExportPrivateKey: () => void
-  onFetchDifficulty: () => void
-  onQuery: () => void
-  onRegister: () => void
-  onRename: () => void
-  registerDifficultyTarget: string
-  status: string | null
 }) {
   return (
     <div className="inspector-content">
@@ -67,29 +24,7 @@ export function FlowNodeOperatePanel({
         node={node}
         nodeState={nodeState}
         onCopy={onCopy}
-        onDelete={onDelete}
-        onExportPrivateKey={onExportPrivateKey}
-        onQuery={onQuery}
-        onRename={onRename}
       />
-      <FlowNodeRegistrationControls
-        busy={busy}
-        centralLocked={centralLocked}
-        miningAttempts={miningAttempts}
-        onDifficultyChange={onDifficultyChange}
-        onFetchDifficulty={onFetchDifficulty}
-        onRegister={onRegister}
-        registerDifficultyTarget={registerDifficultyTarget}
-      />
-      <FlowNodeAuthorizationControls
-        busy={busy}
-        centralLocked={centralLocked}
-        centralPubkey={centralPubkey}
-        onAuthorize={onAuthorize}
-        onCentralPubkeyChange={onCentralPubkeyChange}
-      />
-      <FlowNodeTransactionControls onCreateMount={onCreateMount} onCreateRecord={onCreateRecord} />
-      <OperationFeedback error={error} lastRawBytes={lastRawBytes} status={status} />
     </div>
   )
 }

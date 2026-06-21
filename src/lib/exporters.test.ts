@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { edgesToCsv, rowsToJson, toCurl } from './exporters'
+import { edgesToCsv, parseExportedConsumeChainsJson, rowsToJson, toCurl } from './exporters'
 import type { ChainGraphEdge, ConsumeChainResponseDTO } from './types'
 
 const edge: ChainGraphEdge = {
@@ -49,5 +49,53 @@ describe('exporters', () => {
   it('builds a curl command escaping single quotes', () => {
     expect(toCurl('/api/consume-chains?nodeId=x')).toBe("curl '/api/consume-chains?nodeId=x'")
     expect(toCurl("a'b")).toBe("curl 'a'\\''b'")
+  })
+})
+
+describe('parseExportedConsumeChainsJson', () => {
+  const rows: ConsumeChainResponseDTO[] = [
+    {
+      consumeChain: {
+        id: 'c1',
+        start: 'a',
+        end: 'b',
+        amount: 12500n,
+        currencyType: 1,
+        isLoop: true,
+        tailMountTimestamp: 1_700_000_000_000_000n,
+      },
+      consumeChainEdges: [
+        {
+          id: 'e1',
+          source: 'a',
+          target: 'b',
+          amount: 12500n,
+          currencyType: 1,
+          chain: 'c1',
+          relatedTransactionRecord: 'r',
+          relatedTransactionMount: 'm',
+          relatedTransactionMountTimestamp: 1_700_000_000_000_001n,
+          isLoop: true,
+        },
+      ],
+    },
+  ]
+
+  it('round-trips rowsToJson output back to equivalent bigint rows', () => {
+    const { content, skipped } = parseExportedConsumeChainsJson(rowsToJson(rows))
+    expect(skipped).toBe(0)
+    expect(content).toEqual(rows)
+  })
+
+  it('throws when the top-level JSON is not an array', () => {
+    expect(() => parseExportedConsumeChainsJson('{"consumeChain":{}}')).toThrow()
+  })
+
+  it('skips malformed rows and counts them while keeping valid ones', () => {
+    const serialized = JSON.parse(rowsToJson(rows)) as unknown[]
+    const mixed = JSON.stringify([{ nope: true }, ...serialized])
+    const { content, skipped } = parseExportedConsumeChainsJson(mixed)
+    expect(skipped).toBe(1)
+    expect(content).toEqual(rows)
   })
 })

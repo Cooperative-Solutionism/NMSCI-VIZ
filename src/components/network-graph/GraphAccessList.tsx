@@ -1,4 +1,5 @@
 import type { ChainGraph, ChainGraphEdge, ChainGraphNode } from '../../lib/types'
+import { Button } from '../ui/button'
 
 interface GraphAccessListProps {
   graph: ChainGraph
@@ -11,15 +12,15 @@ export function GraphAccessList({ graph, onSelectEdge, onSelectNode }: GraphAcce
     <div className="sr-only graph-access-list" aria-label="键盘图谱选择">
       <h3>图谱节点</h3>
       {graph.nodes.map((node) => (
-        <button key={node.id} type="button" onClick={() => onSelectNode(node)}>
+        <Button key={node.id} type="button" onClick={() => onSelectNode(node)}>
           选择节点 <span translate="no">{node.id}</span>
-        </button>
+        </Button>
       ))}
       <h3>图谱边</h3>
       {graph.edges.map((edge) => (
-        <button key={edge.id} type="button" onClick={() => onSelectEdge(edge)}>
+        <Button key={edge.id} type="button" onClick={() => onSelectEdge(edge)}>
           选择{edge.status === 'looped' ? '成环' : '开放'}边 <span translate="no">{edge.id}</span>
-        </button>
+        </Button>
       ))}
     </div>
   )

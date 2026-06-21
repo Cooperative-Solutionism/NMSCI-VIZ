@@ -1,17 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { normalizeConsumeChainResponseDTO } from '@nmsci/sdk'
 import {
+  aggregateGraphBySourceTarget,
   buildConsumeChainUrl,
   buildGraphFromConsumeChains,
   chainColor,
+  flowNodeCanvasStatus,
   formatAmount,
   formatVolumeByCurrency,
   mergeConsumeChains,
   mergeLocalNodes,
+  refreshConsumeChains,
   shortId,
 } from './chainGraph'
 import { queryNodeId } from '../test/appFixtures'
-import type { ConsumeChainResponseDTORaw } from './types'
+import type { ChainGraph, ChainGraphEdge, ConsumeChainResponseDTORaw } from './types'
 
 const rawChainRows: ConsumeChainResponseDTORaw[] = [
   {
@@ -114,6 +117,176 @@ describe('chain graph mapping', () => {
     })
   })
 
+  it('numbers edges by segment order inside each consume chain', () => {
+    const graph = buildGraphFromConsumeChains([
+      normalizeConsumeChainResponseDTO({
+        consumeChain: {
+          id: 'chain-newer',
+          start: 'node-a',
+          end: 'node-c',
+          amount: 400,
+          currencyType: 1,
+          isLoop: false,
+          tailMountTimestamp: 40,
+        },
+        consumeChainEdges: [
+          {
+            id: 'edge-newer-same-endpoints',
+            source: 'node-a',
+            target: 'node-b',
+            amount: 300,
+            currencyType: 1,
+            chain: 'chain-newer',
+            relatedTransactionRecord: 'r3',
+            relatedTransactionMount: 'm3',
+            relatedTransactionMountTimestamp: 30,
+            isLoop: false,
+          },
+          {
+            id: 'edge-other-endpoints',
+            source: 'node-b',
+            target: 'node-c',
+            amount: 100,
+            currencyType: 1,
+            chain: 'chain-newer',
+            relatedTransactionRecord: 'r1',
+            relatedTransactionMount: 'm1',
+            relatedTransactionMountTimestamp: 40,
+            isLoop: false,
+          },
+        ],
+      }),
+      normalizeConsumeChainResponseDTO({
+        consumeChain: {
+          id: 'chain-older',
+          start: 'node-a',
+          end: 'node-b',
+          amount: 200,
+          currencyType: 1,
+          isLoop: false,
+          tailMountTimestamp: 20,
+        },
+        consumeChainEdges: [
+          {
+            id: 'edge-older-same-endpoints',
+            source: 'node-a',
+            target: 'node-b',
+            amount: 200,
+            currencyType: 1,
+            chain: 'chain-older',
+            relatedTransactionRecord: 'r2',
+            relatedTransactionMount: 'm2',
+            relatedTransactionMountTimestamp: 20,
+            isLoop: false,
+          },
+        ],
+      }),
+      normalizeConsumeChainResponseDTO({
+        consumeChain: {
+          id: 'chain-reverse',
+          start: 'node-b',
+          end: 'node-a',
+          amount: 500,
+          currencyType: 1,
+          isLoop: false,
+          tailMountTimestamp: 40,
+        },
+        consumeChainEdges: [
+          {
+            id: 'edge-reverse-direction',
+            source: 'node-b',
+            target: 'node-a',
+            amount: 500,
+            currencyType: 1,
+            chain: 'chain-reverse',
+            relatedTransactionRecord: 'r4',
+            relatedTransactionMount: 'm4',
+            relatedTransactionMountTimestamp: 40,
+            isLoop: false,
+          },
+        ],
+      }),
+    ])
+
+    const labelsById = new Map(graph.edges.map((edge) => [edge.id, edge.label]))
+    expect(labelsById.get('edge-older-same-endpoints')).toBe('第1段 2.00 CNY')
+    expect(labelsById.get('edge-newer-same-endpoints')).toBe('第1段 3.00 CNY')
+    expect(labelsById.get('edge-other-endpoints')).toBe('第2段 1.00 CNY')
+    expect(labelsById.get('edge-reverse-direction')).toBe('第1段 5.00 CNY')
+  })
+
+  it('walks from the chain start, stops loops, and appends unreachable edges by original order', () => {
+    const graph = buildGraphFromConsumeChains([
+      normalizeConsumeChainResponseDTO({
+        consumeChain: {
+          id: 'chain-loop',
+          start: 'node-a',
+          end: 'node-c',
+          amount: 1500,
+          currencyType: 1,
+          isLoop: true,
+          tailMountTimestamp: 50,
+        },
+        consumeChainEdges: [
+          {
+            id: 'edge-unreachable',
+            source: 'node-x',
+            target: 'node-y',
+            amount: 900,
+            currencyType: 1,
+            chain: 'chain-loop',
+            relatedTransactionRecord: 'r4',
+            relatedTransactionMount: 'm4',
+            relatedTransactionMountTimestamp: 40,
+            isLoop: false,
+          },
+          {
+            id: 'edge-path-second',
+            source: 'node-b',
+            target: 'node-c',
+            amount: 200,
+            currencyType: 1,
+            chain: 'chain-loop',
+            relatedTransactionRecord: 'r2',
+            relatedTransactionMount: 'm2',
+            relatedTransactionMountTimestamp: 20,
+            isLoop: true,
+          },
+          {
+            id: 'edge-path-first',
+            source: 'node-a',
+            target: 'node-b',
+            amount: 100,
+            currencyType: 1,
+            chain: 'chain-loop',
+            relatedTransactionRecord: 'r1',
+            relatedTransactionMount: 'm1',
+            relatedTransactionMountTimestamp: 10,
+            isLoop: true,
+          },
+          {
+            id: 'edge-loop-back',
+            source: 'node-c',
+            target: 'node-a',
+            amount: 300,
+            currencyType: 1,
+            chain: 'chain-loop',
+            relatedTransactionRecord: 'r3',
+            relatedTransactionMount: 'm3',
+            relatedTransactionMountTimestamp: 30,
+            isLoop: true,
+          },
+        ],
+      }),
+    ])
+
+    const labelsById = new Map(graph.edges.map((edge) => [edge.id, edge.label]))
+    expect(labelsById.get('edge-path-first')).toBe('第1段 1.00 CNY')
+    expect(labelsById.get('edge-path-second')).toBe('第2段 2.00 CNY')
+    expect(labelsById.get('edge-loop-back')).toBe('第3段 3.00 CNY')
+    expect(labelsById.get('edge-unreachable')).toBe('第4段 9.00 CNY')
+  })
+
   it('merges local flow/consume nodes and labels unregistered flow nodes by sequence', () => {
     const graph = buildGraphFromConsumeChains(chainRows)
     const before = graph.nodes.length
@@ -147,19 +320,322 @@ describe('chain graph mapping', () => {
     expect(flow?.kind).toBe('local-flow')
     expect(flow?.label).toBe('未注册1')
     expect(flow?.position).toEqual({ x: 1, y: 2 })
+    expect(flow?.flowStatus).toBe('unregistered')
     expect(merged.nodes.find((node) => node.id === 'pk-registered-flow')?.label).toBe('REGIST')
+    expect(merged.nodes.find((node) => node.id === 'pk-consume')?.flowStatus).toBeUndefined()
     const consume = merged.nodes.find((node) => node.id === 'pk-consume')
     expect(consume?.kind).toBe('local-consume')
     expect(consume?.label).toBe('BRAVO-')
 
-    // 已存在的 id 不重复叠加
-    const dup = mergeLocalNodes(
+    // 命中已有链节点 id 的本地节点 → 原地升级为本地节点（不新增、保留链上吞吐/计数）。
+    const chainNode = graph.nodes[0]!
+    const upgraded = mergeLocalNodes(
       graph,
-      [{ id: 'duplicate-flow-node', publicKeyHex: graph.nodes[0]!.id, label: 'X' }],
+      [{ id: 'duplicate-flow-node', publicKeyHex: chainNode.id, label: 'X', position: { x: 7, y: 9 } }],
       [],
     )
-    expect(dup.nodes.length).toBe(before)
-    expect(dup).toBe(graph)
+    expect(upgraded.nodes.length).toBe(before)
+    const upgradedNode = upgraded.nodes.find((node) => node.id === chainNode.id)
+    expect(upgradedNode?.kind).toBe('local-flow')
+    expect(upgradedNode?.label).toBe('未注册1')
+    // 链上吞吐与计数从被升级的链节点保留下来。
+    expect(upgradedNode?.chainCount).toBe(chainNode.chainCount)
+    expect(upgradedNode?.volumeByCurrency).toEqual(chainNode.volumeByCurrency)
+    // 被升级的链节点本身无落点，应回退到本地 ref 的画布落点。
+    expect(upgradedNode?.position).toEqual({ x: 7, y: 9 })
+  })
+
+  it('upgrades both endpoints when one chain links two local pubkeys', () => {
+    const pkA = `02${'a'.repeat(64)}`
+    const pkB = `03${'b'.repeat(64)}`
+    const graph = buildGraphFromConsumeChains([
+      normalizeConsumeChainResponseDTO({
+        consumeChain: {
+          id: 'chain-x',
+          start: pkA,
+          end: pkB,
+          amount: 4000,
+          currencyType: 1,
+          isLoop: false,
+          tailMountTimestamp: 1,
+        },
+        consumeChainEdges: [
+          {
+            id: 'e1',
+            source: pkA,
+            target: pkB,
+            amount: 4000,
+            currencyType: 1,
+            chain: 'chain-x',
+            relatedTransactionRecord: 'r',
+            relatedTransactionMount: 'm',
+            relatedTransactionMountTimestamp: 1,
+            isLoop: false,
+          },
+        ],
+      }),
+    ])
+    const before = graph.nodes.length
+
+    const merged = mergeLocalNodes(
+      graph,
+      [{ id: 'flow-a', publicKeyHex: pkA, registration: { id: 'reg-a', status: 'sent' } }],
+      [{ id: 'consume-b', publicKeyHex: pkB }],
+    )
+
+    // 两个端点都被原地升级：不新增节点，各自带上正确的本地类型与链上计数。
+    expect(merged.nodes.length).toBe(before)
+    expect(merged.nodes.filter((node) => node.id === pkA)).toHaveLength(1)
+    expect(merged.nodes.filter((node) => node.id === pkB)).toHaveLength(1)
+    expect(merged.nodes.find((node) => node.id === pkA)?.kind).toBe('local-flow')
+    expect(merged.nodes.find((node) => node.id === pkB)?.kind).toBe('local-consume')
+    expect(merged.nodes.find((node) => node.id === pkA)?.chainCount).toBeGreaterThan(0)
+    expect(merged.nodes.find((node) => node.id === pkB)?.chainCount).toBeGreaterThan(0)
+  })
+
+  it('appends only the flow node when a standalone flow and consume share a pubkey (flow priority)', () => {
+    const graph = buildGraphFromConsumeChains([])
+    const shared = 'pk-shared'
+
+    const merged = mergeLocalNodes(
+      graph,
+      [{ id: 'shared-flow', publicKeyHex: shared, registration: { id: 'reg-s', status: 'sent' } }],
+      [{ id: 'shared-consume', publicKeyHex: shared }],
+    )
+
+    // 同一身份只入图一次，且为流转节点（流转优先）。
+    const matches = merged.nodes.filter((node) => node.id === shared)
+    expect(matches).toHaveLength(1)
+    expect(matches[0]!.kind).toBe('local-flow')
+    expect(matches[0]!.flowStatus).toBe('registered')
+  })
+
+  it('upgrades a chain node that shares a local pubkey instead of drawing a second node', () => {
+    const pubkey = `02${'a'.repeat(64)}`
+    const graph = buildGraphFromConsumeChains([
+      normalizeConsumeChainResponseDTO({
+        consumeChain: {
+          id: 'chain-x',
+          start: pubkey,
+          end: '99999999-9999-4999-8999-999999999999',
+          amount: 4000,
+          currencyType: 1,
+          isLoop: false,
+          tailMountTimestamp: 1,
+        },
+        consumeChainEdges: [
+          {
+            id: 'edge-x1',
+            source: pubkey,
+            target: '99999999-9999-4999-8999-999999999999',
+            amount: 4000,
+            currencyType: 1,
+            chain: 'chain-x',
+            relatedTransactionRecord: 'r',
+            relatedTransactionMount: 'm',
+            relatedTransactionMountTimestamp: 1,
+            isLoop: false,
+          },
+        ],
+      }),
+    ])
+    const before = graph.nodes.length
+
+    const merged = mergeLocalNodes(
+      graph,
+      [{ id: 'local-flow-node', publicKeyHex: pubkey, registration: { id: 'reg-1', status: 'sent' } }],
+      [],
+    )
+
+    // 同一节点：不新增；链节点升级为本地流转节点并带上状态。
+    expect(merged.nodes.length).toBe(before)
+    const node = merged.nodes.find((item) => item.id === pubkey)
+    expect(node?.kind).toBe('local-flow')
+    expect(node?.flowStatus).toBe('registered')
+    expect(node?.chainCount).toBeGreaterThan(0)
+  })
+
+  it('rewrites a chain node that uses the local flow registration id onto the local pubkey node', () => {
+    const pubkey = `02${'a'.repeat(64)}`
+    const registrationId = 'f25682aa-1111-4111-8111-111111111111'
+    const otherNodeId = '99999999-9999-4999-8999-999999999999'
+    const graph = buildGraphFromConsumeChains([
+      normalizeConsumeChainResponseDTO({
+        consumeChain: {
+          id: 'chain-reg',
+          start: otherNodeId,
+          end: registrationId,
+          amount: 4000,
+          currencyType: 1,
+          isLoop: false,
+          tailMountTimestamp: 1,
+        },
+        consumeChainEdges: [
+          {
+            id: 'edge-reg',
+            source: otherNodeId,
+            target: registrationId,
+            amount: 4000,
+            currencyType: 1,
+            chain: 'chain-reg',
+            relatedTransactionRecord: 'r',
+            relatedTransactionMount: 'm',
+            relatedTransactionMountTimestamp: 1,
+            isLoop: false,
+          },
+        ],
+      }),
+    ])
+
+    const merged = mergeLocalNodes(
+      graph,
+      [
+        {
+          id: 'local-flow-node',
+          publicKeyHex: pubkey,
+          registration: { id: registrationId, status: 'sent' },
+          authorizations: [{ status: 'sent' }],
+        },
+      ],
+      [],
+    )
+
+    expect(merged.nodes.map((node) => node.id).sort()).toEqual([otherNodeId, pubkey].sort())
+    expect(merged.nodes.find((node) => node.id === registrationId)).toBeUndefined()
+    const localNode = merged.nodes.find((node) => node.id === pubkey)
+    expect(localNode?.kind).toBe('local-flow')
+    expect(localNode?.label).toBe('F25682')
+    expect(localNode?.flowStatus).toBe('authorized')
+    expect(localNode?.chainCount).toBeGreaterThan(0)
+    expect(merged.edges[0]).toMatchObject({ source: otherNodeId, target: pubkey })
+  })
+
+  it('preserves chain segment labels after local aliases rewrite endpoints onto the same source and target', () => {
+    const pubkey = `02${'a'.repeat(64)}`
+    const registrationId = 'f25682aa-1111-4111-8111-111111111111'
+    const sourceNodeId = '99999999-9999-4999-8999-999999999999'
+    const graph = buildGraphFromConsumeChains([
+      normalizeConsumeChainResponseDTO({
+        consumeChain: {
+          id: 'chain-newer',
+          start: sourceNodeId,
+          end: registrationId,
+          amount: 200,
+          currencyType: 1,
+          isLoop: false,
+          tailMountTimestamp: 20,
+        },
+        consumeChainEdges: [
+          {
+            id: 'edge-registration-target',
+            source: sourceNodeId,
+            target: registrationId,
+            amount: 200,
+            currencyType: 1,
+            chain: 'chain-newer',
+            relatedTransactionRecord: 'r2',
+            relatedTransactionMount: 'm2',
+            relatedTransactionMountTimestamp: 20,
+            isLoop: false,
+          },
+        ],
+      }),
+      normalizeConsumeChainResponseDTO({
+        consumeChain: {
+          id: 'chain-older',
+          start: sourceNodeId,
+          end: pubkey,
+          amount: 100,
+          currencyType: 1,
+          isLoop: false,
+          tailMountTimestamp: 10,
+        },
+        consumeChainEdges: [
+          {
+            id: 'edge-pubkey-target',
+            source: sourceNodeId,
+            target: pubkey,
+            amount: 100,
+            currencyType: 1,
+            chain: 'chain-older',
+            relatedTransactionRecord: 'r1',
+            relatedTransactionMount: 'm1',
+            relatedTransactionMountTimestamp: 10,
+            isLoop: false,
+          },
+        ],
+      }),
+    ])
+
+    const merged = mergeLocalNodes(
+      graph,
+      [{ id: 'local-flow-node', publicKeyHex: pubkey, registration: { id: registrationId } }],
+      [],
+    )
+    const labelsById = new Map(merged.edges.map((edge) => [edge.id, edge.label]))
+
+    expect(merged.edges.map((edge) => [edge.source, edge.target])).toEqual([
+      [sourceNodeId, pubkey],
+      [sourceNodeId, pubkey],
+    ])
+    expect(labelsById.get('edge-pubkey-target')).toBe('第1段 1.00 CNY')
+    expect(labelsById.get('edge-registration-target')).toBe('第1段 2.00 CNY')
+  })
+
+  it('only appends standalone local nodes that are explicitly added to the canvas', () => {
+    const graph = buildGraphFromConsumeChains([])
+    const flowRefs = [
+      { id: 'on-canvas', publicKeyHex: 'pk-on-canvas', label: 'On' },
+      { id: 'off-canvas', publicKeyHex: 'pk-off-canvas', label: 'Off' },
+    ]
+
+    const merged = mergeLocalNodes(graph, flowRefs, [], new Set(['pk-on-canvas']))
+
+    expect(merged.nodes.map((node) => node.id)).toEqual(['pk-on-canvas'])
+  })
+
+  it('derives flow-node canvas status from registration and authorizations', () => {
+    expect(flowNodeCanvasStatus({ id: 'a', publicKeyHex: 'pk-a' })).toBe('unregistered')
+    // 注册失败回退为“未注册”，而非独立的失败状态。
+    expect(
+      flowNodeCanvasStatus({
+        id: 'b',
+        publicKeyHex: 'pk-b',
+        registration: { id: 'reg-b', status: 'failed' },
+      }),
+    ).toBe('unregistered')
+    expect(
+      flowNodeCanvasStatus({
+        id: 'c',
+        publicKeyHex: 'pk-c',
+        registration: { id: 'reg-c', status: 'sent' },
+      }),
+    ).toBe('registered')
+    expect(
+      flowNodeCanvasStatus({
+        id: 'd',
+        publicKeyHex: 'pk-d',
+        registration: { id: 'reg-d', status: 'sent' },
+        authorizations: [{ status: 'sent' }],
+      }),
+    ).toBe('authorized')
+  })
+
+  it('tags merged local flow nodes with their canvas status', () => {
+    const graph = buildGraphFromConsumeChains([])
+    const merged = mergeLocalNodes(
+      graph,
+      [
+        {
+          id: 'authorized-flow',
+          publicKeyHex: 'pk-authorized',
+          registration: { id: 'reg-x', status: 'sent' },
+          authorizations: [{ status: 'sent' }],
+        },
+      ],
+      [],
+    )
+    expect(merged.nodes.find((node) => node.id === 'pk-authorized')?.flowStatus).toBe('authorized')
   })
 
   it('aggregates volume per currency and never sums across currencies', () => {
@@ -210,24 +686,30 @@ describe('chain graph mapping', () => {
         mode: 'start',
         nodeId: queryNodeId,
         loopStatus: 'open',
+        page: 1,
+        size: 40,
       }),
-    ).toBe(`/api/consume-chains?startId=${queryNodeId}&isLoop=false&page=0&size=200`)
+    ).toBe(`/api/consume-chains?startId=${queryNodeId}&isLoop=false&page=1&size=40`)
 
     expect(
       buildConsumeChainUrl('http://localhost:8080/', {
         mode: 'end',
         nodeId: 'node 2',
         loopStatus: 'looped',
+        page: 2,
+        size: 25,
       }),
-    ).toBe('http://localhost:8080/consume-chains?endId=node+2&isLoop=true&page=0&size=200')
+    ).toBe('http://localhost:8080/consume-chains?endId=node+2&isLoop=true&page=2&size=25')
 
     expect(
       buildConsumeChainUrl('/api', {
         mode: 'node',
         nodeId: 'node-3',
         loopStatus: 'all',
+        page: 0,
+        size: 25,
       }),
-    ).toBe('/api/consume-chains?nodeId=node-3&page=0&size=200')
+    ).toBe('/api/consume-chains?nodeId=node-3&page=0&size=25')
 
     const pubkey = `02${'a'.repeat(64)}`
     expect(
@@ -235,8 +717,10 @@ describe('chain graph mapping', () => {
         mode: 'start',
         nodeId: pubkey,
         loopStatus: 'all',
+        page: 0,
+        size: 25,
       }),
-    ).toBe(`/api/consume-chains?startPubkey=${pubkey}&page=0&size=200`)
+    ).toBe(`/api/consume-chains?startPubkey=${pubkey}&page=0&size=25`)
   })
 
   it('formats operational labels without losing raw ids', () => {
@@ -286,4 +770,105 @@ describe('chain graph mapping', () => {
     expect(merged.map((row) => row.consumeChain.id)).toEqual(['chain-a', 'chain-b', 'chain-c'])
     expect(merged[0]!.consumeChain.amount).toBe(12500n)
   })
+
+  it('aggregates same source→target edges into one with total/looped/reflow metrics', () => {
+    const graph = graphOf([
+      aggEdge('e1', 'a', 'b', 1, 5000n, 'looped'),
+      aggEdge('e2', 'a', 'b', 1, 3000n, 'open'),
+      aggEdge('e3', 'a', 'b', 1, 2000n, 'looped'),
+      aggEdge('e4', 'b', 'c', 1, 1000n, 'open'),
+    ])
+
+    const aggregated = aggregateGraphBySourceTarget(graph)
+
+    // a→b 三条合并为一；b→c 保持一条。
+    expect(aggregated.edges).toHaveLength(2)
+    const ab = aggregated.edges.find((edge) => edge.source === 'a' && edge.target === 'b')!
+    expect(ab.amount).toBe(10000n)
+    expect(ab.status).toBe('looped')
+    expect(ab.aggregated).toEqual({
+      totalAmount: 10000n,
+      loopedAmount: 7000n,
+      reflowRate: 0.7,
+      edgeCount: 3,
+    })
+    // 三个数据标注在链边标签上：总额 / 成环 / 回流率。
+    expect(ab.label).toContain('总额 100.00 CNY')
+    expect(ab.label).toContain('成环 70.00 CNY')
+    expect(ab.label).toContain('回流率 70.00%')
+
+    const bc = aggregated.edges.find((edge) => edge.source === 'b' && edge.target === 'c')!
+    expect(bc.amount).toBe(1000n)
+    expect(bc.status).toBe('open')
+    expect(bc.aggregated?.reflowRate).toBe(0)
+
+    // 聚合只改边：节点与链级 stats 原样保留（同一引用）。
+    expect(aggregated.nodes).toBe(graph.nodes)
+    expect(aggregated.stats).toBe(graph.stats)
+  })
+
+  it('never merges edges of different currencies between the same nodes', () => {
+    const graph = graphOf([
+      aggEdge('cny', 'a', 'b', 1, 5000n, 'open'),
+      aggEdge('au', 'a', 'b', 0, 2_500_000n, 'open'),
+    ])
+
+    expect(aggregateGraphBySourceTarget(graph).edges).toHaveLength(2)
+  })
+
+  it('returns an empty edge list for an empty graph', () => {
+    expect(aggregateGraphBySourceTarget(graphOf([])).edges).toEqual([])
+  })
+
+  it('refreshes consume chains by replacing matching chain id rows', () => {
+    const refreshed = normalizeConsumeChainResponseDTO({
+      ...rawChainRows[0]!,
+      consumeChain: {
+        ...rawChainRows[0]!.consumeChain,
+        amount: 999999,
+      },
+      consumeChainEdges: rawChainRows[0]!.consumeChainEdges.map((edge) => ({
+        ...edge,
+        id: 'edge-a-refreshed',
+      })),
+    })
+
+    const refreshedRows = refreshConsumeChains(chainRows, [refreshed])
+
+    expect(refreshedRows.map((row) => row.consumeChain.id)).toEqual(['chain-a', 'chain-b'])
+    expect(refreshedRows[0]!.consumeChain.amount).toBe(999999n)
+    expect(refreshedRows[0]!.consumeChainEdges[0]!.id).toBe('edge-a-refreshed')
+  })
 })
+
+function aggEdge(
+  id: string,
+  source: string,
+  target: string,
+  currencyType: number,
+  amount: bigint,
+  status: ChainGraphEdge['status'],
+): ChainGraphEdge {
+  return {
+    id,
+    source,
+    target,
+    label: '',
+    amount,
+    currencyType,
+    chainId: `chain-${id}`,
+    status,
+    color: '#000',
+    relatedTransactionRecord: '',
+    relatedTransactionMount: '',
+    relatedTransactionMountTimestamp: 0n,
+  }
+}
+
+function graphOf(edges: ChainGraphEdge[]): ChainGraph {
+  return {
+    nodes: [],
+    edges,
+    stats: { totalChains: 0, loopedChains: 0, openChains: 0, volumeByCurrency: new Map() },
+  }
+}

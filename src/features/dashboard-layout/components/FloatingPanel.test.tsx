@@ -10,11 +10,41 @@ const queryLabel = '\u67e5\u8be2'
 const queryContent = '\u67e5\u8be2\u6761\u4ef6'
 const openQueryName = /\u6253\u5f00\u67e5\u8be2\u9762\u677f/
 const collapseQueryName = /\u6298\u53e0\u67e5\u8be2\u9762\u677f/
+const closeQueryName = /\u5173\u95ed\u67e5\u8be2\u9762\u677f/
 const moveQueryName = /\u79fb\u52a8\u67e5\u8be2\u9762\u677f/
+
+type PanelPosition = { x: number; y: number }
+
+type RenderFloatingPanelOptions = {
+  onCollapse?: () => void
+  onClose?: () => void
+  onPositionChange?: (position: PanelPosition) => void
+  position?: PanelPosition
+}
 
 function cssRule(css: string, selector: string): string {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   return new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`, 'm').exec(css)?.[1] ?? ''
+}
+
+function renderFloatingPanel({
+  onCollapse = vi.fn(),
+  onClose = vi.fn(),
+  onPositionChange = vi.fn(),
+  position = { x: 72, y: 16 },
+}: RenderFloatingPanelOptions = {}) {
+  const panelActions = { onCollapse, onClose }
+
+  return render(
+    <FloatingPanel
+      title={queryLabel}
+      position={position}
+      onPositionChange={onPositionChange}
+      {...panelActions}
+    >
+      <p>{queryContent}</p>
+    </FloatingPanel>,
+  )
 }
 
 afterEach(cleanup)
@@ -154,13 +184,13 @@ describe('DockIcon', () => {
     expect(onPositionChange).toHaveBeenCalledWith({ x: 32, y: 32 })
   })
 
-  it('sizes the collapsed button to its content instead of a fixed wide block', () => {
+  it('sizes the collapsed button as a compact icon rail entry', () => {
     const css = readFileSync(join(process.cwd(), 'src/styles/dashboard-layout.css'), 'utf8')
     const dockRule = cssRule(css, '.dock-icon')
 
-    expect(dockRule).toContain('width: max-content;')
-    expect(dockRule).toContain('max-width: calc(100vw - 24px);')
-    expect(dockRule).not.toContain('width: min(144px')
+    expect(dockRule).toContain('width: 44px;')
+    expect(dockRule).toContain('max-width: 44px;')
+    expect(dockRule).toContain('justify-content: center;')
   })
 })
 
@@ -169,16 +199,7 @@ describe('FloatingPanel', () => {
     const onCollapse = vi.fn()
     const onPositionChange = vi.fn()
 
-    render(
-      <FloatingPanel
-        title={queryLabel}
-        position={{ x: 72, y: 16 }}
-        onCollapse={onCollapse}
-        onPositionChange={onPositionChange}
-      >
-        <p>{queryContent}</p>
-      </FloatingPanel>,
-    )
+    renderFloatingPanel({ onCollapse, onPositionChange })
 
     const collapseButton = screen.getByRole('button', { name: collapseQueryName })
 
@@ -194,41 +215,45 @@ describe('FloatingPanel', () => {
     expect(onPositionChange).not.toHaveBeenCalled()
   })
 
-  it('places collapse on the left and removes the move button', () => {
-    render(
-      <FloatingPanel
-        title={queryLabel}
-        position={{ x: 72, y: 16 }}
-        onCollapse={vi.fn()}
-        onPositionChange={vi.fn()}
-      >
-        <p>{queryContent}</p>
-      </FloatingPanel>,
-    )
+  it('does not drag or report position when clicking close', () => {
+    const onClose = vi.fn()
+    const onPositionChange = vi.fn()
+
+    renderFloatingPanel({ onClose, onPositionChange })
+
+    const closeButton = screen.getByRole('button', { name: closeQueryName })
+
+    fireEvent.pointerDown(closeButton, {
+      button: 0,
+      clientX: 100,
+      clientY: 200,
+    })
+    fireEvent.pointerUp(window)
+    fireEvent.click(closeButton)
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(onPositionChange).not.toHaveBeenCalled()
+  })
+
+  it('places collapse on the left, close on the right, and removes the move button', () => {
+    renderFloatingPanel()
 
     const collapseButton = screen.getByRole('button', { name: collapseQueryName })
+    const closeButton = screen.getByRole('button', { name: closeQueryName })
     const header = screen
       .getByRole('heading', { name: queryLabel })
       .closest('.floating-panel__header')
 
     expect(header).not.toBeNull()
     expect(header?.firstElementChild).toBe(collapseButton)
+    expect(header?.lastElementChild).toBe(closeButton)
     expect(screen.queryByRole('button', { name: moveQueryName })).not.toBeInTheDocument()
   })
 
   it('ignores non-arrow keys on the draggable header', () => {
     const onPositionChange = vi.fn()
 
-    render(
-      <FloatingPanel
-        title={queryLabel}
-        position={{ x: 72, y: 16 }}
-        onCollapse={vi.fn()}
-        onPositionChange={onPositionChange}
-      >
-        <p>{queryContent}</p>
-      </FloatingPanel>,
-    )
+    renderFloatingPanel({ onPositionChange })
 
     const header = screen
       .getByRole('heading', { name: queryLabel })
@@ -243,16 +268,7 @@ describe('FloatingPanel', () => {
   })
 
   it('renders a dialog by Chinese title and body children', () => {
-    render(
-      <FloatingPanel
-        title={queryLabel}
-        position={{ x: 72, y: 16 }}
-        onCollapse={vi.fn()}
-        onPositionChange={vi.fn()}
-      >
-        <p>{queryContent}</p>
-      </FloatingPanel>,
-    )
+    renderFloatingPanel()
 
     const dialog = screen.getByRole('dialog', { name: queryLabel })
 
@@ -265,35 +281,27 @@ describe('FloatingPanel', () => {
   it('calls onCollapse from the collapse button', () => {
     const onCollapse = vi.fn()
 
-    render(
-      <FloatingPanel
-        title={queryLabel}
-        position={{ x: 72, y: 16 }}
-        onCollapse={onCollapse}
-        onPositionChange={vi.fn()}
-      >
-        <p>{queryContent}</p>
-      </FloatingPanel>,
-    )
+    renderFloatingPanel({ onCollapse })
 
     fireEvent.click(screen.getByRole('button', { name: collapseQueryName }))
 
     expect(onCollapse).toHaveBeenCalledTimes(1)
   })
 
+  it('calls onClose from the close button', () => {
+    const onClose = vi.fn()
+
+    renderFloatingPanel({ onClose })
+
+    fireEvent.click(screen.getByRole('button', { name: closeQueryName }))
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   it('nudges by 8 pixels from focused header arrow keys and reports the updated position', () => {
     const onPositionChange = vi.fn()
 
-    render(
-      <FloatingPanel
-        title={queryLabel}
-        position={{ x: 72, y: 16 }}
-        onCollapse={vi.fn()}
-        onPositionChange={onPositionChange}
-      >
-        <p>{queryContent}</p>
-      </FloatingPanel>,
-    )
+    renderFloatingPanel({ onPositionChange })
 
     const header = screen
       .getByRole('heading', { name: queryLabel })
@@ -312,16 +320,7 @@ describe('FloatingPanel', () => {
   it('reports the updated position after pointer dragging from the panel header', () => {
     const onPositionChange = vi.fn()
 
-    render(
-      <FloatingPanel
-        title={queryLabel}
-        position={{ x: 72, y: 16 }}
-        onCollapse={vi.fn()}
-        onPositionChange={onPositionChange}
-      >
-        <p>{queryContent}</p>
-      </FloatingPanel>,
-    )
+    renderFloatingPanel({ onPositionChange })
 
     const header = screen
       .getByRole('heading', { name: queryLabel })

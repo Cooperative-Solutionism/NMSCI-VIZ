@@ -4,13 +4,10 @@ import {
   ErrorBoundary,
   FlowNodeOperatePanel,
   NodeInspector,
-  TransactionMountForm,
-  TransactionRecordForm,
 } from '../../../components'
-import { flowNodeDisplayName, formatAmount, shortId } from '../../../lib/chainGraph'
+import { flowNodeDisplayName } from '../../../lib/chainGraph'
 import type { LocalConsumeNode } from '../../../lib/consumeNodeStorage'
 import type { LocalFlowNode } from '../../../lib/flowNodeStorage'
-import type { LocalTxRecord } from '../../../lib/txRecordStorage'
 import type {
   ChainGraphEdge,
   ChainGraphNode,
@@ -18,27 +15,22 @@ import type {
   QueryMode,
 } from '../../../lib/types'
 import type { FlowRateView } from '../../../components/NodeInspector'
-import type { RegistrationController } from '../../keyring/hooks/useRegistrationController'
 import type { useNodeDetail } from '../../../hooks/useNodeDetail'
 
 type NodeDetail = ReturnType<typeof useNodeDetail>
 
 export function InspectorPanel({
   apiBase,
-  centralLocked,
   effectiveSelection,
   extendFromNode,
   extendLoading,
   flowRateView,
   inspectorEmptyMessage,
   loading,
-  localConsumeNodes,
   localFlowNodes,
   localNodeState,
-  localTxRecords,
   nodeDetail,
   nodeActions,
-  registration,
   selectedChain,
   selectedEdge,
   selectedLocalConsumeNode,
@@ -46,29 +38,19 @@ export function InspectorPanel({
   selectedNode,
 }: {
   apiBase: string
-  centralLocked: boolean
   effectiveSelection: { kind: 'node'; id: string } | { kind: 'edge'; id: string } | null
   extendFromNode: (node: ChainGraphNode, mode: QueryMode) => Promise<void>
   extendLoading: QueryMode | null
   flowRateView: FlowRateView
   inspectorEmptyMessage: string
   loading: boolean
-  localConsumeNodes: LocalConsumeNode[]
   localFlowNodes: LocalFlowNode[]
   localNodeState: NodeDetail['nodeState']
-  localTxRecords: LocalTxRecord[]
   nodeDetail: NodeDetail
+  // 节点的导出私钥 / 重命名 / 删除已迁移到画布右键菜单；详情面板只需复制能力。
   nodeActions: {
     handleCopyText: (value: string, label: string) => Promise<void>
-    handleDeleteConsumeNode: () => void
-    handleDeleteLocalNode: () => void
-    handleExportConsumeKey: () => Promise<void>
-    handleExportPrivateKey: () => Promise<void>
-    handleQuerySelectedFlowNode: () => void
-    handleRenameConsumeNode: () => void
-    handleRenameLocalNode: () => void
   }
-  registration: RegistrationController
   selectedChain: ConsumeChainResponseDTO | null
   selectedEdge: ChainGraphEdge | null
   selectedLocalConsumeNode: LocalConsumeNode | null
@@ -100,82 +82,16 @@ export function InspectorPanel({
 
       <ErrorBoundary label="详情面板加载失败">
         {selectedLocalNode ? (
-          <>
-            <FlowNodeOperatePanel
-              busy={registration.busy}
-              centralLocked={centralLocked}
-              centralPubkey={registration.centralPubkey}
-              displayName={selectedFlowNodeDisplayName}
-              error={registration.error}
-              lastRawBytes={registration.lastRawBytes}
-              miningAttempts={registration.miningAttempts}
-              node={selectedLocalNode}
-              nodeState={localNodeState}
-              onAuthorize={() => void registration.authorizeCentralPubkey()}
-              onCentralPubkeyChange={registration.setCentralPubkey}
-              onCopy={(value, label) => void nodeActions.handleCopyText(value, label)}
-              onCreateMount={registration.toggleMountForm}
-              onCreateRecord={registration.toggleRecordForm}
-              onDelete={nodeActions.handleDeleteLocalNode}
-              onDifficultyChange={registration.setRegisterDifficultyTarget}
-              onExportPrivateKey={() => void nodeActions.handleExportPrivateKey()}
-              onFetchDifficulty={() => void registration.fetchRegisterDifficulty()}
-              onQuery={nodeActions.handleQuerySelectedFlowNode}
-              onRegister={() => void registration.registerFlowNode()}
-              onRename={nodeActions.handleRenameLocalNode}
-              registerDifficultyTarget={registration.registerDifficultyTarget}
-              status={registration.status}
-            />
-            {registration.recordFormOpen ? (
-              <TransactionRecordForm
-                busy={registration.busy === 'record'}
-                consumeNodes={localConsumeNodes}
-                defaultCentralPubkey={registration.centralPubkey}
-                defaultDifficulty={registration.txDifficulty}
-                error={registration.error}
-                miningAttempts={registration.miningAttempts}
-                onCreate={(draft) => void registration.createTransactionRecord(draft)}
-                status={registration.status}
-              />
-            ) : null}
-            {registration.recordFormOpen && localTxRecords.length > 0 ? (
-              <div className="record-list">
-                <div className="section-title">已创建记录</div>
-                {localTxRecords.map((record) => (
-                  <div key={record.id} className="detail-row">
-                    <span translate="no">{shortId(record.id)}</span>
-                    <strong>{formatAmount(BigInt(record.amount), record.currencyType)}</strong>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-            {registration.mountFormOpen ? (
-              <TransactionMountForm
-                busy={registration.busy === 'mount'}
-                canViewChain={registration.mountedPubkey !== null}
-                defaultDifficulty={registration.txDifficulty}
-                defaultFlowNodePubkey={selectedLocalNode.publicKeyHex}
-                error={registration.error}
-                flowNodes={localFlowNodes}
-                miningAttempts={registration.miningAttempts}
-                onMount={(recordId, flowNodePubkey, difficultyHex) =>
-                  void registration.createTransactionMount(recordId, flowNodePubkey, difficultyHex)
-                }
-                onViewChain={registration.viewConsumeChain}
-                records={localTxRecords}
-                status={registration.status}
-              />
-            ) : null}
-          </>
+          <FlowNodeOperatePanel
+            displayName={selectedFlowNodeDisplayName}
+            node={selectedLocalNode}
+            nodeState={localNodeState}
+            onCopy={(value, label) => void nodeActions.handleCopyText(value, label)}
+          />
         ) : selectedLocalConsumeNode ? (
           <ConsumeNodeOperatePanel
-            error={registration.error}
             node={selectedLocalConsumeNode}
             onCopy={(value, label) => void nodeActions.handleCopyText(value, label)}
-            onDelete={nodeActions.handleDeleteConsumeNode}
-            onExportPrivateKey={() => void nodeActions.handleExportConsumeKey()}
-            onRename={nodeActions.handleRenameConsumeNode}
-            status={registration.status}
           />
         ) : selectedEdge ? (
           <EdgeInspector

@@ -5,17 +5,18 @@ import type {
   ChainGraphNode,
   ConsumeChainQuery,
   ConsumeChainResponseDTO,
-  NodeKind,
+  FlowNodeCanvasStatus,
   VolumeByCurrency,
 } from './types'
-import { dashboardQueryPage, dashboardQuerySize } from '../app/config'
 import { consumeChainParamName, detectIdentityKind } from './consumeChainFilters'
+import { formatRate } from './format'
 import { readGraphTokens } from './tokens'
 
 export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTO[]): ChainGraph {
   const nodes = new Map<string, ChainGraphNode>()
   const edges: ChainGraphEdge[] = []
   const volumeByCurrency: VolumeByCurrency = new Map()
+  const labelByEdgeId = assignChainSegmentLabels(rows)
   let loopedChains = 0
 
   for (const row of rows) {
@@ -30,7 +31,7 @@ export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTO[]): Ch
         id: edge.id,
         source: edge.source,
         target: edge.target,
-        label: formatAmount(edge.amount, edge.currencyType),
+        label: labelByEdgeId.get(edge.id) ?? formatAmount(edge.amount, edge.currencyType),
         amount: edge.amount,
         currencyType: edge.currencyType,
         chainId: edge.chain,
@@ -61,6 +62,74 @@ export function buildGraphFromConsumeChains(rows: ConsumeChainResponseDTO[]): Ch
   }
 }
 
+// 总计模式：把相同 source→target（且同币种）的链边合并为一条，汇总总金额/成环金额，并算出
+// 回流率（成环金额/总金额）。纯客户端按每条边已有的 status('looped'|'open') 汇总，不调后端，
+// 因此对导入的离线数据同样有效。节点与链级 stats 不变（聚合只改边）。
+export function aggregateGraphBySourceTarget(graph: ChainGraph): ChainGraph {
+  const groups = new Map<
+    string,
+    { source: string; target: string; currencyType: number; color: string; edges: ChainGraphEdge[] }
+  >()
+  for (const edge of graph.edges) {
+    // 按币种分桶：CNY 分与 Au 微克不可相加（与全仓 volumeByCurrency 分桶纪律一致）。
+    const key = `${edge.source}|${edge.target}|${edge.currencyType}`
+    const group = groups.get(key)
+    if (group) {
+      group.edges.push(edge)
+    } else {
+      groups.set(key, {
+        source: edge.source,
+        target: edge.target,
+        currencyType: edge.currencyType,
+        color: edge.color,
+        edges: [edge],
+      })
+    }
+  }
+
+  const edges: ChainGraphEdge[] = []
+  for (const group of groups.values()) {
+    let totalAmount = 0n
+    let loopedAmount = 0n
+    for (const edge of group.edges) {
+      totalAmount += edge.amount
+      if (edge.status === 'looped') loopedAmount += edge.amount
+    }
+    // 金额已被 normalizeRowsSafely 保证 ≤ 2^53，Number() 转换安全。
+    const reflowRate = totalAmount > 0n ? Number(loopedAmount) / Number(totalAmount) : 0
+    const id = `agg:${group.source}->${group.target}:${group.currencyType}`
+    edges.push({
+      id,
+      source: group.source,
+      target: group.target,
+      label: aggregatedEdgeLabel(totalAmount, loopedAmount, reflowRate, group.currencyType),
+      amount: totalAmount,
+      currencyType: group.currencyType,
+      chainId: id,
+      status: loopedAmount > 0n ? 'looped' : 'open',
+      color: group.color,
+      relatedTransactionRecord: '',
+      relatedTransactionMount: '',
+      relatedTransactionMountTimestamp: 0n,
+      aggregated: { totalAmount, loopedAmount, reflowRate, edgeCount: group.edges.length },
+    })
+  }
+
+  return { ...graph, edges }
+}
+
+function aggregatedEdgeLabel(
+  totalAmount: bigint,
+  loopedAmount: bigint,
+  reflowRate: number,
+  currencyType: number,
+): string {
+  return `总额 ${formatAmount(totalAmount, currencyType)} · 成环 ${formatAmount(
+    loopedAmount,
+    currencyType,
+  )} · 回流率 ${formatRate(reflowRate)}`
+}
+
 // 展示用：还原 SDK queryConsumeChains 实际请求的 URL（集合根 + id/pubkey 模式查询参数）。
 export function buildConsumeChainUrl(baseUrl: string, query: ConsumeChainQuery): string {
   const normalizedBaseUrl = baseUrl.replace(/\/+$/, '')
@@ -72,8 +141,8 @@ export function buildConsumeChainUrl(baseUrl: string, query: ConsumeChainQuery):
     params.set('isLoop', String(query.loopStatus === 'looped'))
   }
 
-  params.set('page', String(dashboardQueryPage))
-  params.set('size', String(dashboardQuerySize))
+  params.set('page', String(query.page))
+  params.set('size', String(query.size))
 
   return `${normalizedBaseUrl}/consume-chains?${params.toString()}`
 }
@@ -98,6 +167,20 @@ export function mergeConsumeChains(
   return Array.from(rowsByChainId.values())
 }
 
+export function refreshConsumeChains(
+  currentRows: ConsumeChainResponseDTO[],
+  nextRows: ConsumeChainResponseDTO[],
+): ConsumeChainResponseDTO[] {
+  const rowsByChainId = new Map<string, ConsumeChainResponseDTO>()
+  for (const row of currentRows) {
+    rowsByChainId.set(row.consumeChain.id, row)
+  }
+  for (const row of nextRows) {
+    rowsByChainId.set(row.consumeChain.id, row)
+  }
+  return Array.from(rowsByChainId.values())
+}
+
 export function formatAmount(amount: number | bigint, currencyType: number): string {
   const normalizedAmount = typeof amount === 'bigint' ? amount : BigInt(Math.trunc(amount))
   if (currencyType === 1) {
@@ -118,6 +201,45 @@ export function formatVolumeByCurrency(volumeByCurrency: VolumeByCurrency): stri
     .sort(([a], [b]) => a - b)
     .map(([currencyType, amount]) => formatAmount(amount, currencyType))
     .join(' · ')
+}
+
+function assignChainSegmentLabels(rows: ConsumeChainResponseDTO[]): Map<string, string> {
+  const labelByEdgeId = new Map<string, string>()
+
+  for (const row of rows) {
+    const edgesBySource = new Map<string, (typeof row.consumeChainEdges)[number][]>()
+    for (const edge of row.consumeChainEdges) {
+      const group = edgesBySource.get(edge.source)
+      if (group) group.push(edge)
+      else edgesBySource.set(edge.source, [edge])
+    }
+
+    const visited = new Set<string>()
+    let currentNodeId = row.consumeChain.start
+    let sequence = 1
+
+    while (true) {
+      const nextEdge = edgesBySource.get(currentNodeId)?.find((edge) => !visited.has(edge.id))
+      if (!nextEdge) break
+
+      visited.add(nextEdge.id)
+      labelByEdgeId.set(
+        nextEdge.id,
+        `第${sequence}段 ${formatAmount(nextEdge.amount, nextEdge.currencyType)}`,
+      )
+      sequence += 1
+      currentNodeId = nextEdge.target
+    }
+
+    for (const edge of row.consumeChainEdges) {
+      if (visited.has(edge.id)) continue
+      visited.add(edge.id)
+      labelByEdgeId.set(edge.id, `第${sequence}段 ${formatAmount(edge.amount, edge.currencyType)}`)
+      sequence += 1
+    }
+  }
+
+  return labelByEdgeId
 }
 
 function addAmount(target: VolumeByCurrency, currencyType: number, amount: bigint): void {
@@ -165,42 +287,151 @@ export interface LocalNodeRef {
   position?: CanvasPosition
   registration?: {
     id: string
+    status?: 'sent' | 'failed'
   }
+  authorizations?: Array<{ status: 'sent' | 'failed' }>
 }
 
 export function flowNodeDisplayName(node: LocalNodeRef, index: number): string {
   return node.registration?.id ? shortId(node.registration.id) : `未注册${index + 1}`
 }
 
-// 把本地密钥节点（流转/消费）叠加到查询得到的链图上，使其直接显示在画布、可在无查询结果时先建后查。
-// 以 pubkey 为 id；与链节点的 UUID id 不会冲突。
+// 由本地注册/授权记录推断画布状态标签（与本地节点表格的状态列保持一致）。
+// 注册失败不是独立的画布状态：未成功注册（含失败）一律回退为“未注册”。
+export function flowNodeCanvasStatus(node: LocalNodeRef): FlowNodeCanvasStatus {
+  if (node.registration?.status === 'sent') {
+    return node.authorizations?.some((authorization) => authorization.status === 'sent')
+      ? 'authorized'
+      : 'registered'
+  }
+  return 'unregistered'
+}
+
+export const flowNodeStatusLabels: Record<FlowNodeCanvasStatus, string> = {
+  unregistered: '未注册',
+  registered: '已注册',
+  authorized: '已授权',
+}
+
+// Local nodes can match chain nodes by pubkey or by a backend node id, such as a flow
+// registration id. Normalize those aliases to the local pubkey before Cytoscape sees the graph,
+// so nodes and edges are drawn on the same canvas node instead of as duplicate lookalikes.
+// Standalone local nodes are appended only when explicitly added to the canvas; omitting
+// canvasNodeIds keeps the old unrestricted behavior for tests and non-gated callers.
 export function mergeLocalNodes(
   graph: ChainGraph,
   flowNodes: LocalNodeRef[],
   consumeNodes: LocalNodeRef[],
+  canvasNodeIds?: ReadonlySet<string>,
 ): ChainGraph {
-  const seen = new Set(graph.nodes.map((node) => node.id))
-  const extra: ChainGraphNode[] = []
-  const append = (
-    refs: LocalNodeRef[],
-    kind: NodeKind,
-    labelForNode: (node: LocalNodeRef, index: number) => string,
-  ): void => {
-    refs.forEach((ref, index) => {
-      if (seen.has(ref.publicKeyHex)) return
-      seen.add(ref.publicKeyHex)
-      extra.push({
-        id: ref.publicKeyHex,
-        label: labelForNode(ref, index),
-        chainCount: 0,
-        volumeByCurrency: new Map(),
-        kind,
-        position: ref.position,
-      })
-    })
+  const localByPubkey = new Map<
+    string,
+    { kind: 'flow'; ref: LocalNodeRef; index: number } | { kind: 'consume'; ref: LocalNodeRef }
+  >()
+  const aliases = new Map<string, string>()
+  const addAlias = (alias: string | undefined, pubkey: string): void => {
+    const trimmed = alias?.trim()
+    if (trimmed && !aliases.has(trimmed)) aliases.set(trimmed, pubkey)
   }
-  append(flowNodes, 'local-flow', flowNodeDisplayName)
-  append(consumeNodes, 'local-consume', (ref) => shortId(ref.id))
-  if (extra.length === 0) return graph
-  return { ...graph, nodes: [...graph.nodes, ...extra] }
+
+  flowNodes.forEach((ref, index) => {
+    localByPubkey.set(ref.publicKeyHex, { kind: 'flow', ref, index })
+    addAlias(ref.publicKeyHex, ref.publicKeyHex)
+    addAlias(ref.registration?.id, ref.publicKeyHex)
+  })
+  consumeNodes.forEach((ref) => {
+    if (!localByPubkey.has(ref.publicKeyHex)) {
+      localByPubkey.set(ref.publicKeyHex, { kind: 'consume', ref })
+    }
+    addAlias(ref.publicKeyHex, ref.publicKeyHex)
+  })
+
+  const canonicalId = (id: string): string => aliases.get(id) ?? id
+  const baseById = new Map<string, ChainGraphNode>()
+  let changed = false
+  for (const node of graph.nodes) {
+    const id = canonicalId(node.id)
+    if (id !== node.id) changed = true
+    const normalized = id === node.id ? node : { ...node, id }
+    const existing = baseById.get(id)
+    baseById.set(id, existing ? mergeBaseNode(existing, normalized) : normalized)
+  }
+
+  const nodes = Array.from(baseById.values()).map((node) => {
+    const local = localByPubkey.get(node.id)
+    if (!local) return node
+    changed = true
+    return local.kind === 'flow'
+      ? localFlowGraphNode(local.ref, local.index, node)
+      : localConsumeGraphNode(local.ref, node)
+  })
+
+  const edges = graph.edges.map((edge) => {
+    const source = canonicalId(edge.source)
+    const target = canonicalId(edge.target)
+    if (source === edge.source && target === edge.target) return edge
+    changed = true
+    return { ...edge, source, target }
+  })
+
+  // Append standalone local nodes only when they were explicitly added to the canvas.
+  const seen = new Set(nodes.map((node) => node.id))
+  const shouldAppend = (pubkey: string): boolean =>
+    !seen.has(pubkey) && (canvasNodeIds === undefined || canvasNodeIds.has(pubkey))
+  const extra: ChainGraphNode[] = []
+  flowNodes.forEach((ref, index) => {
+    if (!shouldAppend(ref.publicKeyHex)) return
+    seen.add(ref.publicKeyHex)
+    extra.push(localFlowGraphNode(ref, index))
+  })
+  consumeNodes.forEach((ref) => {
+    if (!shouldAppend(ref.publicKeyHex)) return
+    seen.add(ref.publicKeyHex)
+    extra.push(localConsumeGraphNode(ref))
+  })
+
+  if (!changed && extra.length === 0) return graph
+  return { ...graph, nodes: [...nodes, ...extra], edges }
+}
+
+function mergeBaseNode(left: ChainGraphNode, right: ChainGraphNode): ChainGraphNode {
+  const volumeByCurrency = new Map(left.volumeByCurrency)
+  for (const [currencyType, amount] of right.volumeByCurrency) {
+    addAmount(volumeByCurrency, currencyType, amount)
+  }
+  return {
+    ...left,
+    chainCount: left.chainCount + right.chainCount,
+    position: left.position ?? right.position,
+    volumeByCurrency,
+  }
+}
+
+// Build a local flow canvas node; when base exists, keep its chain metrics and position.
+function localFlowGraphNode(
+  ref: LocalNodeRef,
+  index: number,
+  base?: ChainGraphNode,
+): ChainGraphNode {
+  return {
+    id: ref.publicKeyHex,
+    label: flowNodeDisplayName(ref, index),
+    chainCount: base?.chainCount ?? 0,
+    // Copy the base map so the upgraded local node does not share mutable graph state.
+    volumeByCurrency: new Map<number, bigint>(base?.volumeByCurrency),
+    kind: 'local-flow',
+    position: base?.position ?? ref.position,
+    flowStatus: flowNodeCanvasStatus(ref),
+  }
+}
+
+function localConsumeGraphNode(ref: LocalNodeRef, base?: ChainGraphNode): ChainGraphNode {
+  return {
+    id: ref.publicKeyHex,
+    label: shortId(ref.id),
+    chainCount: base?.chainCount ?? 0,
+    volumeByCurrency: new Map<number, bigint>(base?.volumeByCurrency),
+    kind: 'local-consume',
+    position: base?.position ?? ref.position,
+  }
 }

@@ -12,7 +12,8 @@ export interface LocalConsumeNode {
   position?: { x: number; y: number }
 }
 
-// 存储形态：私钥以密文 privateKey 落盘；privateKeyHex 为旧版明文遗留，加载透传、保存即加密迁移。
+// 存储形态：保险库启用时私钥以密文 privateKey 落盘；关闭（codec 为 null）时以明文 privateKeyHex 落盘。
+// privateKeyHex 同时承担旧版明文遗留，加载透传、启用解锁后保存即加密迁移。
 type StoredConsumeNode = Omit<LocalConsumeNode, 'privateKeyHex'> & {
   privateKey?: EncryptedSecret
   privateKeyHex?: string
@@ -26,7 +27,7 @@ interface ConsumeNodeStorageDocument {
 export const consumeNodeStorageKey = 'nmsci.consumeNodes.v1'
 
 export async function loadLocalConsumeNodes(
-  codec: SecretCodec,
+  codec: SecretCodec | null,
   storage: Storage = window.localStorage,
 ): Promise<LocalConsumeNode[]> {
   const raw = storage.getItem(consumeNodeStorageKey)
@@ -43,9 +44,8 @@ export async function loadLocalConsumeNodes(
   const nodes: LocalConsumeNode[] = []
   for (const stored of parsed.nodes) {
     if (!isStoredConsumeNode(stored)) continue
-    const privateKeyHex = stored.privateKey
-      ? await codec.decrypt(stored.privateKey)
-      : stored.privateKeyHex
+    const privateKeyHex =
+      codec && stored.privateKey ? await codec.decrypt(stored.privateKey) : stored.privateKeyHex
     if (typeof privateKeyHex !== 'string') continue
     const { privateKey: _enc, privateKeyHex: _legacy, ...rest } = stored
     nodes.push({ ...rest, privateKeyHex })
@@ -55,14 +55,30 @@ export async function loadLocalConsumeNodes(
 
 export async function saveLocalConsumeNodes(
   nodes: LocalConsumeNode[],
-  codec: SecretCodec,
+  codec: SecretCodec | null,
   storage: Storage = window.localStorage,
 ): Promise<void> {
+  if (!codec) {
+    saveLocalConsumeNodesPlaintext(nodes, storage)
+    return
+  }
   const stored: StoredConsumeNode[] = []
   for (const node of nodes) {
     const { privateKeyHex, ...rest } = node
     stored.push({ ...rest, privateKey: await codec.encrypt(privateKeyHex) })
   }
+  const document: ConsumeNodeStorageDocument = { version: 1, nodes: stored }
+  storage.setItem(consumeNodeStorageKey, JSON.stringify(document))
+}
+
+export function saveLocalConsumeNodesPlaintext(
+  nodes: LocalConsumeNode[],
+  storage: Storage = window.localStorage,
+): void {
+  const stored: StoredConsumeNode[] = nodes.map((node) => {
+    const { privateKeyHex, ...rest } = node
+    return { ...rest, privateKeyHex }
+  })
   const document: ConsumeNodeStorageDocument = { version: 1, nodes: stored }
   storage.setItem(consumeNodeStorageKey, JSON.stringify(document))
 }

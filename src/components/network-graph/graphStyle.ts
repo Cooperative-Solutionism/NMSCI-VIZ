@@ -1,49 +1,56 @@
 import type { GraphTokens } from '../../lib/tokens'
+import { graphNodeIconUrls } from './graphIcons'
 
 type GraphStyle = NonNullable<cytoscape.CytoscapeOptions['style']>
+
+const graphFontFamily =
+  'Geist Variable, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
 
 export function createGraphStyle(tokens: GraphTokens): GraphStyle {
   return [
     {
       selector: 'node',
       style: {
+        'background-clip': 'none',
         'background-color': tokens.nodeBackground,
+        'background-fit': 'contain',
+        'background-height': '74%',
+        'background-image': 'data(icon)',
+        'background-image-containment': 'over',
+        'background-image-smoothing': 'yes',
+        'background-width': '74%',
         'border-color': tokens.nodeBorder,
         'border-width': 1.4,
+        'bounds-expansion': 16,
         color: tokens.nodeText,
         content: 'data(label)',
-        'font-family': 'Inter, ui-sans-serif, system-ui',
+        'font-family': graphFontFamily,
         'font-size': 11,
-        height: 48,
+        height: 58,
         'overlay-opacity': 0,
+        'outline-opacity': 0,
+        'outline-width': 0,
         'text-halign': 'center',
-        'text-valign': 'center',
-        width: 48,
+        'text-margin-y': 8,
+        'text-max-width': '76px',
+        'text-valign': 'bottom',
+        'text-wrap': 'wrap',
+        width: 58,
       },
     },
     {
-      selector: 'node[kind = "local-flow"]',
-      style: {
-        'background-color': tokens.localFlowBackground,
-        'border-color': tokens.localFlowBorder,
-        'border-width': 3,
-      },
-    },
-    {
-      selector: 'node[kind = "local-consume"]',
-      style: {
-        'background-color': tokens.localConsumeBackground,
-        'border-color': tokens.localConsumeBorder,
-        'border-width': 3,
-        shape: 'round-rectangle',
-      },
-    },
-    {
+      // 选中用节点外侧描边（outline），不叠加图标、不遮挡原节点图标。
       selector: 'node:selected',
       style: {
-        'background-color': tokens.nodeSelectedBackground,
-        'border-color': tokens.nodeSelectedBorder,
-        'border-width': 3,
+        'font-weight': 700,
+        'outline-color': tokens.nodeSelectedBorder,
+        'outline-offset': 3,
+        'outline-opacity': 1,
+        'outline-style': 'solid',
+        'outline-width': 5,
+        'text-background-color': tokens.nodeSelectedBackground,
+        'text-background-opacity': 0.86,
+        'z-index': 32,
       },
     },
     {
@@ -51,7 +58,7 @@ export function createGraphStyle(tokens: GraphTokens): GraphStyle {
       style: {
         color: tokens.edgeText,
         'curve-style': 'bezier',
-        'font-family': 'Inter, ui-sans-serif, system-ui',
+        'font-family': graphFontFamily,
         'font-size': 10,
         label: 'data(label)',
         'line-color': 'data(color)',
@@ -95,6 +102,26 @@ export function createGraphStyle(tokens: GraphTokens): GraphStyle {
         'target-arrow-color': 'data(color)',
         width: 5,
         'z-index': 20,
+      },
+    },
+    {
+      selector: 'edge.cycle-highlight',
+      style: {
+        opacity: 1,
+        'line-color': '#b45309',
+        'target-arrow-color': '#b45309',
+        width: 5.5,
+        'z-index': 24,
+      },
+    },
+    {
+      selector: 'node.cycle-endpoint',
+      style: {
+        'background-height': ['74%', '112%'],
+        'background-image': ['data(icon)', graphNodeIconUrls.cycleEndpoint],
+        'background-position-x': ['50%', '50%'],
+        'background-position-y': ['50%', '50%'],
+        'background-width': ['74%', '112%'],
       },
     },
     {

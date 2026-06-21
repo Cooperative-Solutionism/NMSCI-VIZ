@@ -1,20 +1,14 @@
 import {
   DASHBOARD_LAYOUT_STORAGE_KEY,
+  dashboardPanelIds,
   defaultDashboardLayout,
   type DashboardLayoutState,
-  type DashboardPanelId,
 } from '../features/dashboard-layout/dashboardLayout'
 
 export { DASHBOARD_LAYOUT_STORAGE_KEY }
 
-const allDashboardPanels: DashboardPanelId[] = [
-  'query',
-  'details',
-  'loops',
-  'metrics',
-  'export',
-  'system',
-]
+// 派生自布局的唯一真源，避免与 dashboardPanelIds 漂移。
+const allDashboardPanels = dashboardPanelIds
 
 export function seedDashboardLayout(expandedPanels = allDashboardPanels) {
   localStorage.setItem(

@@ -23,11 +23,39 @@ const sendTransactionMountMsgMock = vi.hoisted(() =>
   })),
 )
 
+const buildTransactionRecordMessageMock = vi.hoisted(() =>
+  vi.fn(async () => ({
+    bytes: new Uint8Array([4, 5, 6]),
+    rawBytesHex: '040506',
+    nonce: 7,
+  })),
+)
+
+const sendTransactionRecordMsgMock = vi.hoisted(() =>
+  vi.fn(async () => ({
+    data: { id: 'tx-rec-1', txid: 'record-txid' },
+  })),
+)
+
+// 注册难度与交易难度刻意取不同值，以验证记录/挂载读取的是 transactionDifficultyTarget 而非 register。
+const getLastBlockMock = vi.hoisted(() =>
+  vi.fn(async () => ({
+    data: {
+      height: 100,
+      registerDifficultyTarget: '20ffffff',
+      transactionDifficultyTarget: '1d00ffff',
+      centralPubkey: `02${'c'.repeat(64)}`,
+    },
+  })),
+)
+
 vi.mock('@nmsci/sdk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@nmsci/sdk')>()
   return {
     ...actual,
     sendTransactionMountMsg: sendTransactionMountMsgMock,
+    sendTransactionRecordMsg: sendTransactionRecordMsgMock,
+    getLastBlock: getLastBlockMock,
   }
 })
 
@@ -36,6 +64,7 @@ vi.mock('../../lib/messageBuilders', async (importOriginal) => {
   return {
     ...actual,
     buildTransactionMountMessage: buildTransactionMountMessageMock,
+    buildTransactionRecordMessage: buildTransactionRecordMessageMock,
   }
 })
 
@@ -90,9 +119,57 @@ describe('useFlowNodeTransactionActions', () => {
   beforeEach(() => {
     buildTransactionMountMessageMock.mockClear()
     sendTransactionMountMsgMock.mockClear()
+    buildTransactionRecordMessageMock.mockClear()
+    sendTransactionRecordMsgMock.mockClear()
+    getLastBlockMock.mockClear()
   })
 
-  it('builds an existing-record mount with the user-selected flow node', async () => {
+  it('signs a record as consume(payer)→flow(payee) using the latest transaction difficulty', async () => {
+    const dispatch = vi.fn()
+    const persistTxRecords = vi.fn()
+    const { result } = renderHook(() =>
+      useFlowNodeTransactionActions({
+        clearSelectedLocalNode: vi.fn(),
+        client: {} as ApiClient,
+        dispatch,
+        localConsumeNodes: [consumeNode],
+        localFlowNodes: [originalFlowNode, targetFlowNode],
+        localTxRecords: [],
+        loadConsumeChain: vi.fn(),
+        persistTxRecords,
+        setMiningAttempts: vi.fn(),
+      }),
+    )
+
+    await act(async () => {
+      await result.current.createTransactionRecord({
+        consumeNodePubkey: consumeNode.publicKeyHex,
+        flowNodePubkey: targetFlowNode.publicKeyHex,
+        amount: '5000',
+        currencyType: 1,
+      })
+    })
+
+    expect(buildTransactionRecordMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        // 消费节点是付款方、流转节点是收款方：字段不能写反。
+        consumeNodePubkeyHex: consumeNode.publicKeyHex,
+        flowNodePubkeyHex: targetFlowNode.publicKeyHex,
+        consumePrivateKeyHex: consumeNode.privateKeyHex,
+        flowPrivateKeyHex: targetFlowNode.privateKeyHex,
+        // 取交易难度（1d00ffff），而非注册难度（20ffffff）。
+        difficultyHex: '1d00ffff',
+        centralPubkeyHex: `02${'c'.repeat(64)}`,
+        amount: 5000n,
+        currencyType: 1,
+      }),
+      expect.any(Function),
+    )
+    expect(sendTransactionRecordMsgMock).toHaveBeenCalled()
+    expect(persistTxRecords).toHaveBeenCalled()
+  })
+
+  it('builds an existing-record mount with the user-selected flow node and the latest difficulty', async () => {
     const dispatch = vi.fn()
     const { result } = renderHook(() =>
       useFlowNodeTransactionActions({
@@ -102,20 +179,14 @@ describe('useFlowNodeTransactionActions', () => {
         localConsumeNodes: [consumeNode],
         localFlowNodes: [originalFlowNode, targetFlowNode],
         localTxRecords: [record],
+        loadConsumeChain: vi.fn(),
         persistTxRecords: vi.fn(),
-        runQuery: vi.fn(),
-        selectedLocalNode: originalFlowNode,
         setMiningAttempts: vi.fn(),
       }),
     )
-    const createMount = result.current.createTransactionMount as unknown as (
-      recordId: string,
-      flowNodePubkey: string,
-      difficultyHex: string,
-    ) => Promise<void>
 
     await act(async () => {
-      await createMount(record.id, targetFlowNode.publicKeyHex, '1d00ffff')
+      await result.current.createTransactionMount(record.id, targetFlowNode.publicKeyHex)
     })
 
     expect(buildTransactionMountMessageMock).toHaveBeenCalledWith(
@@ -131,5 +202,80 @@ describe('useFlowNodeTransactionActions', () => {
       expect.any(Function),
     )
     expect(sendTransactionMountMsgMock).toHaveBeenCalled()
+  })
+
+  it('returns the mounted flow node pubkey on success so the canvas-pick path can refresh once', async () => {
+    const { result } = renderHook(() =>
+      useFlowNodeTransactionActions({
+        clearSelectedLocalNode: vi.fn(),
+        client: {} as ApiClient,
+        dispatch: vi.fn(),
+        localConsumeNodes: [consumeNode],
+        localFlowNodes: [originalFlowNode, targetFlowNode],
+        localTxRecords: [record],
+        loadConsumeChain: vi.fn(),
+        persistTxRecords: vi.fn(),
+        setMiningAttempts: vi.fn(),
+      }),
+    )
+
+    let returned: string | undefined
+    await act(async () => {
+      returned = await result.current.createTransactionMount(record.id, targetFlowNode.publicKeyHex)
+    })
+
+    expect(returned).toBe(targetFlowNode.publicKeyHex)
+  })
+
+  it('returns undefined when the mount cannot proceed (no refresh should be triggered)', async () => {
+    const { result } = renderHook(() =>
+      useFlowNodeTransactionActions({
+        clearSelectedLocalNode: vi.fn(),
+        client: {} as ApiClient,
+        dispatch: vi.fn(),
+        localConsumeNodes: [consumeNode],
+        localFlowNodes: [originalFlowNode, targetFlowNode],
+        localTxRecords: [],
+        loadConsumeChain: vi.fn(),
+        persistTxRecords: vi.fn(),
+        setMiningAttempts: vi.fn(),
+      }),
+    )
+
+    let returned: string | undefined = 'sentinel'
+    await act(async () => {
+      returned = await result.current.createTransactionMount(record.id, targetFlowNode.publicKeyHex)
+    })
+
+    expect(returned).toBeUndefined()
+    expect(sendTransactionMountMsgMock).not.toHaveBeenCalled()
+  })
+
+  it('views a mounted consume chain through additive loading instead of resetting the graph query', async () => {
+    const loadConsumeChain = vi.fn(async () => undefined)
+    const runQuery = vi.fn(async () => undefined)
+    const { result } = renderHook(() =>
+      useFlowNodeTransactionActions({
+        clearSelectedLocalNode: vi.fn(),
+        client: {} as ApiClient,
+        dispatch: vi.fn(),
+        localConsumeNodes: [consumeNode],
+        localFlowNodes: [originalFlowNode, targetFlowNode],
+        localTxRecords: [record],
+        loadConsumeChain,
+        persistTxRecords: vi.fn(),
+        setMiningAttempts: vi.fn(),
+      }),
+    )
+
+    await act(async () => {
+      await result.current.createTransactionMount(record.id, targetFlowNode.publicKeyHex)
+    })
+    act(() => {
+      result.current.viewConsumeChain()
+    })
+
+    expect(loadConsumeChain).toHaveBeenCalledWith(targetFlowNode.publicKeyHex)
+    expect(runQuery).not.toHaveBeenCalled()
   })
 })

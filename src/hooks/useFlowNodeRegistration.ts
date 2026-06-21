@@ -3,7 +3,6 @@ import { useCallback, useMemo, useState } from 'react'
 import type { LocalConsumeNode } from '../lib/consumeNodeStorage'
 import type { LocalFlowNode } from '../lib/flowNodeStorage'
 import type { LocalTxRecord } from '../lib/txRecordStorage'
-import type { QueryMode } from '../lib/types'
 import { type FlowNodeBusyState, useOperationFeedback } from './flow-node-registration/feedback'
 import { useFlowNodeLifecycleActions } from './flow-node-registration/useFlowNodeLifecycleActions'
 import { useFlowNodeTransactionActions } from './flow-node-registration/useFlowNodeTransactionActions'
@@ -12,27 +11,25 @@ export type { FlowNodeBusyState }
 
 interface UseFlowNodeRegistrationParams {
   client: ApiClient
-  selectedLocalNode: LocalFlowNode | null
   localFlowNodes: LocalFlowNode[]
   localConsumeNodes: LocalConsumeNode[]
   localTxRecords: LocalTxRecord[]
   persistLocalFlowNodes: (updater: (nodes: LocalFlowNode[]) => LocalFlowNode[]) => void
   persistTxRecords: (updater: (records: LocalTxRecord[]) => LocalTxRecord[]) => void
   reloadLocalNodeState: (pubkey: string) => void
-  runQuery: (override?: { mode: QueryMode; nodeId: string }) => Promise<void>
+  loadConsumeChain: (nodePubkey: string) => Promise<void>
   clearSelectedLocalNode: () => void
 }
 
 export function useFlowNodeRegistration({
   client,
-  selectedLocalNode,
   localFlowNodes,
   localConsumeNodes,
   localTxRecords,
   persistLocalFlowNodes,
   persistTxRecords,
   reloadLocalNodeState,
-  runQuery,
+  loadConsumeChain,
   clearSelectedLocalNode,
 }: UseFlowNodeRegistrationParams) {
   const { busy, status, error, dispatch, notifyStatus, notifyError } = useOperationFeedback()
@@ -48,7 +45,6 @@ export function useFlowNodeRegistration({
     dispatch,
     persistLocalFlowNodes,
     reloadLocalNodeState,
-    selectedLocalNode,
     setLastRawBytes,
     setMiningAttempts,
   })
@@ -59,9 +55,8 @@ export function useFlowNodeRegistration({
     localConsumeNodes,
     localFlowNodes,
     localTxRecords,
+    loadConsumeChain,
     persistTxRecords,
-    runQuery,
-    selectedLocalNode,
     setMiningAttempts,
   })
 
@@ -72,22 +67,13 @@ export function useFlowNodeRegistration({
       error,
       miningAttempts,
       lastRawBytes,
-      registerDifficultyTarget: lifecycleActions.registerDifficultyTarget,
-      setRegisterDifficultyTarget: lifecycleActions.setRegisterDifficultyTarget,
-      centralPubkey: lifecycleActions.centralPubkey,
-      setCentralPubkey: lifecycleActions.setCentralPubkey,
-      txDifficulty: transactionActions.txDifficulty,
-      recordFormOpen: transactionActions.recordFormOpen,
-      mountFormOpen: transactionActions.mountFormOpen,
       mountedPubkey: transactionActions.mountedPubkey,
-      fetchRegisterDifficulty: lifecycleActions.fetchRegisterDifficulty,
       registerFlowNode: lifecycleActions.registerFlowNode,
       authorizeCentralPubkey: lifecycleActions.authorizeCentralPubkey,
       createTransactionRecord: transactionActions.createTransactionRecord,
       createTransactionMount: transactionActions.createTransactionMount,
-      toggleRecordForm: transactionActions.toggleRecordForm,
-      toggleMountForm: transactionActions.toggleMountForm,
       viewConsumeChain: transactionActions.viewConsumeChain,
+      clearMountedPubkey: transactionActions.clearMountedPubkey,
       notifyStatus,
       notifyError,
       clearLastRawBytes,

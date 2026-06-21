@@ -5,6 +5,7 @@ import type { ChainGraphNode, QueryMode } from '../lib/types'
 import { DetailRow } from './DetailRow'
 import { PanelHeader } from './PanelHeader'
 import { ReturnFlowCard } from './ReturnFlowCard'
+import { Button } from './ui/button'
 
 type NodeDetailStatus = 'idle' | 'loading' | 'loaded' | 'error'
 
@@ -41,30 +42,15 @@ export function NodeInspector({
     <div className="inspector-content">
       <PanelHeader icon={<CircleDot size={16} />} title="已选节点" />
       <div className="node-actions">
-        <button
-          className="secondary-button"
-          type="button"
-          disabled={disabled}
-          onClick={onExtendNode}
-        >
+        <Button variant="secondary" type="button" disabled={disabled} onClick={onExtendNode}>
           {extendLoading === 'node' ? '加载中…' : '加载节点'}
-        </button>
-        <button
-          className="secondary-button"
-          type="button"
-          disabled={disabled}
-          onClick={onExtendStart}
-        >
+        </Button>
+        <Button variant="secondary" type="button" disabled={disabled} onClick={onExtendStart}>
           {extendLoading === 'start' ? '扩展中…' : '扩展起点'}
-        </button>
-        <button
-          className="secondary-button"
-          type="button"
-          disabled={disabled}
-          onClick={onExtendEnd}
-        >
+        </Button>
+        <Button variant="secondary" type="button" disabled={disabled} onClick={onExtendEnd}>
           {extendLoading === 'end' ? '扩展中…' : '扩展终点'}
-        </button>
+        </Button>
       </div>
       <DetailRow label="节点" value={<code translate="no">{node.id}</code>} />
       <DetailRow label="标签" value={shortId(node.id)} />
@@ -92,7 +78,7 @@ export function NodeInspector({
           />
         </>
       ) : detailStatus === 'idle' ? (
-        <div className="detail-state">节点状态需要流转节点公钥（请通过公钥查询选择）。</div>
+        <div className="detail-state">节点状态需要流转节点公钥（请通过流转节点浏览选择）。</div>
       ) : null}
       <ReturnFlowCard
         data={flowRate.data}

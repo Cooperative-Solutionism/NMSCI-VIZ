@@ -17,6 +17,12 @@ export function formatMicros(value: number | bigint): string {
     .replace(/\.\d{3}Z$/, ' UTC')
 }
 
+// 把 0~1 的比率渲染为百分比（保留两位小数）；非有限值（如 0/0）显示 '-'。
+export function formatRate(rate: number): string {
+  if (!Number.isFinite(rate)) return '-'
+  return `${(rate * 100).toFixed(2)}%`
+}
+
 export function formatOptional(value: string | number | bigint | undefined): string {
   if (value === undefined || value === '') return '-'
   return String(value)

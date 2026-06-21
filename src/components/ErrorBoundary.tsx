@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { Button } from './ui/button'
 
 export class ErrorBoundary extends Component<
   { children: ReactNode; label?: string },
@@ -20,9 +21,9 @@ export class ErrorBoundary extends Component<
         <div className="error-boundary" role="alert">
           <strong>{this.props.label ?? '视图加载失败'}</strong>
           <span>{this.state.error.message}</span>
-          <button type="button" onClick={() => this.setState({ error: null })}>
+          <Button type="button" onClick={() => this.setState({ error: null })}>
             重新加载视图
-          </button>
+          </Button>
         </div>
       )
     }
