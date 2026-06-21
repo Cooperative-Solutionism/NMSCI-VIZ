@@ -102,7 +102,7 @@ describe('syncGraphElements', () => {
         id: 'edge-a',
         source: 'node-a',
         target: 'node-b',
-        label: '第1笔 1.00 CNY',
+        label: '第1段 1.00 CNY',
         amount: 100n,
         currencyType: 1,
         chainId: 'chain-a',
@@ -116,7 +116,7 @@ describe('syncGraphElements', () => {
 
     expect(add).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ label: '第1笔 1.00 CNY' }),
+        data: expect.objectContaining({ label: '第1段 1.00 CNY' }),
         group: 'edges',
       }),
     )

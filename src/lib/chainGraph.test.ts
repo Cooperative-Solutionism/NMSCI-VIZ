@@ -116,7 +116,7 @@ describe('chain graph mapping', () => {
     })
   })
 
-  it('numbers edges with the same source and target by mount time across consume chains', () => {
+  it('numbers edges by segment order inside each consume chain', () => {
     const graph = buildGraphFromConsumeChains([
       normalizeConsumeChainResponseDTO({
         consumeChain: {
@@ -208,10 +208,82 @@ describe('chain graph mapping', () => {
     ])
 
     const labelsById = new Map(graph.edges.map((edge) => [edge.id, edge.label]))
-    expect(labelsById.get('edge-older-same-endpoints')).toBe('第1笔 2.00 CNY')
-    expect(labelsById.get('edge-newer-same-endpoints')).toBe('第2笔 3.00 CNY')
-    expect(labelsById.get('edge-other-endpoints')).toBe('第1笔 1.00 CNY')
-    expect(labelsById.get('edge-reverse-direction')).toBe('第1笔 5.00 CNY')
+    expect(labelsById.get('edge-older-same-endpoints')).toBe('第1段 2.00 CNY')
+    expect(labelsById.get('edge-newer-same-endpoints')).toBe('第1段 3.00 CNY')
+    expect(labelsById.get('edge-other-endpoints')).toBe('第2段 1.00 CNY')
+    expect(labelsById.get('edge-reverse-direction')).toBe('第1段 5.00 CNY')
+  })
+
+  it('walks from the chain start, stops loops, and appends unreachable edges by original order', () => {
+    const graph = buildGraphFromConsumeChains([
+      normalizeConsumeChainResponseDTO({
+        consumeChain: {
+          id: 'chain-loop',
+          start: 'node-a',
+          end: 'node-c',
+          amount: 1500,
+          currencyType: 1,
+          isLoop: true,
+          tailMountTimestamp: 50,
+        },
+        consumeChainEdges: [
+          {
+            id: 'edge-unreachable',
+            source: 'node-x',
+            target: 'node-y',
+            amount: 900,
+            currencyType: 1,
+            chain: 'chain-loop',
+            relatedTransactionRecord: 'r4',
+            relatedTransactionMount: 'm4',
+            relatedTransactionMountTimestamp: 40,
+            isLoop: false,
+          },
+          {
+            id: 'edge-path-second',
+            source: 'node-b',
+            target: 'node-c',
+            amount: 200,
+            currencyType: 1,
+            chain: 'chain-loop',
+            relatedTransactionRecord: 'r2',
+            relatedTransactionMount: 'm2',
+            relatedTransactionMountTimestamp: 20,
+            isLoop: true,
+          },
+          {
+            id: 'edge-path-first',
+            source: 'node-a',
+            target: 'node-b',
+            amount: 100,
+            currencyType: 1,
+            chain: 'chain-loop',
+            relatedTransactionRecord: 'r1',
+            relatedTransactionMount: 'm1',
+            relatedTransactionMountTimestamp: 10,
+            isLoop: true,
+          },
+          {
+            id: 'edge-loop-back',
+            source: 'node-c',
+            target: 'node-a',
+            amount: 300,
+            currencyType: 1,
+            chain: 'chain-loop',
+            relatedTransactionRecord: 'r3',
+            relatedTransactionMount: 'm3',
+            relatedTransactionMountTimestamp: 30,
+            isLoop: true,
+          },
+        ],
+      }),
+    ])
+
+    const labelsById = new Map(graph.edges.map((edge) => [edge.id, edge.label]))
+    expect(labelsById.get('edge-path-first')).toBe('第1段 1.00 CNY')
+    expect(labelsById.get('edge-path-second')).toBe('第2段 2.00 CNY')
+    expect(labelsById.get('edge-loop-back')).toBe('第3段 3.00 CNY')
+    expect(labelsById.get('edge-unreachable')).toBe('第4段 9.00 CNY')
   })
 
   it('merges local flow/consume nodes and labels unregistered flow nodes by sequence', () => {
@@ -437,7 +509,7 @@ describe('chain graph mapping', () => {
     expect(merged.edges[0]).toMatchObject({ source: otherNodeId, target: pubkey })
   })
 
-  it('renumbers edges after local aliases rewrite endpoints onto the same source and target', () => {
+  it('preserves chain segment labels after local aliases rewrite endpoints onto the same source and target', () => {
     const pubkey = `02${'a'.repeat(64)}`
     const registrationId = 'f25682aa-1111-4111-8111-111111111111'
     const sourceNodeId = '99999999-9999-4999-8999-999999999999'
@@ -505,8 +577,8 @@ describe('chain graph mapping', () => {
       [sourceNodeId, pubkey],
       [sourceNodeId, pubkey],
     ])
-    expect(labelsById.get('edge-pubkey-target')).toBe('第1笔 1.00 CNY')
-    expect(labelsById.get('edge-registration-target')).toBe('第2笔 2.00 CNY')
+    expect(labelsById.get('edge-pubkey-target')).toBe('第1段 1.00 CNY')
+    expect(labelsById.get('edge-registration-target')).toBe('第1段 2.00 CNY')
   })
 
   it('only appends standalone local nodes that are explicitly added to the canvas', () => {
