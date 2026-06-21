@@ -16,6 +16,7 @@ export function GraphPanel({
   onGenerateRecord,
   onMountRecord,
   onLoadChain,
+  onClearCanvas,
   onExportNodeKey,
   onRenameNode,
   onDeleteNode,
@@ -32,6 +33,7 @@ export function GraphPanel({
   onGenerateRecord: (node: ChainGraphNode) => void
   onMountRecord: (node: ChainGraphNode) => void
   onLoadChain: (node: ChainGraphNode, mode: QueryMode) => void
+  onClearCanvas: () => void
   onExportNodeKey: (node: ChainGraphNode) => void
   onRenameNode: (node: ChainGraphNode) => void
   onDeleteNode: (node: ChainGraphNode) => void
@@ -59,6 +61,7 @@ export function GraphPanel({
               onGenerateRecord={onGenerateRecord}
               onMountRecord={onMountRecord}
               onLoadChain={onLoadChain}
+              onClearCanvas={onClearCanvas}
               onExportNodeKey={onExportNodeKey}
               onRenameNode={onRenameNode}
               onDeleteNode={onDeleteNode}

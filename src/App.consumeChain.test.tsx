@@ -122,4 +122,30 @@ describe('App consume-chain loading from the canvas', () => {
     fireEvent.click(within(localPanel).getByRole('button', { name: '添加到画布' }))
     expect(await screen.findByRole('button', { name: `Select node ${localPubkey}` })).toBeTruthy()
   })
+
+  it('clears loaded chains and local canvas nodes without deleting stored local nodes', async () => {
+    stubFetchByUrl((url) => {
+      if (url.pathname === '/consume-chains' && url.searchParams.get('startPubkey') === localPubkey) {
+        return jsonResponse(sliceResponse([chain('chain-1', localPubkey, nodeA)]))
+      }
+      throw new Error(`Unexpected URL ${url.href}`)
+    })
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /canvas add flow node/i }))
+    await screen.findByRole('button', { name: `context register ${localPubkey}` })
+    fireEvent.click(screen.getByRole('button', { name: `context load following ${localPubkey}` }))
+    await screen.findByRole('button', { name: `Select node ${nodeA}` })
+
+    fireEvent.click(screen.getByRole('button', { name: /canvas clear/i }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: `Select node ${localPubkey}` })).toBeNull()
+      expect(screen.queryByRole('button', { name: `Select node ${nodeA}` })).toBeNull()
+    })
+    const saved = JSON.parse(localStorage.getItem('nmsci.flowNodes.v1') ?? '{"nodes":[]}') as {
+      nodes: Array<{ publicKeyHex: string }>
+    }
+    expect(saved.nodes[0]?.publicKeyHex).toBe(localPubkey)
+  })
 })

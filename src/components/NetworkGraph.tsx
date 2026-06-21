@@ -43,6 +43,7 @@ export function NetworkGraph({
   onGenerateRecord,
   onMountRecord,
   onLoadChain,
+  onClearCanvas,
   onExportNodeKey,
   onRenameNode,
   onDeleteNode,
@@ -412,6 +413,7 @@ export function NetworkGraph({
         onDownloadPng={handleDownloadPng}
         onFit={fitGraph}
         onHighlightModeChange={handleHighlightModeChange}
+        onClearCanvas={onClearCanvas}
         onZoomBy={zoomBy}
       />
       <GraphLegend />

@@ -18,6 +18,7 @@ export interface NetworkGraphProps {
   onGenerateRecord?: (node: ChainGraphNode) => void
   onMountRecord?: (node: ChainGraphNode) => void
   onLoadChain?: (node: ChainGraphNode, mode: QueryMode) => void
+  onClearCanvas?: () => void
   onExportNodeKey?: (node: ChainGraphNode) => void
   onRenameNode?: (node: ChainGraphNode) => void
   onDeleteNode?: (node: ChainGraphNode) => void

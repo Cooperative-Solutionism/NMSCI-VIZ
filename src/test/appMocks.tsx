@@ -36,6 +36,7 @@ vi.mock('../components/NetworkGraph', () => ({
     onGenerateRecord,
     onMountRecord,
     onLoadChain,
+    onClearCanvas,
     onExportNodeKey,
     onRenameNode,
     onDeleteNode,
@@ -53,6 +54,7 @@ vi.mock('../components/NetworkGraph', () => ({
     onGenerateRecord?: (node: ChainGraphNode) => void
     onMountRecord?: (node: ChainGraphNode) => void
     onLoadChain?: (node: ChainGraphNode, mode: 'start' | 'end' | 'node') => void
+    onClearCanvas?: () => void
     onExportNodeKey?: (node: ChainGraphNode) => void
     onRenameNode?: (node: ChainGraphNode) => void
     onDeleteNode?: (node: ChainGraphNode) => void
@@ -63,6 +65,9 @@ vi.mock('../components/NetworkGraph', () => ({
       </button>
       <button type="button" onClick={() => onAddConsumeNode?.({ x: 56, y: 78 })}>
         canvas add consume node
+      </button>
+      <button type="button" onClick={() => onClearCanvas?.()}>
+        canvas clear
       </button>
       {graph.nodes.map((node) => (
         <div key={node.id}>

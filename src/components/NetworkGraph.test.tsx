@@ -72,6 +72,24 @@ describe('NetworkGraph selection highlighting', () => {
     expect(screen.getByText('选中 NODE-B')).toBeInTheDocument()
   })
 
+  it('exposes a clear-canvas tool action', () => {
+    const onClearCanvas = vi.fn()
+
+    render(
+      <NetworkGraph
+        graph={baseGraph}
+        selectedId={null}
+        onSelectEdge={vi.fn()}
+        onSelectNode={vi.fn()}
+        onClearCanvas={onClearCanvas}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '清屏' }))
+
+    expect(onClearCanvas).toHaveBeenCalledTimes(1)
+  })
+
   it('does not render an empty-canvas prompt block', () => {
     const onAddFlowNode = vi.fn()
     const onAddConsumeNode = vi.fn()

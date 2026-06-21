@@ -1,10 +1,11 @@
-import { Download, Maximize2, ZoomIn, ZoomOut } from 'lucide-react'
+import { Download, Eraser, Maximize2, ZoomIn, ZoomOut } from 'lucide-react'
 import type { GraphHighlightMode } from './graphViewState'
 import { Button } from '../ui/button'
 
 interface GraphToolsProps {
   hasCycles: boolean
   highlightMode: GraphHighlightMode
+  onClearCanvas?: () => void
   onDownloadPng: () => void
   onFit: () => void
   onHighlightModeChange: (mode: GraphHighlightMode) => void
@@ -14,6 +15,7 @@ interface GraphToolsProps {
 export function GraphTools({
   hasCycles,
   highlightMode,
+  onClearCanvas,
   onDownloadPng,
   onFit,
   onHighlightModeChange,
@@ -83,6 +85,16 @@ export function GraphTools({
         onClick={onDownloadPng}
       >
         <Download aria-hidden="true" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        type="button"
+        aria-label="清屏"
+        title="清屏"
+        onClick={() => onClearCanvas?.()}
+      >
+        <Eraser aria-hidden="true" />
       </Button>
     </div>
   )

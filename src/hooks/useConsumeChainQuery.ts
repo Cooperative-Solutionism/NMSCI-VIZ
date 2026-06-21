@@ -284,7 +284,23 @@ export function useConsumeChainQuery(apiBase: string) {
     setSelection({ kind: 'node', id: node.id })
   }, [])
 
+  const clear = useCallback(() => {
+    graphRequestGenerationRef.current += 1
+    graphResetGenerationRef.current += 1
+    setRows([])
+    setSelection(null)
+    setOrigin('idle')
+    setLoading(false)
+    setExtendLoading(null)
+    setExtended(false)
+    setError(null)
+    setWarning(null)
+    setHasNextPage(false)
+    setHasPreviousPage(false)
+  }, [])
+
   return {
+    clear,
     currencyFilter,
     effectiveSelection,
     error,

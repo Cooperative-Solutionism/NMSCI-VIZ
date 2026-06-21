@@ -231,6 +231,13 @@ function App() {
     },
     [extendFromNode],
   )
+  const handleClearCanvas = useCallback(() => {
+    query.clear()
+    setCanvasNodeIds(new Set())
+    selection.clearSelectedLocalNode()
+    registration.notifyStatus('画布已清空。')
+    registration.notifyError(null)
+  }, [query, registration, selection, setCanvasNodeIds])
   // 右键“节点管理”（导出私钥 / 重命名 / 删除）：按节点类型解析出本地节点，操作直接作用于该节点（无需先选中）。
   const handleExportNodeKey = useCallback(
     (node: ChainGraphNode) => {
@@ -378,6 +385,7 @@ function App() {
             onGenerateRecord={handleGenerateRecord}
             onMountRecord={handleMountRecord}
             onLoadChain={handleLoadChain}
+            onClearCanvas={handleClearCanvas}
             onExportNodeKey={handleExportNodeKey}
             onRenameNode={handleRenameNode}
             onDeleteNode={handleDeleteNode}
